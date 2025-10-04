@@ -18,7 +18,7 @@ This backend currently provides:
 
 ```bash
 cd backend
-mkdir .env
+touch .env
 ```
 
 ### 2. Configure Your Environment Variables

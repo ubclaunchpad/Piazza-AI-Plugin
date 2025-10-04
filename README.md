@@ -5,6 +5,7 @@ AI-powered browser extension that enhances the Piazza experience with intelligen
 ## 🏗️ Righ High-Level Architecture
 
 ![Architecture Diagram](./docs/media/rough-architecture-diagram.png)
+
 ## 📁 Project Structure
 
 ```
@@ -69,63 +70,64 @@ Piazza-AI-Plugin/
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) (v18+)
+- [Chrome Browser](https://www.google.com/chrome/) (for extension development)
 - [Python](https://python.org/) (v3.11+)
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/)
-- [Supabase CLI](https://supabase.com/docs/guides/cli)
+- [Supabase CLI](https://supabase.com/docs/guides/cli) (for database)
 
-### 1. Clone & Setup
+### 🚀 Setup Instructions
+
+Follow these guides in order for complete setup:
+
+1. **📁 [Backend Setup Guide](./backend/README.md)**
+
+   - FastAPI server configuration
+   - Environment variables setup
+   - Database connection
+
+2. **🗄️ [Supabase Database Guide](./supabase/README.md)**
+
+   - Local database setup
+   - Schema initialization
+   - CLI configuration
+
+3. **🌐 [Frontend Chrome Extension Guide](./frontend/README.md)**
+   - Extension development setup
+   - Environment configuration
+   - Loading in Chrome Developer Mode
+
+### ⚡ Quick Development Start
 
 ```bash
+# 1. Clone repository
 git clone https://github.com/ubclaunchpad/Piazza-AI-Plugin.git
 cd Piazza-AI-Plugin
-```
 
-### 2. Backend Setup
+# 2. Setup backend (see backend/README.md for details)
+cd backend && pip install -r requirements.txt
+touch .env  # Add your environment variables
+python main.py
 
-```bash
-cd backend
-python -m venv ../venv
-source ../venv/bin/activate  # On Windows: ..\venv\Scripts\activate
-pip install -r requirements.txt
-cp .env.example .env
-# Edit .env with your configuration
-```
+# 3. Setup database (see supabase/README.md for details)
+cd ../supabase && supabase start
 
-### 3. Database Setup
-
-```bash
-cd ../supabase
-supabase start
-supabase status  # Copy the keys to backend/.env
-```
-
-### 4. Frontend Setup (Coming Soon)
-
-```bash
-cd ../frontend
-npm install
-npm run dev
-```
-
-### 5. Run Development Environment
-
-```bash
-# Terminal 1: Backend
-cd backend && python main.py
-
-# Terminal 2: Database (if not already running)
-cd supabase && supabase start
-
-# Terminal 3: Frontend (when available)
-cd frontend && npm run dev
+# 4. Setup frontend (see frontend/README.md for details)
+cd ../frontend && ./build.sh
+# Load build/ folder in Chrome Developer Mode
 ```
 
 ## 📚 Documentation
 
-- **[Backend Setup Guide](./backend/README.md)** - FastAPI backend configuration
-- **[Supabase Guide](./supabase/README.md)** - Database setup and migrations
+### Setup Guides
+
+- **[🌐 Frontend Chrome Extension](./frontend/README.md)** - Extension development, environment setup, and Chrome loading
+- **[⚙️ Backend FastAPI Server](./backend/README.md)** - API server configuration, dependencies, and environment setup
+- **[🗄️ Supabase Database](./supabase/README.md)** - Database setup, migrations, and local development
+
+### Development Resources
+
 - **[API Documentation](http://localhost:8000/docs)** - Interactive API docs (when backend is running)
+- **[Architecture Overview](#-data-flow)** - System design and component interaction
+- **[Contributing Guidelines](#-contributing)** - Development workflow and standards
 
 ## 🔧 Development Workflow
 
