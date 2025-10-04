@@ -9,6 +9,9 @@ pydantic==2.5.0
 pydantic-settings==2.0.3
 python-dotenv==1.0.0
 
+# Database
+psycopg2-binary==2.9.9
+
 # Database (when needed)
 # Uncomment when adding database functionality:
 # asyncpg==0.29.0

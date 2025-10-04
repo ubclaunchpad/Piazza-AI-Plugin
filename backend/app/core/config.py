@@ -5,44 +5,39 @@ This module handles all application settings with environment variable support,
 type validation, and centralized configuration management.
 """
 
+import os
 from typing import List
 
+from dotenv import load_dotenv
 from pydantic_settings import BaseSettings
+
+# Load environment variables from .env file
+load_dotenv()
 
 
 class Settings(BaseSettings):
     """Application settings with environment variable support."""
 
     # Application
-    APP_NAME: str = "Piazza AI Plugin"
-    ENVIRONMENT: str = "development"
-    DEBUG: bool = True
-    VERSION: str = "1.0.0"
+    APP_NAME: str
+    ENVIRONMENT: str
+    DEBUG: bool
+    VERSION: str
 
     # Server
-    HOST: str = "0.0.0.0"
-    PORT: int = 8000
+    HOST: str
+    PORT: int
 
     # CORS - Chrome Extension Support
-    ALLOWED_ORIGINS: List[str] = [
-        "http://localhost:3000",
-        "chrome-extension://*",
-        "https://piazza.com",
-    ]
+    ALLOWED_ORIGINS: List[str]
 
     # API Configuration
-    API_V1_PREFIX: str = "/api/v1"
+    API_PREFIX: str
 
-    # Database (placeholder for Supabase)
-    DATABASE_URL: str = ""
-
-    # Future: Add these when implementing features
-    # SUPABASE_URL: str = ""
-    # SUPABASE_ANON_KEY: str = ""
-    # OPENAI_API_KEY: str = ""
+    # Database Configuration
+    DATABASE_URL: str
 
     class Config:
-        env_file = ".env"
         case_sensitive = True
 
     @property

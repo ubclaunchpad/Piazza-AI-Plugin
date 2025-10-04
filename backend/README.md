@@ -8,10 +8,52 @@ This backend currently provides:
 
 - **Basic FastAPI application** with CORS support for browser extensions
 - **One example endpoint** (`/api/v1/health`) to demonstrate the structure
-- **Minimal dependencies** - only FastAPI, Uvicorn, and Pydantic
-- **Placeholder files** for future database, authentication, and business logic
+- **Environment-based configuration** using Pydantic Settings
+- **Supabase integration ready** with database configuration
+- **Minimal dependencies** - FastAPI, Uvicorn, Pydantic, and psycopg2
 
-## � Quick Start
+## ⚙️ Environment Configuration
+
+### 1. Create env File
+
+```bash
+cd backend
+mkdir .env
+```
+
+### 2. Configure Your Environment Variables
+
+Edit the `.env` file with your specific values:
+
+```bash
+APP_NAME="Piazza AI Plugin"
+ENVIRONMENT=development
+DEBUG=true
+VERSION=1.0.0
+
+
+HOST=0.0.0.0
+PORT=8000
+API_PREFIX=/api/v1
+
+ALLOWED_ORIGINS=["http://localhost:3000", "chrome-extension://*", "https://piazza.com"]
+DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres
+```
+
+### 3. Get Supabase Values
+
+To get your actual Supabase keys, run:
+
+```bash
+cd ../supabase
+supabase status
+```
+
+Copy the values from the output:
+
+- **Database URL** → `DATABASE_URL`
+
+## 🚀 Quick Start
 
 ### 1. Install Dependencies
 
@@ -20,7 +62,14 @@ cd backend
 pip install -r requirements.txt
 ```
 
-### 2. Run the Server
+### 2. Set Up Environment
+
+```bash
+cp .env.example .env
+# Edit .env with your values (see Environment Configuration above)
+```
+
+### 3. Run the Server
 
 ```bash
 python main.py
