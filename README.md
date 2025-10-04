@@ -2,79 +2,9 @@
 
 AI-powered browser extension that enhances the Piazza experience with intelligent features for students and instructors.
 
-## 🏗️ High-Level Architecture
+## 🏗️ Righ High-Level Architecture
 
-```mermaid
-graph TB
-    subgraph "Browser Environment"
-        CE[Chrome Extension]
-        PI[Piazza Interface]
-        UI[Enhanced UI Components]
-    end
-
-    subgraph "Backend Services"
-        API[FastAPI Backend]
-        AUTH[Authentication Layer]
-        DB_HANDLER[Database Handler]
-        RAG[RAG Engine]
-        VECTOR_STORE[Vector Database]
-    end
-
-    subgraph "Database Layer"
-        SUPABASE[Supabase PostgreSQL]
-        AUTH_TABLES[(Auth Tables)]
-        USER_DATA[(User Data)]
-        ANALYTICS[(Analytics)]
-        EMBEDDINGS[(Document Embeddings)]
-    end
-
-    subgraph "External APIs"
-        OPENAI[OpenAI API]
-        ANTHROPIC[Anthropic API]
-        PIAZZA_API[Piazza API]
-    end
-
-    %% User Interactions
-    CE --> PI
-    PI --> UI
-
-    %% Extension to Backend Communication
-    CE -.->|HTTPS/CORS| API
-    UI -.->|REST API| API
-
-    %% Backend Internal Flow
-    API --> AUTH
-    API --> DB_HANDLER
-    API --> RAG
-    DB_HANDLER --> SUPABASE
-    RAG --> VECTOR_STORE
-    VECTOR_STORE --> EMBEDDINGS
-
-    %% Database Relationships
-    SUPABASE --> AUTH_TABLES
-    SUPABASE --> USER_DATA
-    SUPABASE --> ANALYTICS
-    SUPABASE --> EMBEDDINGS
-
-    %% External API Integration
-    API -.->|AI Processing| OPENAI
-    API -.->|AI Processing| ANTHROPIC
-    API -.->|Data Sync| PIAZZA_API
-    RAG -.->|Embeddings & Context| OPENAI
-    RAG -.->|Knowledge Retrieval| PIAZZA_API
-
-    %% Styling
-    classDef frontend fill:#e1f5fe
-    classDef backend fill:#f3e5f5
-    classDef database fill:#e8f5e8
-    classDef external fill:#fff3e0
-
-    class CE,PI,UI frontend
-    class API,AUTH,DB_HANDLER,RAG,VECTOR_STORE backend
-    class SUPABASE,AUTH_TABLES,USER_DATA,ANALYTICS,EMBEDDINGS database
-    class OPENAI,ANTHROPIC,PIAZZA_API external
-```
-
+![Architecture Diagram](./docs/media/rough-architecture-diagram.png)
 ## 📁 Project Structure
 
 ```
