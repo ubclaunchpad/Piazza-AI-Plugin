@@ -4,12 +4,78 @@ on:
     branches: [main, dev]
 
 jobs:
-  backend-tests:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./backend
+  # Commented out until backend testing is set up
+  # backend-tests:
+  #   runs-on: ubuntu-latest
+  #   defaults:
+  #     run:
+  #       working-directory: ./backend
 
+  #   steps:
+  #     - uses: actions/checkout@v4
+
+  #     - name: Set up Python 3.11
+  #       uses: actions/setup-python@v4
+  #       with:
+  #         python-version: "3.11"
+
+  #     - name: Install uv
+  #       uses: astral-sh/setup-uv@v3
+
+  #     - name: Cache dependencies
+  #       uses: actions/cache@v3
+  #       with:
+  #         path: ~/.cache/uv
+  #         key: ${{ runner.os }}-uv-${{ hashFiles('**/requirements*.txt') }}
+  #         restore-keys: |
+  #           ${{ runner.os }}-uv-
+
+  #     - name: Install dependencies
+  #       run: |
+  #         uv pip install -r requirements.txt
+  #         uv pip install -r requirements-dev.txt
+
+  #     - name: Run tests
+  #       run: |
+  #         pytest --cov=app --cov-report=xml
+
+  #     - name: Upload coverage to Codecov
+  #       uses: codecov/codecov-action@v3
+  #       with:
+  #         file: ./backend/coverage.xml
+  #         flags: backend
+  #         name: backend-coverage
+
+  # Commented out until frontend is created
+  # frontend-tests:
+  #   runs-on: ubuntu-latest
+  #   defaults:
+  #     run:
+  #       working-directory: ./frontend
+
+  #   steps:
+  #     - uses: actions/checkout@v4
+
+  #     - name: Set up Node.js
+  #       uses: actions/setup-node@v4
+  #       with:
+  #         node-version: "lts/*"
+  #         cache: "yarn"
+  #         cache-dependency-path: ./frontend/yarn.lock
+
+  #     - name: Install dependencies
+  #       run: yarn install
+
+  #     - name: Run tests
+  #       run: yarn test
+
+  #     - name: Build extension
+  #       run: yarn build
+
+  # Linting Jobs
+  backend-lint:
+    runs-on: ubuntu-latest
+    if: contains(github.event.head_commit.modified, 'backend/') || github.event_name == 'pull_request'
     steps:
       - uses: actions/checkout@v4
 
@@ -18,57 +84,60 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v3
+      - name: Install ruff
+        run: pip install ruff
 
-      - name: Cache dependencies
-        uses: actions/cache@v3
-        with:
-          path: ~/.cache/uv
-          key: ${{ runner.os }}-uv-${{ hashFiles('**/requirements*.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-uv-
+      - name: Run ruff linting
+        run: ruff check backend/
 
-      - name: Install dependencies
-        run: |
-          uv pip install -r requirements.txt
-          uv pip install -r requirements-dev.txt
+      - name: Run ruff formatting check
+        run: ruff format --check backend/
 
-      - name: Run tests
-        run: |
-          pytest --cov=app --cov-report=xml
+  # Commented out until frontend folder is created
+  # frontend-lint:
+  #   runs-on: ubuntu-latest
+  #   if: contains(github.event.head_commit.modified, 'frontend/') || github.event_name == 'pull_request'
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
 
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
-        with:
-          file: ./backend/coverage.xml
-          flags: backend
-          name: backend-coverage
+  #     - name: Install Node.js
+  #       uses: actions/setup-node@v4
+  #       with:
+  #         node-version: "lts/*"
+  #         cache: "yarn"
+  #         cache-dependency-path: frontend/yarn.lock
 
-  frontend-tests:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./frontend
+  #     - name: Install dependencies
+  #       run: yarn install
+  #       working-directory: frontend/
 
-    steps:
-      - uses: actions/checkout@v4
+  #     - name: Run ESLint
+  #       run: yarn lint
+  #       working-directory: frontend/
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "lts/*"
-          cache: "yarn"
-          cache-dependency-path: ./frontend/yarn.lock
+  # Commented out until frontend folder is created
+  # prettier-check:
+  #   runs-on: ubuntu-latest
+  #   if: github.event_name == 'pull_request'
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
 
-      - name: Install dependencies
-        run: yarn install
+  #     - name: Install Node.js
+  #       uses: actions/setup-node@v4
+  #       with:
+  #         node-version: "lts/*"
+  #         cache: "yarn"
+  #         cache-dependency-path: frontend/yarn.lock
 
-      - name: Run tests
-        run: yarn test
+  #     - name: Install dependencies
+  #       run: yarn install
+  #       working-directory: frontend/
 
-      - name: Build extension
-        run: yarn build
+  #     - name: Check Prettier formatting
+  #       run: yarn prettier --check "**/*.{js,ts,tsx,json,md,css}"
+  #       working-directory: frontend/
 
   security-scan:
     runs-on: ubuntu-latest
