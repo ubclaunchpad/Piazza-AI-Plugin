@@ -2,7 +2,7 @@
 
 AI-powered browser extension that enhances the Piazza experience with intelligent features for students and instructors.
 
-## 🏗️ Righ High-Level Architecture
+## 🏗️ Rough High-Level Architecture
 
 ![Architecture Diagram](./docs/media/rough-architecture-diagram.png)
 
