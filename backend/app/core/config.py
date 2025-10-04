@@ -5,7 +5,6 @@ This module handles all application settings with environment variable support,
 type validation, and centralized configuration management.
 """
 
-import os
 from typing import List
 
 from dotenv import load_dotenv
