@@ -88,14 +88,14 @@ cd backend
 python -m venv ../venv
 source ../venv/bin/activate  # On Windows: ..\venv\Scripts\activate
 pip install -r requirements.txt
-cp .env.example .env
+touch .env
 # Edit .env with your configuration
 ```
 
 ### 3. Database Setup
 
 ```bash
-cd ../supabase
+cd supabase
 supabase start
 supabase status  # Copy the keys to backend/.env
 ```
@@ -103,7 +103,7 @@ supabase status  # Copy the keys to backend/.env
 ### 4. Frontend Setup (Coming Soon)
 
 ```bash
-cd ../frontend
+cd frontend
 npm install
 npm run dev
 ```
