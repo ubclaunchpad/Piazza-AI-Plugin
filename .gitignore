@@ -20,6 +20,12 @@ yarn-error.log*
 .env.test.local
 .env.production.local
 
+# Chrome Extension builds
+frontend/build/
+frontend/dist/
+*.zip
+*.crx
+
 # Python
 __pycache__/
 *.py[cod]

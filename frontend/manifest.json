@@ -1,0 +1,35 @@
+{
+  "manifest_version": 3,
+  "name": "Piazza AI Plugin",
+  "version": "1.0.0",
+  "description": "AI-powered browser extension that enhances the Piazza experience with intelligent features for students and instructors.",
+
+  "permissions": ["activeTab", "storage", "scripting"],
+
+  "host_permissions": ["https://piazza.com/*", "http://localhost:8000/*"],
+
+  "background": {
+    "service_worker": "src/background/service-worker.js"
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["https://piazza.com/*"],
+      "js": ["src/content/piazza-enhancer.js"],
+      "css": ["src/content/piazza-styles.css"],
+      "run_at": "document_end"
+    }
+  ],
+
+  "action": {
+    "default_popup": "src/popup/popup.html",
+    "default_title": "Piazza AI Plugin"
+  },
+
+  "web_accessible_resources": [
+    {
+      "resources": ["assets/*", "src/content/*"],
+      "matches": ["https://piazza.com/*"]
+    }
+  ]
+}
