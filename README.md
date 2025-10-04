@@ -80,20 +80,32 @@ Follow these guides in order for complete setup:
 
 1. **📁 [Backend Setup Guide](./backend/README.md)**
 
-   - FastAPI server configuration
-   - Environment variables setup
-   - Database connection
+```bash
+cd backend
+python -m venv ../venv
+source ../venv/bin/activate  # On Windows: ..\venv\Scripts\activate
+pip install -r requirements.txt
+touch .env
+# Edit .env with your configuration
+```
 
-2. **🗄️ [Supabase Database Guide](./supabase/README.md)**
+### 3. Database Setup
+
+```bash
+cd supabase
+supabase start
+supabase status  # Copy the keys to backend/.env
+```
 
    - Local database setup
    - Schema initialization
    - CLI configuration
 
-3. **🌐 [Frontend Chrome Extension Guide](./frontend/README.md)**
-   - Extension development setup
-   - Environment configuration
-   - Loading in Chrome Developer Mode
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
 ### ⚡ Quick Development Start
 
