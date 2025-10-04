@@ -36,7 +36,7 @@ def root():
     return {
         "message": settings.APP_NAME,  # ✅ Use config!
         "version": settings.VERSION,  # ✅ Use config!
-        "status": "running",
+        "status": "gello world",
         "environment": settings.ENVIRONMENT,
     }
 
