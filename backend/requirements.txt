@@ -1,0 +1,16 @@
+# Minimal FastAPI Backend Dependencies
+
+# Core Framework
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+
+# Configuration
+pydantic==2.5.0
+pydantic-settings==2.0.3
+python-dotenv==1.0.0
+
+# Database (when needed)
+# Uncomment when adding database functionality:
+# asyncpg==0.29.0
+# sqlalchemy[asyncio]==2.0.23
+# supabase==2.0.3
