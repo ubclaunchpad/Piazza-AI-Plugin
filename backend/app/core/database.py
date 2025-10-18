@@ -185,6 +185,30 @@ def test_connection() -> bool:
 # Helper functions for common database operations
 
 
+def execute_statement(query: str, params=None):
+    """
+    Execute a non-SELECT statement (INSERT, UPDATE, DELETE).
+
+    Args:
+        query: SQL statement to execute
+        params: Query parameters (optional)
+
+    Returns:
+        Number of affected rows
+
+    Example:
+        # Delete records
+        affected = execute_statement("DELETE FROM example WHERE id = %s", (1,))
+
+        # Update records
+        affected = execute_statement("UPDATE example SET name = %s WHERE id = %s", ("New Name", 1))
+    """
+    with get_db() as db:
+        cursor = db.cursor()
+        cursor.execute(query, params)
+        return cursor.rowcount
+
+
 def execute_query(query: str, params=None, fetch_one: bool = False):
     """
     Execute a query and return results.
