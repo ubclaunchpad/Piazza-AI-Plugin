@@ -19,9 +19,16 @@ inserted_thread AS (
     '{}'::jsonb
   )
   RETURNING id
-)
+),
 
 -- Insert Enrollment
-INSERT INTO enrollments (user_id, thread_id, opted_in)
-SELECT u.id, t.id, TRUE
-FROM inserted_user u, inserted_thread t;
+inserted_enrollment AS (
+  INSERT INTO enrollments (user_id, thread_id, opted_in)
+  SELECT u.id, t.id, TRUE
+  FROM inserted_user u, inserted_thread t
+)
+-- Insert Post
+
+INSERT INTO posts (thread_id, piazza_post_id, poster_role, body_html, body_text, metadata)
+SELECT t.id, 'some id','student', '', '', '{}'::jsonb
+FROM inserted_thread t;
