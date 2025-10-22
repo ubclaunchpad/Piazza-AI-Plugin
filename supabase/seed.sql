@@ -26,9 +26,16 @@ inserted_enrollment AS (
   INSERT INTO enrollments (user_id, thread_id, opted_in)
   SELECT u.id, t.id, TRUE
   FROM inserted_user u, inserted_thread t
-)
+),
 -- Insert Post
+inserted_post AS (
+  INSERT INTO posts (thread_id, piazza_post_id, poster_role, body_html, body_text, metadata)
+  SELECT t.id, 'some id','student', '', '', '{}'::jsonb
+  FROM inserted_thread t
+  RETURNING id
+)
 
-INSERT INTO posts (thread_id, piazza_post_id, poster_role, body_html, body_text, metadata)
-SELECT t.id, 'some id','student', '', '', '{}'::jsonb
-FROM inserted_thread t;
+-- Insert PostChunk
+INSERT INTO postChunk (post_id, thread_id, chunk_index, text_chunk, token_count, metadata)
+SELECT p.id, t.id, 0, '', 0, '{}'::jsonb
+FROM inserted_post p, inserted_thread t
