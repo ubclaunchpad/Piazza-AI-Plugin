@@ -33,9 +33,15 @@ inserted_post AS (
   SELECT t.id, 'some id','student', '', '', '{}'::jsonb
   FROM inserted_thread t
   RETURNING id
-)
+),
 
 -- Insert PostChunk
-INSERT INTO postChunk (post_id, thread_id, chunk_index, text_chunk, token_count, metadata)
-SELECT p.id, t.id, 0, '', 0, '{}'::jsonb
-FROM inserted_post p, inserted_thread t
+insert_post_chunk AS (
+  INSERT INTO postChunk (post_id, thread_id, chunk_index, text_chunk, token_count, metadata)
+  SELECT p.id, t.id, 0, '', 0, '{}'::jsonb
+  FROM inserted_post p, inserted_thread t
+)
+-- Insert Document
+INSERT INTO documents (thread_id, uploader_id, file_name, file_type, file_size, permission, metadata)
+SELECT t.id, u.id, 'syllabus', 'pdf', '1000', 'thread', '{}'::jsonb
+FROM inserted_thread t, inserted_user u
