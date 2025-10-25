@@ -9,39 +9,41 @@
 
 
   function initRoot() {
-  let host = document.getElementById(DOM_IDS.ROOT_ID);
-  if (!host) {
-    host = document.createElement("div");
-    host.id = DOM_IDS.ROOT_ID;
-    (document.body || document.documentElement).appendChild(host);
+    let host = document.getElementById(DOM_IDS.ROOT_ID);
+    if (!host) {
+      host = document.createElement("div");
+      host.id = DOM_IDS.ROOT_ID;
+
+      const feedSearchBar = document.querySelector("#feed_search_bar");
+      feedSearchBar.parentNode.insertBefore(host, feedSearchBar.nextSibling);
+    }
+
+    const shadow = host.shadowRoot || host.attachShadow({ mode: "open" });
+      
+    // TODO: temporary dev badge remove this in production
+    if (!shadow.querySelector("[data-ts-badge]")) {
+      const badge = document.createElement("div");
+      badge.setAttribute("data-ts-badge", "true");
+      badge.textContent = "🧠 AI";
+      badge.style.cssText = `
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        background: linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+        color: white;
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 12px;
+        z-index: 2147483647;
+        font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;
+        pointer-events: none;
+      `;
+      shadow.appendChild(badge);
+      setTimeout(() => badge.remove(), 3000);
+    }
+
+    return shadow;
   }
-
-  const shadow = host.shadowRoot || host.attachShadow({ mode: "open" });
-
-  // TODO: temporary dev badge remove this in production
-  if (!shadow.querySelector("[data-ts-badge]")) {
-    const badge = document.createElement("div");
-    badge.setAttribute("data-ts-badge", "true");
-    badge.textContent = "🧠 AI";
-    badge.style.cssText = `
-      position: fixed;
-      top: 10px;
-      right: 10px;
-      background: linear-gradient(135deg,#667eea 0%,#764ba2 100%);
-      color: white;
-      padding: 4px 8px;
-      border-radius: 12px;
-      font-size: 12px;
-      z-index: 2147483647;
-      font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;
-      pointer-events: none;
-    `;
-    shadow.appendChild(badge);
-    setTimeout(() => badge.remove(), 3000);
-  }
-
-  return shadow;
-}
 
   /**
    * Return the existing shadowRoot, or null if not initialized.
