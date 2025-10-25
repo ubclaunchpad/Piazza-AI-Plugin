@@ -20,8 +20,8 @@
     .ts-searchbar-btn {
       display: inline-flex;
       align-items: center;
-      padding-top: 5px;
-      padding-bottom: 5px;
+      padding: 8px 10px;
+      margin-bottom: 10px;
       font-size: 14px;
       border-radius: 7px;
       text-shadow: none;

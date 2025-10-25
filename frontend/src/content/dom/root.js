@@ -7,15 +7,34 @@
 
   const DOM_IDS = window.ThreadSenseContracts.DOM_IDS;
 
+  /**
+   * Creates a shadow dom root with rootID placed after beforeNode
+   * @param rootID - id for root container
+   * @param beforeNode - root will be positioned after this node
+   * @returns 
+   */
+  function initRoot(rootID, beforeNode) {
+    const id = rootID ? rootID : DOM_IDS.ROOT_ID;
 
-  function initRoot() {
-    let host = document.getElementById(DOM_IDS.ROOT_ID);
+    if (!Object.values(DOM_IDS).includes(id)) {
+      console.error(`initRoot: DOM_IDS does not contain key '${id}'`);
+      return null;
+    }
+
+    let host = document.getElementById(id);
     if (!host) {
       host = document.createElement("div");
-      host.id = DOM_IDS.ROOT_ID;
+      host.id = id;
 
-      const feedSearchBar = document.querySelector("#feed_search_bar");
-      feedSearchBar.parentNode.insertBefore(host, feedSearchBar.nextSibling);
+      let parentNode = document.body;
+      let referenceNode = null;
+
+      if (beforeNode) {
+        referenceNode = document.querySelector(beforeNode);
+        parentNode = referenceNode ? referenceNode.parentNode : null;
+      }
+
+      parentNode.insertBefore(host, referenceNode ? referenceNode.nextSibling : null);
     }
 
     const shadow = host.shadowRoot || host.attachShadow({ mode: "open" });
@@ -48,8 +67,9 @@
   /**
    * Return the existing shadowRoot, or null if not initialized.
    */
-  function getRoot() {
-    return document.getElementById(DOM_IDS.ROOT_ID)?.shadowRoot ?? null;
+  function getRoot(rootID) {
+    const id = rootID ? rootID : DOM_IDS.ROOT_ID;
+    return document.getElementById(id)?.shadowRoot ?? null;
   }
 
   /**

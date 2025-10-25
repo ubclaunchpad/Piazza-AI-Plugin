@@ -1,5 +1,3 @@
-const { createSearchBar } = window.ThreadSenseComponents;
-
 /**
  * Renders ThreadSenseComponent into the ThreadSense Shadow DOM root
  */
@@ -10,11 +8,11 @@ const { createSearchBar } = window.ThreadSenseComponents;
    * Visible at the top of the page as a temporary placeholder UI
    */
   function renderSearchBar() {
-
-    const shadowRoot = window.ThreadSenseRoot.getRoot();
+    const rootID = window.ThreadSenseContracts.DOM_IDS.SEARCHBAR_ID;
+    let shadowRoot = window.ThreadSenseRoot.getRoot(rootID);
+    
     if (!shadowRoot) {
-      console.error("window.ThreadSense.renderSearchBar: Shadow DOM root not available");
-      return;
+      shadowRoot = window.ThreadSenseRoot.initRoot(rootID, "#feed_search_bar");
     }
 
     // Prevent duplicate injection
@@ -24,7 +22,7 @@ const { createSearchBar } = window.ThreadSenseComponents;
     wrapper.classList.add("ts-searchbar-container");
     wrapper.appendChild(window.ThreadSenseStyles.searchBar);
 
-    const searchBar = createSearchBar();
+    const searchBar = window.ThreadSenseComponents.createSearchBar();
     wrapper.appendChild(searchBar);
 
     shadowRoot.appendChild(wrapper);
