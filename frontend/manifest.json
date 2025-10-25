@@ -15,8 +15,8 @@
   "content_scripts": [
     {
       "matches": ["https://piazza.com/*"],
-      "js": ["src/content/piazza-enhancer.js"],
-      "css": ["src/content/piazza-styles.css"],
+      "js": ["content.js"],
+      "css": ["content.css"],
       "run_at": "document_end"
     }
   ],
@@ -28,7 +28,7 @@
 
   "web_accessible_resources": [
     {
-      "resources": ["assets/*", "src/content/*"],
+      "resources": ["assets/*", "src/content/*", "*.js", "*.css"],
       "matches": ["https://piazza.com/*"]
     }
   ]

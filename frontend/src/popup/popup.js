@@ -1,3 +1,4 @@
+import "./popup.css";
 /**
  * Simple Popup Controller
  */
