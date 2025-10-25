@@ -17,7 +17,10 @@
       "matches": ["https://piazza.com/*"],
       "js": [
         "src/shared/contracts.js",
+        "src/content/ui/styles.js",
         "src/content/dom/root.js",
+        "src/content/ui/components.js",
+        "src/content/ui/renders.js",
         "src/content/piazza-enhancer.js"],
       "css": ["src/content/piazza-styles.css"],
       "run_at": "document_end"

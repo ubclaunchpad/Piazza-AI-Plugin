@@ -22,6 +22,8 @@
   // DOM identifiers used for locating or preventing duplicate injections
   const DOM_IDS = {
     ROOT_ID: "threadsense-root",
+    SEARCHBAR_ID: "threadsense-search-bar",
+    RESPONSECARD_ID: "threadsense-response-card",
     CARD_ATTR: "data-threadsense-card",
   };
 
