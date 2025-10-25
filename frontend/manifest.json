@@ -15,7 +15,10 @@
   "content_scripts": [
     {
       "matches": ["https://piazza.com/*"],
-      "js": ["src/content/piazza-enhancer.js"],
+      "js": [
+        "src/shared/contracts.js",
+        "src/content/dom/root.js",
+        "src/content/piazza-enhancer.js"],
       "css": ["src/content/piazza-styles.css"],
       "run_at": "document_end"
     }

@@ -1,0 +1,75 @@
+/**
+ * Create (if missing) and return the extension's Shadow DOM root.
+ * Also renders a temporary badge for visibility in dev mode.
+ */
+
+(function () {
+
+  const DOM_IDS = window.ThreadSenseContracts.DOM_IDS;
+
+
+  function initRoot() {
+  let host = document.getElementById(DOM_IDS.ROOT_ID);
+  if (!host) {
+    host = document.createElement("div");
+    host.id = DOM_IDS.ROOT_ID;
+    (document.body || document.documentElement).appendChild(host);
+  }
+
+  const shadow = host.shadowRoot || host.attachShadow({ mode: "open" });
+
+  // TODO: temporary dev badge remove this in production
+  if (!shadow.querySelector("[data-ts-badge]")) {
+    const badge = document.createElement("div");
+    badge.setAttribute("data-ts-badge", "true");
+    badge.textContent = "🧠 AI";
+    badge.style.cssText = `
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      background: linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+      color: white;
+      padding: 4px 8px;
+      border-radius: 12px;
+      font-size: 12px;
+      z-index: 2147483647;
+      font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;
+      pointer-events: none;
+    `;
+    shadow.appendChild(badge);
+    setTimeout(() => badge.remove(), 3000);
+  }
+
+  return shadow;
+}
+
+  /**
+   * Return the existing shadowRoot, or null if not initialized.
+   */
+  function getRoot() {
+    return document.getElementById(DOM_IDS.ROOT_ID)?.shadowRoot ?? null;
+  }
+
+  /**
+   * Cleanup registry for teardown callbacks 
+   */
+  const __cleanups = new Set();
+  function registerCleanup(fn) {
+    if (typeof fn === "function") __cleanups.add(fn);
+    return () => __cleanups.delete(fn);
+  }
+
+  /**
+   * Remove the shadow host and run cleanup callbacks.
+   */
+  function teardownRoot() {
+    for (const fn of __cleanups) {
+      try { fn(); } catch (_) {}
+    }
+    __cleanups.clear();
+    document.getElementById(DOM_IDS.ROOT_ID)?.remove();
+    return null;
+  }
+
+  window.ThreadSenseRoot = { initRoot, getRoot, teardownRoot, registerCleanup };
+})();
