@@ -7,47 +7,69 @@
 
   const DOM_IDS = window.ThreadSenseContracts.DOM_IDS;
 
+  /**
+   * Creates a shadow dom root with rootID placed after beforeNode
+   * @param rootID - id for root container
+   * @param beforeNode - root will be positioned after this node
+   * @returns 
+   */
+  function initRoot(rootID, beforeNode) {
+    const id = rootID ? rootID : DOM_IDS.ROOT_ID;
 
-  function initRoot() {
-  let host = document.getElementById(DOM_IDS.ROOT_ID);
-  if (!host) {
-    host = document.createElement("div");
-    host.id = DOM_IDS.ROOT_ID;
-    (document.body || document.documentElement).appendChild(host);
+    if (!Object.values(DOM_IDS).includes(id)) {
+      console.error(`initRoot: DOM_IDS does not contain key '${id}'`);
+      return null;
+    }
+
+    let host = document.getElementById(id);
+    if (!host) {
+      host = document.createElement("div");
+      host.id = id;
+
+      let parentNode = document.body;
+      let referenceNode = null;
+
+      if (beforeNode) {
+        referenceNode = document.querySelector(beforeNode);
+        parentNode = referenceNode ? referenceNode.parentNode : null;
+      }
+
+      parentNode.insertBefore(host, referenceNode ? referenceNode.nextSibling : null);
+    }
+
+    const shadow = host.shadowRoot || host.attachShadow({ mode: "open" });
+      
+    // TODO: temporary dev badge remove this in production
+    if (!shadow.querySelector("[data-ts-badge]")) {
+      const badge = document.createElement("div");
+      badge.setAttribute("data-ts-badge", "true");
+      badge.textContent = "🧠 AI";
+      badge.style.cssText = `
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        background: linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+        color: white;
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 12px;
+        z-index: 2147483647;
+        font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;
+        pointer-events: none;
+      `;
+      shadow.appendChild(badge);
+      setTimeout(() => badge.remove(), 3000);
+    }
+
+    return shadow;
   }
-
-  const shadow = host.shadowRoot || host.attachShadow({ mode: "open" });
-
-  // TODO: temporary dev badge remove this in production
-  if (!shadow.querySelector("[data-ts-badge]")) {
-    const badge = document.createElement("div");
-    badge.setAttribute("data-ts-badge", "true");
-    badge.textContent = "🧠 AI";
-    badge.style.cssText = `
-      position: fixed;
-      top: 10px;
-      right: 10px;
-      background: linear-gradient(135deg,#667eea 0%,#764ba2 100%);
-      color: white;
-      padding: 4px 8px;
-      border-radius: 12px;
-      font-size: 12px;
-      z-index: 2147483647;
-      font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;
-      pointer-events: none;
-    `;
-    shadow.appendChild(badge);
-    setTimeout(() => badge.remove(), 3000);
-  }
-
-  return shadow;
-}
 
   /**
    * Return the existing shadowRoot, or null if not initialized.
    */
-  function getRoot() {
-    return document.getElementById(DOM_IDS.ROOT_ID)?.shadowRoot ?? null;
+  function getRoot(rootID) {
+    const id = rootID ? rootID : DOM_IDS.ROOT_ID;
+    return document.getElementById(id)?.shadowRoot ?? null;
   }
 
   /**
