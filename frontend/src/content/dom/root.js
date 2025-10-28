@@ -42,6 +42,7 @@ const CREATED_ROOT_IDS = new Set();
 
     // add to shadow registry 
     CREATED_ROOT_IDS.add(host.id);
+    console.log(CREATED_ROOT_IDS);
 
     const shadow = host.shadowRoot || host.attachShadow({ mode: "open" });
       
@@ -111,5 +112,5 @@ const CREATED_ROOT_IDS = new Set();
     return null;
   }
 
-  window.ThreadSenseRoot = { initRoot, getRoot, teardownAllRoots, registerCleanup };
+  window.ThreadSenseRoot = { initRoot, getRoot, teardownAllRoots, teardownRootById, registerCleanup };
 })();

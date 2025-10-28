@@ -9,10 +9,10 @@
    */
   function renderSearchBar() {
     const rootID = window.ThreadSenseContracts.DOM_IDS.SEARCHBAR_ID;
-    let shadowRoot = window.ThreadSenseRoot.getRoot(rootID);
+    let shadowRoot = window.ThreadSenseRoot.initRoot(rootID, "#feed_search_bar");
     
     if (!shadowRoot) {
-      shadowRoot = window.ThreadSenseRoot.initRoot(rootID, "#feed_search_bar");
+      console.error("Shadow root not available");
     }
 
     // Prevent duplicate injection
@@ -32,20 +32,23 @@
 
   /**
    * Renders the ResponseCard component into the ThreadSense Shadow DOM root
-   * Visible under each post below Student Answer
+   * Visible under each post section
    */
+  const responseCardRootID = window.ThreadSenseContracts.DOM_IDS.RESPONSECARD_ID;
   const responseCardPosition = '#qaContentViewId'
+
   function renderResponseCardRequest() {
-    waitForPost(responseCardPosition, renderResponseCard);
+    console.log("ResponseCard component waiting for post to load...");
+    waitForElement(responseCardPosition, renderResponseCard);
   }
 
   function renderResponseCard() {
-    const rootID = window.ThreadSenseContracts.DOM_IDS.RESPONSECARD_ID;
-    let shadowRoot = window.ThreadSenseRoot.getRoot(rootID);
+    shadowRoot = window.ThreadSenseRoot.initRoot(responseCardRootID, responseCardPosition);
 
     if (!shadowRoot) {
-      shadowRoot = window.ThreadSenseRoot.initRoot(rootID, responseCardPosition);
-    }
+      console.error("Shadow root not available");
+    return;
+  }
 
     // Prevent duplicate injection
     if (shadowRoot.querySelector(".ts-response-card-container")) return;
@@ -58,15 +61,19 @@
     wrapper.appendChild(responseCard);
 
     shadowRoot.appendChild(wrapper);
-    console.log("Response Card component rendered into shadow root");
+    console.log("ResponseCard component rendered into shadow root");
     console.log("Shadow root:", shadowRoot);
   }
 
   /**
-   * Helper that waits for query element to be loaded 
-   * Then calls callback functino
+   * UI Injection on Load
    */
-  function waitForPost(query, callback) {
+  function waitForElement(query, callback) {
+    if (document.querySelector(query)) {
+      callback();
+      return;
+    }
+
     const observer = new MutationObserver((_mutations, obs) => {
       const post = document.querySelector(query);
       if (post) {
@@ -77,6 +84,28 @@
 
     observer.observe(document.body, { childList: true, subtree: true });
   }
+
+  /**
+   * UI Injection on Navigation
+   */
+
+  let lastUrl = location.href;
+  function observeUrlChanges(callback) {
+    const observer = new MutationObserver(() => {
+      if (location.href !== lastUrl) {
+        lastUrl = location.href;
+        callback();
+      }
+    });
+
+    observer.observe(document.body, { childList: true, subtree: true });
+  }
+
+  observeUrlChanges(() => {
+    console.log("Navigation detected, re-injecting components...");
+    window.ThreadSenseRoot.teardownRootById(responseCardRootID);
+    renderResponseCardRequest();
+  })
 
   window.ThreadSenseUI = { renderSearchBar, renderResponseCardRequest };
 })();
