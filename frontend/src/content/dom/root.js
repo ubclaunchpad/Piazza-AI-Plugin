@@ -3,6 +3,9 @@
  * Also renders a temporary badge for visibility in dev mode.
  */
 
+// shadow dom root registry 
+const CREATED_ROOT_IDS = new Set();  
+
 (function () {
 
   const DOM_IDS = window.ThreadSenseContracts.DOM_IDS;
@@ -36,6 +39,9 @@
 
       parentNode.insertBefore(host, referenceNode ? referenceNode.nextSibling : null);
     }
+
+    // add to shadow registry 
+    CREATED_ROOT_IDS.add(host.id);
 
     const shadow = host.shadowRoot || host.attachShadow({ mode: "open" });
       
@@ -81,17 +87,29 @@
     return () => __cleanups.delete(fn);
   }
 
-  /**
-   * Remove the shadow host and run cleanup callbacks.
-   */
-  function teardownRoot() {
+  function runCleanups() {
     for (const fn of __cleanups) {
       try { fn(); } catch (_) {}
     }
     __cleanups.clear();
-    document.getElementById(DOM_IDS.ROOT_ID)?.remove();
+  }
+
+  function teardownRootById(rootID) {
+    try { document.getElementById(rootID)?.remove(); } catch(_) {}
+    CREATED_ROOT_IDS.delete(rootID);
     return null;
   }
 
-  window.ThreadSenseRoot = { initRoot, getRoot, teardownRoot, registerCleanup };
+  /**
+   * Remove the shadow host and run cleanup callbacks.
+   */
+  function teardownAllRoots() {
+    runCleanups();
+    for (const id of Array.from(CREATED_ROOT_IDS)) {
+      teardownRootById(id);
+    }
+    return null;
+  }
+
+  window.ThreadSenseRoot = { initRoot, getRoot, teardownAllRoots, registerCleanup };
 })();
