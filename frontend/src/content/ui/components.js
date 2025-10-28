@@ -33,5 +33,27 @@
     return container;
   }
 
-  window.ThreadSenseComponents = { createSearchBar };
+  /**
+   * ResponseCard Component
+   * -----------------------
+   * AI-generated summaries and insights component to appear below each posts' student answer
+   */
+  function createResponseCard(summaryText = "AI summary coming soon...") {
+    const container = document.createElement("div");
+    container.classList.add("ts-response-card");
+
+    const header = document.createElement("div");
+    header.textContent = "💡 ThreadSense AI Response Summary";
+    header.classList.add("ts-response-card-header");
+
+    const content = document.createElement("div");
+    content.classList.add("ts-response-card-content");
+    content.textContent = summaryText;
+
+    container.append(header, content);
+    console.log("ResponseCard component created");
+    return container;
+  };
+
+  window.ThreadSenseComponents = { createSearchBar, createResponseCard };
 })();

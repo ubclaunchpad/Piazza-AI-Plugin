@@ -37,11 +37,12 @@ const CREATED_ROOT_IDS = new Set();
         parentNode = referenceNode ? referenceNode.parentNode : null;
       }
 
-      parentNode.insertBefore(host, referenceNode ? referenceNode.nextSibling : null);
+      parentNode.insertBefore(host, referenceNode?.nextSibling);
     }
 
     // add to shadow registry 
     CREATED_ROOT_IDS.add(host.id);
+    console.log(CREATED_ROOT_IDS);
 
     const shadow = host.shadowRoot || host.attachShadow({ mode: "open" });
       
@@ -111,5 +112,5 @@ const CREATED_ROOT_IDS = new Set();
     return null;
   }
 
-  window.ThreadSenseRoot = { initRoot, getRoot, teardownAllRoots, registerCleanup };
+  window.ThreadSenseRoot = { initRoot, getRoot, teardownAllRoots, teardownRootById, registerCleanup };
 })();
