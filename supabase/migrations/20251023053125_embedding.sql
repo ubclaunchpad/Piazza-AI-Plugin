@@ -10,7 +10,7 @@ CREATE TABLE embeddings (
     source_type source_type_enum NOT NULL,
     source_id UUID NOT NULL,
     thread_id UUID NOT NULL,
-    embedding VECTOR(768) NOT NULL,
+    embedding VECTOR NOT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     metadata JSONB,
     FOREIGN KEY (thread_id) REFERENCES threads(id),
@@ -27,10 +27,6 @@ CREATE TABLE embeddings_post_chunks
 CREATE TABLE embeddings_doc_chunks
     PARTITION OF embeddings
     FOR VALUES IN ('doc_chunk', 'external');
-
--- Create Composite Index On Parent (propagated to childeren)
-CREATE INDEX ON embeddings USING ivfflat (embedding vector_cosine_ops)
-WITH (lists = 100);
 
 
 -- Enforce Function 
@@ -60,33 +56,3 @@ FOR EACH ROW
 EXECUTE FUNCTION enforce_source_fk();
 
 
--- Basic Similarity Retrieval Function 
-CREATE OR REPLACE FUNCTION match_documents (
-  query_embedding VECTOR(768),
-  match_threshold FLOAT,
-  match_count INT
-)
-RETURNS TABLE (
-  embedding_id UUID,
-  source_id UUID,
-  source_type source_type_enum,
-  metadata JSONB,
-  similarity FLOAT
-)
-SET search_path = ''
-LANGUAGE plpgsql
-AS $$
-BEGIN
-  RETURN QUERY
-  SELECT
-    id,
-    source_id,
-    source_type,
-    metadata,
-    1 - (embedding <=> query_embedding) AS similarity
-  FROM embeddings
-  WHERE 1 - (embedding <=> query_embedding) > match_threshold
-  ORDER BY similarity DESC
-  LIMIT match_count;
-END;
-$$;
