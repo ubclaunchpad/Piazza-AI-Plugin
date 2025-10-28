@@ -37,7 +37,7 @@ const CREATED_ROOT_IDS = new Set();
         parentNode = referenceNode ? referenceNode.parentNode : null;
       }
 
-      parentNode.insertBefore(host, referenceNode ? referenceNode.nextSibling : null);
+      parentNode.insertBefore(host, referenceNode?.nextSibling);
     }
 
     // add to shadow registry 

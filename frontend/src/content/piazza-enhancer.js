@@ -1,5 +1,5 @@
 const { initRoot, getRoot, teardownAllRoots } = window.ThreadSenseRoot;
-const { renderSearchBar } = window.ThreadSenseUI;
+const { renderSearchBar, renderResponseCardRequest } = window.ThreadSenseUI;
 const { STORAGE_KEYS } = window.ThreadSenseContracts;
 
 console.log("🧠 content entry loaded");
@@ -18,15 +18,17 @@ function safeInit() {
     initRoot();
     if (hasRoot()) {
       renderSearchBar();
+      renderResponseCardRequest();
       console.log("Shadow root initialized");
     }
     else {
-      console.error("renderSearchBar() not found or Root missing");
+      console.error("Root missing");
     }
   } finally {
     window.__TS__.initing = false;
   }
 }
+
 function safeTeardown() {
   try { teardownAllRoots?.(); } catch {}
 }
