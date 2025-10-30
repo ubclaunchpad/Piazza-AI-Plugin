@@ -11,10 +11,57 @@ chrome.runtime.onInstalled.addListener((details) => {
   }
 });
 
-// Handle basic messages
+// Messaging bridge: handle REQUEST_* and return mocked *_RESULT
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  console.log("Background received:", message.type);
+  try {
+    if (!message || message.source !== "threadsense" || typeof message.type !== "string") {
+      return; // ignore unrelated or malformed messages silently
+    }
 
-  // Simple echo for testing
-  sendResponse({ received: true, timestamp: Date.now() });
+    // REQUEST_SEARCH => SEARCH_RESULT
+    if (message.type === "REQUEST_SEARCH") {
+      console.log("TS bg: REQUEST_SEARCH", message.payload);
+      const query = message?.payload?.query ?? "";
+      sendResponse({
+        type: "SEARCH_RESULT",
+        payload: { query, results: [], echoedAt: Date.now() },
+      });
+      return; // sync response
+    }
+
+    // REQUEST_AI_SUMMARY => AI_SUMMARY_RESULT
+    if (message.type === "REQUEST_AI_SUMMARY") {
+      console.log("TS bg: REQUEST_AI_SUMMARY", message.payload);
+      sendResponse({
+        type: "AI_SUMMARY_RESULT",
+        payload: {
+          summary: "Mock summary from background",
+          echoedAt: Date.now(),
+        },
+      });
+      return; // sync response
+    }
+
+    // REQUEST_ANSWER_CHECK => ANSWER_CHECK_RESULT
+    // Combined action for "check duplicates" + "suggest answer" -> Might beed to split later (TODO)
+    if (message.type === "REQUEST_ANSWER_CHECK") {
+      console.log("TS bg: REQUEST_ANSWER_CHECK", message.payload);
+      const draft = message?.payload?.draft ?? "";
+      const context = message?.payload?.context ?? {};
+      sendResponse({
+        type: "ANSWER_CHECK_RESULT",
+        payload: {
+          duplicates: [], // mock: no duplicates found
+          suggestion: draft ? `Suggested reply based on draft: ${draft.slice(0, 64)}...` : "Mock suggested answer from background",
+          contextEcho: context,
+          echoedAt: Date.now(),
+        },
+      });
+      return; // sync response
+    }
+
+    // threadsense-scoped but unknown: ignore silently
+  } catch (_) {
+    // swallow errors to avoid noisy logs
+  }
 });
