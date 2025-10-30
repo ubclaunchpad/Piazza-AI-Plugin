@@ -19,6 +19,27 @@ function safeInit() {
     if (hasRoot()) {
       renderSearchBar();
       renderResponseCardRequest();
+      // Start DOM observer once root is ready; log outcome
+      try {
+        const started = window.ThreadSenseObserver?.start?.();
+        console.log(started ? "TS observe: start ok" : "TS observe: not started (no root or already running)");
+      } catch {}
+      // Re-inject ResponseCard on DOM changes (idempotent renderer)
+      try {
+        if (!window.__TS_OBS_CARD_BOUND) { // ThreadSense Observer ResponseCard bind
+          window.__TS_OBS_CARD_BOUND = true;
+          
+          // this return  () => offDomChanged(cb);
+          const unsubscribe = window.ThreadSenseObserver?.onDomChanged?.(() => {
+            try { window.ThreadSenseUI?.renderResponseCardRequest?.(); } catch {}
+          });
+          // Unsubscribe and reset flag when root is torn down
+          window.ThreadSenseRoot?.registerCleanup?.(() => {
+            try { unsubscribe?.(); } catch {}
+            window.__TS_OBS_CARD_BOUND = false;
+          });
+        }
+      } catch {}
       console.log("Shadow root initialized");
     }
     else {
