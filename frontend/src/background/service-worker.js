@@ -42,6 +42,24 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return; // sync response
     }
 
+    // REQUEST_ANSWER_CHECK => ANSWER_CHECK_RESULT
+    // Combined action for "check duplicates" + "suggest answer" -> Might beed to split later (TODO)
+    if (message.type === "REQUEST_ANSWER_CHECK") {
+      console.log("TS bg: REQUEST_ANSWER_CHECK", message.payload);
+      const draft = message?.payload?.draft ?? "";
+      const context = message?.payload?.context ?? {};
+      sendResponse({
+        type: "ANSWER_CHECK_RESULT",
+        payload: {
+          duplicates: [], // mock: no duplicates found
+          suggestion: draft ? `Suggested reply based on draft: ${draft.slice(0, 64)}...` : "Mock suggested answer from background",
+          contextEcho: context,
+          echoedAt: Date.now(),
+        },
+      });
+      return; // sync response
+    }
+
     // threadsense-scoped but unknown: ignore silently
   } catch (_) {
     // swallow errors to avoid noisy logs
