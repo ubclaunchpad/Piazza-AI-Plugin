@@ -26,7 +26,7 @@
     ROOT_ID: "threadsense-root",
     SEARCHBAR_ID: "threadsense-search-bar",
     RESPONSECARD_ID: "threadsense-response-card",
-    CARD_ATTR: "data-threadsense-card",
+    COMPOSER_ID: "data-threadsense-composer",
   };
 
   // Storage keys for user preferences and toggles
