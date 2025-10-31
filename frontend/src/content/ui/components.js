@@ -66,12 +66,12 @@
    * -----------------------
    * A button to check duplicates or suggest answer insights in the composer area
    */
-  function createComposerButton() {
+  function createComposerButton(message) {
     const container = document.createElement("div");
     container.classList.add("ts-composer-area");
 
     const button = document.createElement("button");
-    button.textContent = "Check Duplicates / Suggest Answer";
+    button.textContent = message;
     button.classList.add("ts-composer-btn");
 
     button.addEventListener("click", () => {

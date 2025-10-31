@@ -61,11 +61,17 @@
 
     const composerButton = document.createElement("style");
     composerButton.textContent = `
+    .ts-composer-container {
+      display: flex;
+      justify-content: flex-end;
+    }
+
     .ts-composer-area {
       display: flex;
       gap: 6px;
-      margin-top: 10px;
-      margin-left: 3px;
+      margin-top: 12px;
+      margin-left: auto;
+      margin-right: 16px;
       align-items: center;
       font-family: system-ui, sans-serif;
     }
