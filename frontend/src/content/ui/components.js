@@ -25,7 +25,13 @@
       const query = input.value.trim();
       if (!query) return;
       console.log("🧠 Semantic search triggered:", query);
-      // TODO: connect to messaging bridge -> REQUEST_SEARCH via postMessage.
+
+      window.postMessage({
+        source: "threadsense",
+        type: "REQUEST_SEARCH",
+        payload: { query: query }
+      });
+
     });
 
     container.append(input, button);
@@ -36,7 +42,7 @@
   /**
    * ResponseCard Component
    * -----------------------
-   * AI-generated summaries and insights component to appear below each posts' student answer
+   * AI-generated summaries and insights component to appear below each visible post
    */
   function createResponseCard(summaryText = "AI summary coming soon...") {
     const container = document.createElement("div");
@@ -55,5 +61,36 @@
     return container;
   };
 
-  window.ThreadSenseComponents = { createSearchBar, createResponseCard };
+  /**
+   * ComposerButton Component
+   * -----------------------
+   * A button to check duplicates or suggest answer insights in the composer area
+   */
+  function createComposerButton() {
+    const container = document.createElement("div");
+    container.classList.add("ts-composer-area");
+
+    const button = document.createElement("button");
+    button.textContent = "Check Duplicates / Suggest Answer";
+    button.classList.add("ts-composer-btn");
+
+    button.addEventListener("click", () => {
+      const query = "test query";
+      if (!query) return;
+      console.log("🧠 Composer button triggered:", query);
+
+      window.postMessage({
+        source: "threadsense",
+        type: "REQUEST_ANSWER_CHECK",
+        payload: { query: query }
+      });
+
+    });
+
+    container.append(button);
+    console.log("ComposerButton component created");
+    return container;
+  }
+
+  window.ThreadSenseComponents = { createSearchBar, createResponseCard, createComposerButton };
 })();

@@ -7,16 +7,18 @@
    * Renders the SearchBar component into the ThreadSense Shadow DOM root
    * Visible at the top of the page with placeholder UI
    */
+  const searchBarRootID = window.ThreadSenseContracts.DOM_IDS.SEARCHBAR_ID;
+  const searchBarPosition = "#feed_search_bar";
+  
   function renderSearchBar() {
-    const rootID = window.ThreadSenseContracts.DOM_IDS.SEARCHBAR_ID;
-    let shadowRoot = window.ThreadSenseRoot.initRoot(rootID, "#feed_search_bar");
+    let shadowDom = window.ThreadSenseRoot.initRoot(searchBarRootID, searchBarPosition);
     
-    if (!shadowRoot) {
-      console.error("Shadow root not available");
+    if (!shadowDom) {
+      console.error("Shadow DOM not available");
+      return;
     }
 
-    // Prevent duplicate injection
-    if (shadowRoot.querySelector(".ts-searchbar-container")) return;
+    if (shadowDom.querySelector(".ts-searchbar-container")) return;
 
     const wrapper = document.createElement("div");
     wrapper.classList.add("ts-searchbar-container");
@@ -25,9 +27,9 @@
     const searchBar = window.ThreadSenseComponents.createSearchBar();
     wrapper.appendChild(searchBar);
 
-    shadowRoot.appendChild(wrapper);
-    console.log("SearchBar component rendered into shadow root");
-    console.log("Shadow root:", shadowRoot);
+    shadowDom.appendChild(wrapper);
+    console.log("SearchBar component rendered into Shadow DOM");
+    console.log("Shadow DOM:", shadowDom);
   }
 
   /**
@@ -35,77 +37,74 @@
    * Visible under each post section
    */
   const responseCardRootID = window.ThreadSenseContracts.DOM_IDS.RESPONSECARD_ID;
-  const responseCardPosition = '#qaContentViewId'
+  const responseCardPosition = "#qaContentViewId"
 
   function renderResponseCardRequest() {
-    console.log("ResponseCard component waiting for post to load...");
-    waitForElement(responseCardPosition, renderResponseCard);
+    window.ThreadSenseObserver.waitForElement(responseCardPosition, renderResponseCard);
   }
 
   function renderResponseCard() {
-    shadowRoot = window.ThreadSenseRoot.initRoot(responseCardRootID, responseCardPosition);
+    let shadowDom = window.ThreadSenseRoot.initRoot(responseCardRootID, responseCardPosition);
 
-    if (!shadowRoot) {
-      console.error("Shadow root not available");
-    return;
-  }
+    if (!shadowDom) {
+      console.error("Shadow DOM not available");
+      return;
+    }
 
-    // Prevent duplicate injection
-    if (shadowRoot.querySelector(".ts-response-card-container")) return;
+    if (shadowDom.querySelector(".ts-response-card-container")) return;
 
     const wrapper = document.createElement("div");
     wrapper.classList.add("ts-response-card-container");
     wrapper.appendChild(window.ThreadSenseStyles.responseCard);
 
+    window.postMessage({
+      source: "threadsense",
+      type: "REQUEST_AI_SUMMARY",
+      payload: { query: "Test AI Summary" }
+    });
+
     const responseCard = window.ThreadSenseComponents.createResponseCard();
     wrapper.appendChild(responseCard);
 
-    shadowRoot.appendChild(wrapper);
-    console.log("ResponseCard component rendered into shadow root");
-    console.log("Shadow root:", shadowRoot);
+    shadowDom.appendChild(wrapper);
+    console.log("ResponseCard component rendered into Shadow DOM");
+    console.log("Shadow DOM:", shadowDom);
   }
 
   /**
-   * UI Injection on Load
+   * Renders the ComposerButton component into the ThreadSense Shadow DOM root
+   * Visible below composer area when creating a new post and when 
    */
-  function waitForElement(query, callback) {
-    if (document.querySelector(query)) {
-      callback();
+  const composerButtonRootID = window.ThreadSenseContracts.DOM_IDS.COMPOSER_ID;
+  const newPostPosition = "#main-post > :nth-child(8)";
+  const studentAnswerPosition = "#s_answer_edit";
+
+  function renderComposerButtonRequest() {
+    window.ThreadSenseObserver.waitForElement(newPostPosition, () => renderComposerButton(newPostPosition));
+    window.ThreadSenseObserver.waitForElement(studentAnswerPosition, () => renderComposerButton(studentAnswerPosition));
+  }
+
+  function renderComposerButton(position) {
+    let shadowDom = window.ThreadSenseRoot.initRoot(composerButtonRootID, position);
+
+    if (!shadowDom) {
+      console.error("Shadow DOM not available");
       return;
     }
 
-    const observer = new MutationObserver((_mutations, obs) => {
-      const post = document.querySelector(query);
-      if (post) {
-        obs.disconnect();
-        callback();
-      }
-    });
+    if (shadowDom.querySelector(".ts-composer-container")) return;
 
-    observer.observe(document.body, { childList: true, subtree: true });
+    const wrapper = document.createElement("div");
+    wrapper.classList.add("ts-composer-container");
+    wrapper.appendChild(window.ThreadSenseStyles.composerButton);
+
+    const composerButton = window.ThreadSenseComponents.createComposerButton();
+    wrapper.appendChild(composerButton);
+
+    shadowDom.appendChild(wrapper);
+    console.log("ComposerButton component rendered into Shadow DOM");
+    console.log("Shadow DOM:", shadowDom);
   }
 
-  /**
-   * UI Injection on Navigation
-   */
-
-  let lastUrl = location.href;
-  function observeUrlChanges(callback) {
-    const observer = new MutationObserver(() => {
-      if (location.href !== lastUrl) {
-        lastUrl = location.href;
-        callback();
-      }
-    });
-
-    observer.observe(document.body, { childList: true, subtree: true });
-  }
-
-  observeUrlChanges(() => {
-    console.log("Navigation detected, re-injecting components...");
-    window.ThreadSenseRoot.teardownRootById(responseCardRootID);
-    renderResponseCardRequest();
-  })
-
-  window.ThreadSenseUI = { renderSearchBar, renderResponseCardRequest };
+  window.ThreadSenseUI = { renderSearchBar, renderResponseCardRequest, renderComposerButtonRequest };
 })();

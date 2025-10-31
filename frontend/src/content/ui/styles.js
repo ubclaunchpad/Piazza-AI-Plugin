@@ -37,11 +37,11 @@
       background-color: #094b87;
       border-color: #09457b;
     }
-  `;
+    `;
 
-   const responseCard = document.createElement("style");
-   responseCard.textContent =  `
-   .ts-response-card {
+    const responseCard = document.createElement("style");
+    responseCard.textContent =  `
+    .ts-response-card {
       margin-top: 8px;
       margin-bottom: 8px;
       padding: 10px 14px;
@@ -57,7 +57,39 @@
       color: #2d4cc8;
       margin-bottom: 6px;
     }
-   `
+    `;
 
-    window.ThreadSenseStyles = { searchBar, responseCard };
+    const composerButton = document.createElement("style");
+    composerButton.textContent = `
+    .ts-composer-area {
+      display: flex;
+      gap: 6px;
+      margin-top: 10px;
+      margin-left: 3px;
+      align-items: center;
+      font-family: system-ui, sans-serif;
+    }
+    .ts-composer-btn {
+      display: inline-flex;
+      align-items: center;
+      padding: 8px 10px;
+      margin-bottom: 10px;
+      font-size: 14px;
+      border-radius: 7px;
+      text-shadow: none;
+      text-decoration: none;
+      box-shadow: none;
+      color: #fff;
+      background-color: #0c5fab;
+      border-color: #0c5fab;
+      cursor: pointer;
+    }
+    .ts-composer-btn:hover {
+      color: #fff;
+      background-color: #094b87;
+      border-color: #09457b;
+    }
+    `;
+
+    window.ThreadSenseStyles = { searchBar, responseCard, composerButton };
 })();
