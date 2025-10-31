@@ -77,6 +77,23 @@
     callbacks.delete(cb);
   }
 
-  window.ThreadSenseObserver = { start, stop, onDomChanged, offDomChanged };
+  function waitForElement(query, callback) {
+    if (document.querySelector(query)) {
+      callback();
+      return;
+    }
+
+    const observer = new MutationObserver((_mutations, obs) => {
+      const post = document.querySelector(query);
+      if (post) {
+        obs.disconnect();
+        callback();
+      }
+    });
+
+    observer.observe(document.body, { childList: true, subtree: true });
+  }
+
+  window.ThreadSenseObserver = { start, stop, onDomChanged, offDomChanged, waitForElement };
 })();
 
