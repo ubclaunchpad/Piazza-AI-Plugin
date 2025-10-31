@@ -19,6 +19,7 @@
         "src/shared/contracts.js",
         "src/content/ui/styles.js",
         "src/content/dom/root.js",
+        "src/content/observe/observer.js",
         "src/content/bridge/bridge.js",
         "src/content/ui/components.js",
         "src/content/ui/renders.js",
