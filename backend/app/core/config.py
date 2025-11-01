@@ -36,6 +36,11 @@ class Settings(BaseSettings):
     # Database Configuration
     DATABASE_URL: str
 
+    # Supabase Configuration
+    SUPABASE_URL: str
+    SUPABASE_ANON_KEY: str
+    SUPABASE_SERVICE_ROLE_KEY: str
+
     class Config:
         case_sensitive = True
 
