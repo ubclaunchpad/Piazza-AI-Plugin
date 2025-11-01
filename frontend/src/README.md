@@ -40,7 +40,7 @@ src/
 
 ## 📋 Testing
 
-1. In popup, toggle Threadsense On/Off and make sure injections are only injected when toggle is On
+1. Make sure injections are only visible when Threadsense toggle in popup is on
 
 2. Ensure search bar is injected on the left column below Piazza search bar
 <img width="394" height="212" alt="Screenshot 2025-10-25 at 3 50 02 PM" src="https://github.com/user-attachments/assets/125a6d83-9293-445b-a693-9b548651ddb9" />
