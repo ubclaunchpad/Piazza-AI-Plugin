@@ -66,7 +66,7 @@
    * -----------------------
    * A button to check duplicates or suggest answer insights in the composer area
    */
-  function createComposerButton(message) {
+  function createComposerButton(message, req) {
     const container = document.createElement("div");
     container.classList.add("ts-composer-area");
 
@@ -75,13 +75,13 @@
     button.classList.add("ts-composer-btn");
 
     button.addEventListener("click", () => {
-      const query = "test query";
+      const query = "Composer area draft query";
       if (!query) return;
       console.log("🧠 Composer button triggered:", query);
 
       window.postMessage({
         source: "threadsense",
-        type: "REQUEST_ANSWER_CHECK",
+        type: req,
         payload: { query: query }
       });
 

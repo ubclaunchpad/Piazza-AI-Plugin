@@ -42,16 +42,31 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return; // sync response
     }
 
-    // REQUEST_ANSWER_CHECK => ANSWER_CHECK_RESULT
-    // Combined action for "check duplicates" + "suggest answer" -> Might beed to split later (TODO)
-    if (message.type === "REQUEST_ANSWER_CHECK") {
-      console.log("TS bg: REQUEST_ANSWER_CHECK", message.payload);
+    // REQUEST_DUPLICATE_CHECK => DUPLICATE_CHECK_RESULT
+    // Action for "Check Duplicates"
+    if (message.type === "REQUEST_DUPLICATE_CHECK") {
+      console.log("TS bg: REQUEST_DUPLICATE_CHECK", message.payload);
+      const context = message?.payload?.context ?? {};
+      sendResponse({
+        type: "DUPLICATE_CHECK_RESULT",
+        payload: {
+          duplicates: [], // mock: no duplicates found
+          contextEcho: context,
+          echoedAt: Date.now(),
+        },
+      });
+      return; // sync response
+    }
+
+    // REQUEST_AI_SUGGESTION => AI_SUGGESTION_RESULT
+    // Action for "Suggest Answer"
+    if (message.type === "REQUEST_AI_SUGGESTION") {
+      console.log("TS bg: REQUEST_AI_SUGGESTION", message.payload);
       const draft = message?.payload?.draft ?? "";
       const context = message?.payload?.context ?? {};
       sendResponse({
-        type: "ANSWER_CHECK_RESULT",
+        type: "AI_SUGGESTION_RESULT",
         payload: {
-          duplicates: [], // mock: no duplicates found
           suggestion: draft ? `Suggested reply based on draft: ${draft.slice(0, 64)}...` : "Mock suggested answer from background",
           contextEcho: context,
           echoedAt: Date.now(),

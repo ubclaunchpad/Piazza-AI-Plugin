@@ -80,11 +80,22 @@
   const studentAnswerPosition = "#s_answer_edit";
 
   function renderComposerButtonRequest() {
-    window.ThreadSenseObserver.waitForElement(newPostPosition, () => renderComposerButton(newPostPosition, "Check Duplicates"));
-    window.ThreadSenseObserver.waitForElement(studentAnswerPosition, () => renderComposerButton(studentAnswerPosition, "Suggest Answer"));
+    window.ThreadSenseObserver.waitForElement(
+      newPostPosition, () => renderComposerButton(
+        newPostPosition, 
+        "Check Duplicates", 
+        "REQUEST_DUPLICATE_CHECK"
+      ));
+    
+    window.ThreadSenseObserver.waitForElement(
+      studentAnswerPosition, () => renderComposerButton(
+        studentAnswerPosition, 
+        "Suggest Answer", 
+        "REQUEST_AI_SUGGESTION"
+      ));
   }
 
-  function renderComposerButton(position, message) {
+  function renderComposerButton(position, message, req) {
     let shadowDom = window.ThreadSenseRoot.initRoot(composerButtonRootID, position);
 
     if (!shadowDom) {
@@ -98,7 +109,7 @@
     wrapper.classList.add("ts-composer-container");
     wrapper.appendChild(window.ThreadSenseStyles.composerButton);
 
-    const composerButton = window.ThreadSenseComponents.createComposerButton(message);
+    const composerButton = window.ThreadSenseComponents.createComposerButton(message, req);
     wrapper.appendChild(composerButton);
 
     shadowDom.appendChild(wrapper);
