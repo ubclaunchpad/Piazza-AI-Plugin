@@ -49,22 +49,33 @@ A Chrome extension that enhances the Piazza experience with AI-powered features 
 
 ```
 frontend/
-├── manifest.json              # Extension configuration
-├── .env                      # Your environment variables (git-ignored)
+├── assets/
+│   └── icons/                  # Extension icons
 ├── src/
-│   ├── config/               # Configuration management
-│   │   └── config.js         # Environment configuration loader
-│   ├── popup/                # Extension popup interface
-│   │   ├── popup.html        # Popup UI
-│   │   ├── popup.css         # Popup styling
-│   │   └── popup.js          # Popup functionality
-│   ├── content/              # Content scripts (injected into Piazza)
-│   │   ├── piazza-enhancer.js # Main content script
-│   │   └── piazza-styles.css  # Injected styles
-│   └── background/           # Background processes
-│       └── service-worker.js # Service worker for extension
-└── assets/
-    └── icons/                # Extension icons
+│   ├── background/             # Background processes
+│   │   └── service-worker.js   # Service worker for extension
+│   ├── config/                 # Configuration management
+│   │   └── config.js           # Environment configuration loader
+│   ├── content/                # Content scripts (injected into Piazza)
+│   │   ├── bridge/
+│   │   │   └── bridge.js       # Message bridge to connect UI injections with background
+│   │   ├── dom/                
+│   │   │   └── root.js         # Shadow dom root used for UI injections
+│   │   ├── observe
+│   │   │   └── observer.js     # Monitor DOM changes for re-injection
+│   │   ├── ui/                
+│   │   │   ├── components.js   # UI injection components
+│   │   │   ├── renders.js      # Renders components into shadow DOM
+│   │   │   └── styles.js       # Component styles
+│   │   └── piazza-enhancer.js  # Main content script
+│   ├── popup/                  # Extension popup interface
+│   │   ├── popup.css           # Popup styling
+│   │   ├── popup.html          # Popup UI
+│   │   └── popup.js            # Popup functionality
+│   ├── shared/                 
+│   │   └── contracts.js        # Common definitions to avoid naming drift
+├── .env                        # Your environment variables (git-ignored)
+└── manifest.json               # Extension configuration
 ```
 
 ## 🛠️ Development Workflow
