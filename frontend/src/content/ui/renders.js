@@ -59,7 +59,7 @@
 
     window.postMessage({
       source: "threadsense",
-      type: "REQUEST_AI_SUMMARY",
+      type: window.ThreadSenseContracts.EVENT_TYPES.REQUEST_AI_SUMMARY,
       payload: { query: "Test AI Summary" }
     });
 
@@ -84,14 +84,14 @@
       newPostPosition, () => renderComposerButton(
         newPostPosition, 
         "Check Duplicates", 
-        "REQUEST_DUPLICATE_CHECK"
+        window.ThreadSenseContracts.EVENT_TYPES.REQUEST_DUPLICATE_CHECK
       ));
     
     window.ThreadSenseObserver.waitForElement(
       studentAnswerPosition, () => renderComposerButton(
         studentAnswerPosition, 
         "Suggest Answer", 
-        "REQUEST_AI_SUGGESTION"
+        window.ThreadSenseContracts.EVENT_TYPES.REQUEST_AI_SUGGESTION
       ));
   }
 

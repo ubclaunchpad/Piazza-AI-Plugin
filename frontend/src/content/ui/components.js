@@ -28,7 +28,7 @@
 
       window.postMessage({
         source: "threadsense",
-        type: "REQUEST_SEARCH",
+        type: window.ThreadSenseContracts.EVENT_TYPES.REQUEST_SEARCH,
         payload: { query: query }
       });
 
