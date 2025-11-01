@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 # Import endpoint routers
 from app.api.endpoints import example
+from app.api.endpoints import auth
 
 # Create main API router
 api_router = APIRouter()
@@ -21,7 +22,7 @@ class MessageResponse(BaseModel):
 
 # Include example endpoints
 api_router.include_router(example.router, prefix="/example", tags=["users"])
-
+api_router.include_router(auth.router, prefix="/auth", tags=["authentication"])
 
 @api_router.get("/health", response_model=MessageResponse)
 def health_check():
