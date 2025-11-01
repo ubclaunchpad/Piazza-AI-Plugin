@@ -15,10 +15,11 @@
     REQUEST_SEARCH: "REQUEST_SEARCH",
     REQUEST_AI_SUMMARY: "REQUEST_AI_SUMMARY",
     REQUEST_AI_SUGGESTION: "REQUEST_AI_SUGGESTION",
-    REQUEST_ANSWER_CHECK: "REQUEST_ANSWER_CHECK",
+    REQUEST_DUPLICATE_CHECK: "REQUEST_DUPLICATE_CHECK",
     SEARCH_RESULT: "SEARCH_RESULT",
     AI_SUMMARY_RESULT: "AI_SUMMARY_RESULT",
-    ANSWER_CHECK_RESULT: "ANSWER_CHECK_RESULT",
+    AI_SUGGESTION_RESULT: "AI_SUGGESTION_RESULT",
+    DUPLICATE_CHECK_RESULT: "DUPLICATE_CHECK_RESULT",
   };
 
   // DOM identifiers used for locating or preventing duplicate injections
@@ -27,6 +28,7 @@
     SEARCHBAR_ID: "threadsense-search-bar",
     RESPONSECARD_ID: "threadsense-response-card",
     CARD_ATTR: "data-threadsense-card",
+    COMPOSER_ID: "threadsense-composer-area",
   };
 
   // Storage keys for user preferences and toggles

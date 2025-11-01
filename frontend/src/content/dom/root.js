@@ -42,7 +42,6 @@ const CREATED_ROOT_IDS = new Set();
 
     // add to shadow registry 
     CREATED_ROOT_IDS.add(host.id);
-    console.log(CREATED_ROOT_IDS);
 
     const shadow = host.shadowRoot || host.attachShadow({ mode: "open" });
       

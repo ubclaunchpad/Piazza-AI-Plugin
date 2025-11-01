@@ -1,5 +1,5 @@
 const { initRoot, getRoot, teardownAllRoots } = window.ThreadSenseRoot;
-const { renderSearchBar, renderResponseCardRequest } = window.ThreadSenseUI;
+const { renderSearchBar, renderResponseCardRequest, renderComposerButtonRequest } = window.ThreadSenseUI;
 const { STORAGE_KEYS } = window.ThreadSenseContracts;
 
 console.log("🧠 content entry loaded");
@@ -19,6 +19,7 @@ function safeInit() {
     if (hasRoot()) {
       renderSearchBar();
       renderResponseCardRequest();
+      renderComposerButtonRequest();
       // Start DOM observer once root is ready; log outcome
       try {
         const started = window.ThreadSenseObserver?.start?.();
@@ -31,7 +32,10 @@ function safeInit() {
           
           // this return  () => offDomChanged(cb);
           const unsubscribe = window.ThreadSenseObserver?.onDomChanged?.(() => {
-            try { window.ThreadSenseUI?.renderResponseCardRequest?.(); } catch {}
+            try { 
+              renderResponseCardRequest();
+              renderComposerButtonRequest();
+            } catch {}
           });
           // Unsubscribe and reset flag when root is torn down
           window.ThreadSenseRoot?.registerCleanup?.(() => {
