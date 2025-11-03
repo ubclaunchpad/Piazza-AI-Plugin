@@ -15,7 +15,10 @@ from app.models.auth import SignUpRequest, SignUpResponse
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-@router.post("/signup", response_model=SignUpResponse, status_code=status.HTTP_201_CREATED)
+
+@router.post(
+    "/signup", response_model=SignUpResponse, status_code=status.HTTP_201_CREATED
+)
 def signup(user_data: SignUpRequest):
     """
     Register a new user via Supabase Auth and persist their profile to the local database.
@@ -56,9 +59,14 @@ def signup(user_data: SignUpRequest):
         if "user already registered" in msg:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=msg)
         if "password" in msg and ("invalid" in msg or "weak" in msg):
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=msg)
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=msg
+            )
         logger.exception("Supabase sign_up failed")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Supabase signup failed: " + msg)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Supabase signup failed: " + msg,
+        )
 
     user = res.user
     if not user or not getattr(user, "id", None):

@@ -23,6 +23,7 @@ class MessageResponse(BaseModel):
 api_router.include_router(example.router, prefix="/example", tags=["users"])
 api_router.include_router(auth.router, prefix="/auth", tags=["authentication"])
 
+
 @api_router.get("/health", response_model=MessageResponse)
 def health_check():
     """Health check endpoint example."""
