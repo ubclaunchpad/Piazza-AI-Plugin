@@ -4,12 +4,13 @@ Authentication endpoint handler for user registration.
 
 import logging
 from hashlib import sha256
+
 from fastapi import APIRouter, HTTPException, status
 
-from app.core.database import execute_insert
-from app.models.auth import SignUpRequest, SignUpResponse
-from app.core.supabase import supabase
 from app.core.config import settings
+from app.core.database import execute_insert
+from app.core.supabase import supabase
+from app.models.auth import SignUpRequest, SignUpResponse
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -37,7 +38,7 @@ def signup(user_data: SignUpRequest):
             500 - if Supabase or database operations fail.
     """
     try:
-        # Create a user in Supabase Auth. 
+        # Create a user in Supabase Auth.
         # The `email_redirect_to` defines where users land after confirming their email.
         res = supabase.auth.sign_up(
             {
@@ -79,7 +80,7 @@ def signup(user_data: SignUpRequest):
             (user.id, user_data.display_name, email_hash),
             return_id=False,
         )
-    except Exception as e:
+    except Exception:
         # If DB insertion fails, delete the Supabase Auth user to prevent orphaned records
         if user and getattr(user, "id", None):
             try:

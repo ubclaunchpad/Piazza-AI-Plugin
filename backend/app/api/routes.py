@@ -6,8 +6,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 # Import endpoint routers
-from app.api.endpoints import example
-from app.api.endpoints import auth
+from app.api.endpoints import auth, example
 
 # Create main API router
 api_router = APIRouter()
