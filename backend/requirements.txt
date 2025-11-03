@@ -16,5 +16,6 @@ psycopg2-binary==2.9.11
 # Uncomment when adding database functionality:
 # asyncpg==0.29.0
 # sqlalchemy[asyncio]==2.0.23
+# websockets is required as a peer dependency for supabase==2.23.0 (even though it is not directly imported or used in this codebase).
 websockets>=12,<14
 supabase==2.23.0

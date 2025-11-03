@@ -54,11 +54,12 @@ def signup(user_data: SignUpRequest):
             }
         )
     except Exception as e:
-        msg = str(e).lower()
+        msg = str(e)
+        msg_lc = msg.lower()
         # Handle common Supabase errors gracefully
-        if "user already registered" in msg:
+        if "user already registered" in msg_lc:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=msg)
-        if "password" in msg and ("invalid" in msg or "weak" in msg):
+        if "password" in msg_lc and ("invalid" in msg_lc or "weak" in msg_lc):
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=msg
             )
@@ -79,15 +80,19 @@ def signup(user_data: SignUpRequest):
         # Store the user profile locally.
         # The email is hashed (lowercased, SHA-256) for privacy and consistency.
         email_hash = sha256(user_data.email.lower().encode("utf-8")).hexdigest()
-        execute_insert(
+        inserted_id = execute_insert(
             (
                 "INSERT INTO users (id, display_name, hashed_email) "
                 "VALUES (%s, %s, %s) "
-                "ON CONFLICT (id) DO NOTHING;"
+                "ON CONFLICT (id) DO NOTHING RETURNING id;"
             ),
             (user.id, user_data.display_name, email_hash),
-            return_id=False,
+            return_id=True,
         )
+        if not inserted_id:
+            logger.warning(
+                f"User profile insertion conflict: user with id {user.id} already exists in database."
+            )
     except Exception:
         # If DB insertion fails, delete the Supabase Auth user to prevent orphaned records
         if user and getattr(user, "id", None):
