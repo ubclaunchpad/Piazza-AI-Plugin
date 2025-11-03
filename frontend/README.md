@@ -58,7 +58,7 @@ frontend/
 │   │   └── config.js           # Environment configuration loader
 │   ├── content/                # Content scripts (injected into Piazza)
 │   │   ├── bridge/
-│   │   │   └── bridge.js       # Message bridge to connect UI injections with background
+│   │   │   └── bridge.js       # Message bridge between injected UI and background
 │   │   ├── dom/                
 │   │   │   └── root.js         # Shadow dom root used for UI injections
 │   │   ├── observe

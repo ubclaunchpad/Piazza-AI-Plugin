@@ -1,33 +1,3 @@
-
-## 📁 Structure
-
-```
-src/
-├── background/             # Background processes
-│   └── service-worker.js   # Service worker for extension
-├── config/                 # Configuration management
-│   └── config.js           # Environment configuration loader
-├── content/                # Content scripts (injected into Piazza)
-│   ├── bridge/
-│   │   └── bridge.js       # Message bridge to connect UI injections with background
-│   ├── dom/                
-│   │   └── root.js         # Shadow dom root used for UI injections
-│   ├── observe
-│   │   └── observer.js     # Monitor DOM changes for re-injection
-│   ├── ui/                
-│   │   ├── components.js   # UI injection components
-│   │   ├── renders.js      # Renders components into shadow DOM
-│   │   └── styles.js       # Component styles
-│   └── piazza-enhancer.js  # Main content script
-├── popup/                  # Extension popup interface
-│   ├── popup.css           # Popup styling
-│   ├── popup.html          # Popup UI
-│   └── popup.js            # Popup functionality
-└── shared/                 
-    └── contracts.js        # Common definitions to avoid naming drift
-```
-
-
 ## 🛠️ Injection Points
 
 |            Component             |                  Position                  |           Selector          |
