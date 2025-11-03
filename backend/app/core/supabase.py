@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 def get_supabase_client() -> Client:
     """Safely create and return a Supabase client."""
     try:
-        client = create_client(settings.SUPABASE_URL, settings.SUPABASE_ANON_KEY)
+        client = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)
         logger.info("Supabase client initialized successfully.")
         return client
     except Exception as exc:
