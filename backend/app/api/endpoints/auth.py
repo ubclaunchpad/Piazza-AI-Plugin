@@ -8,7 +8,7 @@ from hashlib import sha256
 from fastapi import APIRouter, HTTPException, status
 
 from app.core.config import settings
-from app.core.database import execute_insert
+from app.core.database import execute_statement
 from app.core.supabase import supabase
 from app.models.auth import SignUpRequest, SignUpResponse
 
@@ -80,19 +80,14 @@ def signup(user_data: SignUpRequest):
         # Store the user profile locally.
         # The email is hashed (lowercased, SHA-256) for privacy and consistency.
         email_hash = sha256(user_data.email.lower().encode("utf-8")).hexdigest()
-        inserted_id = execute_insert(
+        execute_statement(
             (
                 "INSERT INTO users (id, display_name, hashed_email) "
                 "VALUES (%s, %s, %s) "
-                "ON CONFLICT (id) DO NOTHING RETURNING id;"
+                "ON CONFLICT (id) DO NOTHING;"
             ),
             (user.id, user_data.display_name, email_hash),
-            return_id=True,
         )
-        if not inserted_id:
-            logger.warning(
-                f"User profile insertion conflict: user with id {user.id} already exists in database."
-            )
     except Exception:
         # If DB insertion fails, delete the Supabase Auth user to prevent orphaned records
         if user and getattr(user, "id", None):
