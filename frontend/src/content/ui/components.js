@@ -77,7 +77,7 @@
     button.addEventListener("click", () => {
       const query = "Composer area draft query";
       if (!query) return;
-      console.log("🧠 Composer button triggered:", query);
+      console.log("🧠 Composer button triggered:");
 
       window.postMessage({
         source: "threadsense",
