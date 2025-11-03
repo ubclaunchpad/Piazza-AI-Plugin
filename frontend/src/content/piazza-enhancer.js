@@ -1,55 +1,87 @@
-/**
- * Simple Content Script for Piazza AI Plugin
- */
+const { initRoot, getRoot, teardownAllRoots } = window.ThreadSenseRoot;
+const { renderSearchBar, renderResponseCardRequest, renderComposerButtonRequest } = window.ThreadSenseUI;
+const { STORAGE_KEYS } = window.ThreadSenseContracts;
 
-console.log("🧠 Piazza AI Plugin: Content script loaded");
-
-// Set a flag to indicate this script is loaded
+console.log("🧠 content entry loaded");
 window.piazzaAILoaded = true;
 
-// Listen for messages from popup
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  console.log("Content script received:", message);
+// TS : thread Sense State
+if (!window.__TS__) window.__TS__ = { initing: false }; 
 
-  if (message.type === "TEST") {
-    sendResponse({ success: true, message: "Content script is working!" });
-    return true;
+function hasRoot() { return !!getRoot?.(); }  // TODO ? 
+
+function safeInit() {
+  if (window.__TS__.initing) return;
+  if (hasRoot()) return;
+  window.__TS__.initing = true;
+  try {
+    initRoot();
+    if (hasRoot()) {
+      renderSearchBar();
+      renderResponseCardRequest();
+      renderComposerButtonRequest();
+      // Start DOM observer once root is ready; log outcome
+      try {
+        const started = window.ThreadSenseObserver?.start?.();
+        console.log(started ? "TS observe: start ok" : "TS observe: not started (no root or already running)");
+      } catch {}
+      // Re-inject ResponseCard on DOM changes (idempotent renderer)
+      try {
+        if (!window.__TS_OBS_CARD_BOUND) { // ThreadSense Observer ResponseCard bind
+          window.__TS_OBS_CARD_BOUND = true;
+          
+          // this return  () => offDomChanged(cb);
+          const unsubscribe = window.ThreadSenseObserver?.onDomChanged?.(() => {
+            try { 
+              renderResponseCardRequest();
+              renderComposerButtonRequest();
+            } catch {}
+          });
+          // Unsubscribe and reset flag when root is torn down
+          window.ThreadSenseRoot?.registerCleanup?.(() => {
+            try { unsubscribe?.(); } catch {}
+            window.__TS_OBS_CARD_BOUND = false;
+          });
+        }
+      } catch {}
+      console.log("Shadow root initialized");
+    }
+    else {
+      console.error("Root missing");
+    }
+  } finally {
+    window.__TS__.initing = false;
+  }
+}
+
+function safeTeardown() {
+  try { teardownAllRoots?.(); } catch {}
+}
+
+chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (msg && msg.type === "TEST") {
+    const ok = !!getRoot();
+    sendResponse({ success: ok, message: ok ? "root OK" : "root missing" });
+    // return false (sync). Only return true if you will reply async.
   }
 
-  // TODO: Add more message handlers as needed
+  if (msg?.type === "TS_TOGGLE") {
+      msg.enabled ? safeInit() : safeTeardown();
+    }  
+
 });
 
-// Simple page enhancement
-function enhance() {
-  // Add a small indicator that the extension is active
-  const indicator = document.createElement("div");
-  indicator.innerHTML = "🧠 AI";
-  indicator.style.cssText = `
-    position: fixed;
-    top: 10px;
-    right: 10px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    padding: 4px 8px;
-    border-radius: 12px;
-    font-size: 12px;
-    z-index: 9999;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
-  `;
-
-  document.body.appendChild(indicator);
-
-  // Auto-remove after 3 seconds
-  setTimeout(() => {
-    if (indicator.parentNode) {
-      indicator.remove();
-    }
-  }, 3000);
+async function initThreadSense() {
+  const res = await chrome.storage.sync.get({ [STORAGE_KEYS.ENABLED]: true });
+  const enabled = !!res[STORAGE_KEYS.ENABLED];
+  enabled ? safeInit() : safeTeardown();
 }
 
-// Run enhancement when page loads
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", enhance);
+  document.addEventListener("DOMContentLoaded", () => initThreadSense());
 } else {
-  enhance();
+  initThreadSense();
 }
+
+// TODO: for the testing purpose, this is dev only should be removed for production
+window.ThreadSense = { initRoot, getRoot, teardownAllRoots };

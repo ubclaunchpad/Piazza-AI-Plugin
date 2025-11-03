@@ -26,11 +26,27 @@ document.addEventListener("DOMContentLoaded", () => {
   const testBtn = document.getElementById("testBtn");
   const status = document.getElementById("status");
   const versionElement = document.getElementById("version");
+  const tsToggle = document.getElementById("tsToggle");
 
   // Set version from config
   if (versionElement) {
     versionElement.textContent = `v${config.get("VERSION")}`;
   }
+
+  // chrome sync toggle option
+  chrome.storage.sync.get({ ts_enabled: true }, ({ ts_enabled }) => {  
+    if (tsToggle) tsToggle.checked = !!ts_enabled;
+  });
+
+  tsToggle?.addEventListener("change", async (e) => {
+    const enabled = e.target.checked;
+    await chrome.storage.sync.set({ ts_enabled: enabled});
+
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true }).catch(() => []);
+    if (tab?.url.includes("piazza.com")) {
+      chrome.tabs.sendMessage(tab.id, { type: "TS_TOGGLE", enabled }).catch(() => {});
+    }
+  })
 
   testBtn.addEventListener("click", async () => {
     status.textContent = "Testing...";
