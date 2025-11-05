@@ -6,7 +6,11 @@ pdf extraction and content normalization.
 
 import pdfplumber
 import hashlib
+import uuid
+import json
 from pathlib import Path
+from datetime import datetime, timezone
+
 
 def sha256_file(path: Path) -> str:
     """File hashing and unique identifier"""
@@ -17,3 +21,28 @@ def sha256_file(path: Path) -> str:
             h.update(chunk)
     return h.hexdigest()
 
+def pdf_extract(input_path: Path, output_path: Path, page_range=None) -> int:
+    """Text extraction and metadata assignment"""
+
+    # Get unique identifier
+    doc_hash = sha256_file(input_path)
+    doc_uuid = str(uuid.uuid5(uuid.NAMESPACE_URL, doc_hash))
+
+    # Create flag for skipped pages
+    skipped = False
+
+    # Create pdfpllumber instance and file-write handle
+    with pdfplumber.open(input_path) as pdf, open(output_path, "w", encoding="utf-8") as fout:
+
+        header = {
+            "type":"document",
+            "doc_id":doc_uuid,
+            "source_path": str(input_path),
+            "created_at":datetime.now(timezone.utc).isoformat(),
+            "tool_version": "0.1.0"
+        }
+
+        fout.write(json.dumps(header) + "\n")
+
+    return 0
+    
