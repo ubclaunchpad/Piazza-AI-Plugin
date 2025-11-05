@@ -1,13 +1,16 @@
 const path = require('path');
-const HTMLWebpackPlugin = require('html-webpack-plugin');
-
-
+const CopyPlugin = require("copy-webpack-plugin");
 
 module.exports = {
-    entry: "./src/index.jsx",
+    mode: "production",
+    devtool: 'cheap-module-source-map',
+    entry: {
+        content: "./src/index.jsx",
+        background: "./src/background.js"
+    },
     output: {
-        path: path.resolve(__dirname, '/dist'),
-        filename: "bundle.js",
+        path: path.resolve(__dirname, 'dist'),
+        filename: "[name].js",
         clean: true
     },
     resolve: {
@@ -18,15 +21,15 @@ module.exports = {
             {
                 test: /\.(js|jsx)$/,
                 exclude: /node_modules/,
-                use: 'babel-loader'
-            },
-            {
-                test: /\.sass/,
-                use: [
-                    'style-loader',
-                    'css-loader',
-                    "sass-loader"
-                ]
+                use: {
+                    loader: 'babel-loader',
+                    options: {
+                        presets: [
+                            '@babel/preset-env',
+                            ['@babel/preset-react', { runtime: 'automatic' }]
+                        ]
+                    }
+                }
             },
             {
                 test: /\.css$/,
@@ -39,19 +42,11 @@ module.exports = {
         ]
     },
     plugins: [
-        new HTMLWebpackPlugin({
-            template: "./public/index.html",
-        }),
+        new CopyPlugin({
+            patterns: [
+                { from: 'public/manifest.json', to: 'manifest.json' },
+                { from: 'public/icons', to: 'icons', noErrorOnMissing: true }
+            ]
+        })
     ],
-    devServer: {
-        port: 3000,
-        compress: true,
-        open: true,
-        hot: true,
-        static: {
-            directory: path.join(__dirname, "dist"),
-            watch: true
-        }
-    },
-    mode: "development"
 }

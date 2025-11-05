@@ -1,12 +1,14 @@
-import { StrictMode } from 'react';
 import { createRoot } from "react-dom/client";
-import './styles/index.css';
-import App from './App';
+import App from "./App";
+import "./App.css"
 
-const root = createRoot(document.getElementById('root'));
+// Create a shadow DOM to isolate styles from the host page
+const container = document.createElement('div');
+container.id = 'ai-chatbot-extension-root';
 
-root.render(
-    <StrictMode>
-        <App />
-    </StrictMode>
-)
+// Append to body
+document.body.appendChild(container);
+
+// Render React app
+const root = createRoot(container);
+root.render(<App />);

@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "ThreadSense Chat",
+  "version": "1.0",
+  "description": "AI-powered chat assistant",
+  "content_scripts": [
+    {
+      "matches": ["https://piazza.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "permissions": ["storage"],
+  "host_permissions": ["<all_urls>"]
+}
