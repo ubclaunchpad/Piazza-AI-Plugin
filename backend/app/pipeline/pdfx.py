@@ -1,6 +1,0 @@
-"""
-
-PDF extraction and normalization
-
-"""
-
