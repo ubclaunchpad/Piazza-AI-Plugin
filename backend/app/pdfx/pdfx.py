@@ -4,6 +4,7 @@ command line interface for pdf extraction.
 
 """
 import click
+import extraction
 
 
 @click.group()
@@ -38,6 +39,8 @@ def extract(input_path, out):
     """
     
     click.echo(f"extracting from {input_path} to {out}")
+    sha:str = extraction.sha256_file(input_path)
+    click.echo(f"unique file identifier {sha}")
     
 
 if __name__ == '__main__':
