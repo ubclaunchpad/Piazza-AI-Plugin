@@ -54,7 +54,7 @@ def extract(input_path, output_path, page_range):
         start, end = page_range
         click.echo(f"Extracting pages {start} to {end}")
     else:
-        start, end = None, None
+        start, end = None,None
         
 
     input_path = Path(input_path)
@@ -64,7 +64,9 @@ def extract(input_path, output_path, page_range):
         output_path = output_path / f"{input_path.stem}-{sha256_file(input_path)}.jsonl"
 
     click.echo(f"extracting from {input_path} to {output_path}")
-    exit_code = pdf_extract(input_path, output_path, (start, end))
+    # pass None to pdf_extract when no page range was provided
+    page_range_arg = None if (start is None and end is None) else (start, end)
+    exit_code = pdf_extract(input_path, output_path, page_range_arg)
     raise SystemExit(exit_code)
     
 
