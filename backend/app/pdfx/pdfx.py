@@ -4,8 +4,11 @@ command line interface for pdf extraction.
 
 """
 import click
-import extraction
 from pathlib import Path
+from .extraction import pdf_extract, sha256_file
+from . import PageRange
+
+
 
 
 @click.group()
@@ -25,15 +28,19 @@ def health_check():
               type=click.Path(dir_okay=True, writable=True),
               default="./",
               help="relative output file path")
-def extract(input_path, output_path):
+@click.option("--page-range", "-p", "page_range", help="Range of text extraction", type = PageRange())
+def extract(input_path, output_path, page_range):
     """
     Extract Pdf to JSONL.
 
-    Args:
+    Arguments:
         input_path: input file path
+
+    Options:
         out: output file path or directory path
           - default, if no output file is given, auto generate .jsonl
           - if out is a directory, also generate .jsonl
+        page_range
 
     Exit Codes:
         0: Success
@@ -41,16 +48,23 @@ def extract(input_path, output_path):
         2: Fatal
 
     """
-    doc_id:str = extraction.sha256_file(input_path)
+
+    # Check if page range was given
+    if page_range:
+        start, end = page_range
+        click.echo(f"Extracting pages {start} to {end}")
+    else:
+        start, end = None, None
+        
 
     input_path = Path(input_path)
     output_path = Path(output_path)
 
     if output_path.is_dir():
-        output_path = output_path / f"{input_path.stem}-{doc_id}.jsonl"
+        output_path = output_path / f"{input_path.stem}-{sha256_file(input_path)}.jsonl"
 
     click.echo(f"extracting from {input_path} to {output_path}")
-    exit_code = extraction.pdf_extract(input_path, output_path)
+    exit_code = pdf_extract(input_path, output_path, (start, end))
     raise SystemExit(exit_code)
     
 

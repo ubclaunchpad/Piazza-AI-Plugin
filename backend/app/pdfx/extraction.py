@@ -39,10 +39,30 @@ def pdf_extract(input_path: Path, output_path: Path, page_range=None) -> int:
             "doc_id":doc_uuid,
             "source_path": str(input_path),
             "created_at":datetime.now(timezone.utc).isoformat(),
-            "tool_version": "0.1.0"
+            "tool_version": "0.1.0",
+            "page_length":len(pdf.pages)
         }
 
         fout.write(json.dumps(header) + "\n")
 
+        if page_range is None:
+            start, end = page_range
+        else:
+            start, end = 0, len(pdf.pages)
+
+        for i, pages in enumerate(pdf.pages[start:end], start = start):
+            text = pdf.pages[i].extract_text()
+
+            if not text:
+                skipped = True
+                continue
+            
+            block = {
+                "type":"block",
+                "text": text
+            }
+
+            fout.write(json.dumps(block) + "\n")
+    
     return 0
     
