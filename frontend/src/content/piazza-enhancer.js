@@ -1,22 +1,190 @@
-/**
- * Simple Content Script for Piazza AI Plugin
- */
-
 console.log("🧠 Piazza AI Plugin: Content script loaded");
-
-// Set a flag to indicate this script is loaded
 window.piazzaAILoaded = true;
 
-// Listen for messages from popup
+/**
+ * Extract CSRF token from the Piazza page
+ */
+function getCSRFToken() {
+  const metaToken = document.querySelector('meta[name="csrf_token"]')?.content;
+  if (metaToken) return metaToken;
+
+  console.warn("CSRF token not found");
+  return null;
+}
+
+function getNetworkId() {
+  const match = window.location.pathname.match(/\/class\/([a-z0-9]+)/i);
+  return match ? match[1] : null;
+}
+
+/**
+ * Make authenticated API call to Piazza
+ * Uses session cookies automatically attached by the browser
+ * 
+ * @param {string} method - Piazza API method (e.g., "network.get_my_feed")
+ * @param {object} params - Parameters for the API call
+ * @returns {Promise<object>} - API response data
+ */
+async function callPiazzaAPI(method, params = {}) {
+  const csrfToken = getCSRFToken();
+  
+  if (!csrfToken) {
+    throw new Error("CSRF token not available");
+  }
+
+  try {
+    const response = await fetch("https://piazza.com/logic/api", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "CSRF-Token": csrfToken,
+      },
+      credentials: "include", // Ensure cookies are sent
+      body: JSON.stringify({
+        method: method,
+        params: params
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`API call failed: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error("Piazza API call failed:", error);
+    throw error;
+  }
+}
+
+/**
+ * Fetch user's feed for the current class
+ */
+async function fetchMyFeed() {
+  const nid = getNetworkId();
+  if (!nid) {
+    throw new Error("Not on a class page");
+  }
+
+  console.log("Fetching feed for class:", nid);
+  const data = await callPiazzaAPI("network.get_my_feed", { nid });
+  console.log("Feed data:", data);
+  return data;
+}
+
+/**
+ * Fetch all posts for the current class
+ * Note: This might be a heavy operation
+ */
+async function fetchAllPosts() {
+  const nid = getNetworkId();
+  if (!nid) {
+    throw new Error("Not on a class page");
+  }
+
+  console.log("Fetching all posts for class:", nid);
+  const data = await callPiazzaAPI("network.get_all_posts", { nid });
+  console.log("All posts data:", data);
+  return data;
+}
+
+/**
+ * Fetch user profile information
+ */
+async function fetchUserProfile() {
+  console.log("Fetching user profile");
+  const data = await callPiazzaAPI("get_user_profile", {});
+  console.log("User profile:", data);
+  return data;
+}
+
+/**
+ * Fetch statistics for the current class
+ */
+async function fetchClassStats() {
+  const nid = getNetworkId();
+  if (!nid) {
+    throw new Error("Not on a class page");
+  }
+
+  console.log("Fetching class statistics:", nid);
+  const data = await callPiazzaAPI("network.get_stats", { nid });
+  console.log("Class stats:", data);
+  return data;
+}
+
+/**
+ * Send CSRF token to background script
+ * Allows background script to make authenticated requests
+ */
+function sendCSRFToBackground() {
+  const csrfToken = getCSRFToken();
+  if (csrfToken) {
+    chrome.runtime.sendMessage({
+      type: "CSRF_TOKEN",
+      token: csrfToken,
+      networkId: getNetworkId()
+    });
+  }
+}
+
+/**
+ * Send fetched data to background script for processing
+ */
+function sendDataToBackground(dataType, data) {
+  chrome.runtime.sendMessage({
+    type: "PIAZZA_DATA",
+    dataType: dataType,
+    data: data,
+    timestamp: Date.now()
+  });
+}
+
+// Listen for messages from popup and background script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log("Content script received:", message);
 
-  if (message.type === "TEST") {
-    sendResponse({ success: true, message: "Content script is working!" });
-    return true;
-  }
+  const handleAsync = async () => {
+    try {
+      switch (message.type) {
+        case "TEST":
+          return { success: true, message: "Content script is working!" };
 
-  // TODO: Add more message handlers as needed
+        case "GET_CSRF":
+          return { success: true, token: getCSRFToken(), networkId: getNetworkId() };
+
+        case "FETCH_FEED":
+          const feedData = await fetchMyFeed();
+          sendDataToBackground("feed", feedData);
+          return { success: true, data: feedData };
+
+        case "FETCH_ALL_POSTS":
+          const postsData = await fetchAllPosts();
+          sendDataToBackground("all_posts", postsData);
+          return { success: true, data: postsData };
+
+        case "FETCH_USER_PROFILE":
+          const profileData = await fetchUserProfile();
+          sendDataToBackground("user_profile", profileData);
+          return { success: true, data: profileData };
+
+        case "FETCH_CLASS_STATS":
+          const statsData = await fetchClassStats();
+          sendDataToBackground("class_stats", statsData);
+          return { success: true, data: statsData };
+
+        default:
+          return { success: false, error: "Unknown message type" };
+      }
+    } catch (error) {
+      console.error("Error handling message:", error);
+      return { success: false, error: error.message };
+    }
+  };
+
+  handleAsync().then(sendResponse);
+  return true;
 });
 
 // Simple page enhancement
@@ -36,6 +204,7 @@ function enhance() {
     z-index: 9999;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
   `;
+  
 
   document.body.appendChild(indicator);
 
@@ -49,7 +218,11 @@ function enhance() {
 
 // Run enhancement when page loads
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", enhance);
+  document.addEventListener("DOMContentLoaded", () => {
+    enhance();
+    sendCSRFToBackground();
+  });
 } else {
   enhance();
+  sendCSRFToBackground();
 }
