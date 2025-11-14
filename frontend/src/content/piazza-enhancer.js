@@ -169,22 +169,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
         case "FETCH_FEED":
           const feedData = await fetchMyFeed();
-          sendDataToBackground("feed", feedData);
           return { success: true, data: feedData };
 
         case "FETCH_ALL_POSTS":
           const postsData = await fetchAllPosts();
-          sendDataToBackground("all_posts", postsData);
           return { success: true, data: postsData };
 
         case "FETCH_USER_PROFILE":
           const profileData = await fetchUserProfile();
-          sendDataToBackground("user_profile", profileData);
           return { success: true, data: profileData };
 
         case "FETCH_CLASS_STATS":
           const statsData = await fetchClassStats();
-          sendDataToBackground("class_stats", statsData);
           return { success: true, data: statsData };
 
         default:
