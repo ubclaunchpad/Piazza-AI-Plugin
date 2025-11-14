@@ -13,7 +13,7 @@ function getCSRFToken() {
 }
 
 function getNetworkId() {
-  const match = window.location.pathname.match(/\/class\/([a-z0-9]+)/i);
+  const match = window.location.pathname.match(/\/class\/([A-Za-z0-9]+)/i);
   return match ? match[1] : null;
 }
 
