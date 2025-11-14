@@ -2,6 +2,8 @@
 
 command line interface for pdf extraction.
 
+run via python -m app.pdfx.pdfx 
+
 """
 import click
 from pathlib import Path
