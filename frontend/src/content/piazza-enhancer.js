@@ -134,6 +134,12 @@ function sendCSRFToBackground() {
       type: "CSRF_TOKEN",
       token: csrfToken,
       networkId: getNetworkId()
+    }, (response) => {
+      if (chrome.runtime.lastError) {
+        console.error("Failed to send CSRF token:", chrome.runtime.lastError.message);
+      } else {
+        console.log("CSRF token sent successfully");
+      }
     });
   } else {
     console.warn("sendCSRFToBackground: CSRF token is null or undefined. Token not sent to background script.", {
@@ -151,6 +157,12 @@ function sendDataToBackground(dataType, data) {
     dataType: dataType,
     data: data,
     timestamp: Date.now()
+  }, (response) => {
+    if (chrome.runtime.lastError) {
+      console.error(`Failed to send ${dataType} data:`, chrome.runtime.lastError.message);
+    } else {
+      console.log(`${dataType} data sent successfully`);
+    }
   });
 }
 
