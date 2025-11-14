@@ -135,6 +135,10 @@ function sendCSRFToBackground() {
       token: csrfToken,
       networkId: getNetworkId()
     });
+  } else {
+    console.warn("sendCSRFToBackground: CSRF token is null or undefined. Token not sent to background script.", {
+      networkId: getNetworkId()
+    });
   }
 }
 
