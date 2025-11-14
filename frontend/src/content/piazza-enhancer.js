@@ -12,6 +12,15 @@ function getCSRFToken() {
   return null;
 }
 
+/**
+ * Extract the network (class) ID from the current Piazza URL.
+ *
+ * @returns {string|null} The network ID if present in the URL, otherwise null.
+ *
+ * @example
+ * // If the URL is "https://piazza.com/class/abc123"
+ * const nid = getNetworkId(); // "abc123"
+ */
 function getNetworkId() {
   const match = window.location.pathname.match(/\/class\/([A-Za-z0-9]+)/i);
   return match ? match[1] : null;
