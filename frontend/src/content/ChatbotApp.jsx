@@ -159,14 +159,14 @@ function ChatbotApp() {
               className="bg-white/20 border-none text-white w-7 h-7 rounded-full cursor-pointer text-base flex items-center justify-center transition-colors hover:bg-white/30"
               onClick={() => setIsExpanded(false)}
             >
-              ✕
+              &times;
             </button>
           </div>
 
           <div className="flex-1 overflow-y-auto p-5 bg-gray-50 flex flex-col gap-3 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
             {messages.length === 0 ? (
               <div className="flex items-center justify-center h-full text-gray-600 text-sm">
-                <p>👋 Hi! How can I help you today?</p>
+                <p>Hi! How can I help you today?</p>
               </div>
             ) : (
               messages.map((msg, idx) => (
@@ -317,7 +317,7 @@ function ChatbotApp() {
               className="w-10 h-10 rounded-full border-none bg-gradient-to-br from-purple-500 to-purple-700 text-white text-lg cursor-pointer flex items-center justify-center flex-shrink-0 transition-transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={!inputValue.trim() || isLoading}
             >
-              ➤
+              &rarr;
             </button>
           </form>
         </div>
