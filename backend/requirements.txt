@@ -1,16 +1,19 @@
 # Minimal FastAPI Backend Dependencies
 
 # Core Framework
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
+fastapi
+uvicorn[standard]
 
 # Configuration
-pydantic==2.5.0
-pydantic-settings==2.0.3
-python-dotenv==1.0.0
+pydantic
+pydantic-settings
+python-dotenv
+
+# LLM / AI
+langchain-groq
 
 # Database
-psycopg2-binary==2.9.9
+psycopg2-binary
 
 # Database (when needed)
 # Uncomment when adding database functionality:

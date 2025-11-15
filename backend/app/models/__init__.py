@@ -10,6 +10,9 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
+# Import LLM models
+from app.models.llm import QueryRequest, QueryResponse
+
 
 class UserStatus(str, Enum):
     """User status enumeration."""
@@ -65,6 +68,8 @@ __all__ = [
     "UserCreate",
     "UserResponse",
     "UserUpdate",
+    "QueryRequest",
+    "QueryResponse",
 ]
 
 # TODO: Add SQLAlchemy database models when needed
