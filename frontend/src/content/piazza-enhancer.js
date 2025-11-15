@@ -1,7 +1,7 @@
 /**
  * Simple Content Script for Piazza AI Plugin
  */
-
+import "./piazza-styles.css";
 console.log("🧠 Piazza AI Plugin: Content script loaded");
 
 // Set a flag to indicate this script is loaded
