@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
 
 /* global chrome */
-export default function DashboardPage({ user, onLogout }) {
+export default function DashboardPage({
+  user,
+  onLogout,
+  onNavigateToAssistant,
+}) {
   const [currentTab, setCurrentTab] = useState(null);
   const [piazzaInfo, setPiazzaInfo] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -30,7 +34,20 @@ export default function DashboardPage({ user, onLogout }) {
           classId: pathParts[1] || null,
           postId: url.searchParams.get("cid") || null,
           pathname: url.pathname,
+          threadName: null,
         };
+
+        // Try to get thread name from content script
+        try {
+          const response = await chrome.tabs.sendMessage(tab.id, {
+            type: "GET_PIAZZA_INFO",
+          });
+          if (response && response.success && response.threadName) {
+            info.threadName = response.threadName;
+          }
+        } catch (error) {
+          console.log("Could not get thread name from content script:", error);
+        }
 
         setPiazzaInfo(info);
       } else {
@@ -120,6 +137,17 @@ export default function DashboardPage({ user, onLogout }) {
                   </div>
                 )}
 
+                {piazzaInfo.threadName && (
+                  <div className="flex items-start gap-2 text-sm">
+                    <span className="text-gray-600 font-medium min-w-[70px]">
+                      Thread:
+                    </span>
+                    <span className="text-gray-900 font-semibold bg-purple-50 px-1.5 py-0.5 rounded">
+                      {piazzaInfo.threadName}
+                    </span>
+                  </div>
+                )}
+
                 {piazzaInfo.postId && (
                   <div className="flex items-start gap-2 text-sm">
                     <span className="text-gray-600 font-medium min-w-[70px]">
@@ -146,13 +174,16 @@ export default function DashboardPage({ user, onLogout }) {
 
               {/* Quick Actions */}
               <div className="flex gap-2 mt-2">
-                <button className="flex-1 px-3 py-2 bg-gray-100 border border-gray-200 rounded-md text-xs font-medium cursor-pointer flex items-center justify-center gap-1.5 transition-all hover:bg-gray-200 hover:border-gray-300">
-                  <span>💬</span>
-                  Open Chat
+                <button
+                  onClick={onNavigateToAssistant}
+                  className="flex-1 px-3 py-2 bg-gray-100 border border-gray-200 rounded-md text-xs font-medium cursor-pointer flex items-center justify-center gap-1.5 transition-all hover:bg-gray-200 hover:border-gray-300"
+                >
+                  <span>📊</span>
+                  Assistant
                 </button>
                 <button className="flex-1 px-3 py-2 bg-gray-100 border border-gray-200 rounded-md text-xs font-medium cursor-pointer flex items-center justify-center gap-1.5 transition-all hover:bg-gray-200 hover:border-gray-300">
-                  <span>📊</span>
-                  Analytics
+                  <span>📥</span>
+                  Ingest Thread
                 </button>
               </div>
             </div>

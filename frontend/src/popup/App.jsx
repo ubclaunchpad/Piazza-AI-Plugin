@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import LoginPage from "./LoginPage";
 import DashboardPage from "./DashboardPage";
+import AssistantPage from "./AssistantPage";
 
 /* global chrome */
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState(null);
+  const [currentPage, setCurrentPage] = useState("dashboard"); // 'dashboard' or 'assistant'
 
   // Check if user is already logged in
   useEffect(() => {
@@ -77,6 +79,7 @@ export default function App() {
     await chrome.storage.local.remove(["user", "authToken"]);
     setUser(null);
     setIsAuthenticated(false);
+    setCurrentPage("dashboard");
   };
 
   if (isLoading) {
@@ -93,7 +96,18 @@ export default function App() {
   return (
     <div className="w-[380px] min-h-[500px] bg-white flex flex-col">
       {isAuthenticated ? (
-        <DashboardPage user={user} onLogout={handleLogout} />
+        currentPage === "dashboard" ? (
+          <DashboardPage
+            user={user}
+            onLogout={handleLogout}
+            onNavigateToAssistant={() => setCurrentPage("assistant")}
+          />
+        ) : (
+          <AssistantPage
+            user={user}
+            onBack={() => setCurrentPage("dashboard")}
+          />
+        )
       ) : (
         <LoginPage onLogin={handleLogin} onSignup={handleSignup} />
       )}

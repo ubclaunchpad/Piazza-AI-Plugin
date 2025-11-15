@@ -12,7 +12,7 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://piazza.com/*"],
+      "matches": ["https://piazza.com/class/*"],
       "js": ["content.js"],
       "run_at": "document_end"
     }
@@ -32,5 +32,5 @@
     "service_worker": "background.js"
   },
   "permissions": ["activeTab", "storage"],
-  "host_permissions": ["https://piazza.com/*", "http://localhost:8000/*"]
+  "host_permissions": ["https://piazza.com/class/*", "http://localhost:8000/*"]
 }
