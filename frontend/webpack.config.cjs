@@ -2,6 +2,7 @@ const path = require("path");
 const CopyPlugin = require("copy-webpack-plugin");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
 const webpack = require("webpack");
+const TerserPlugin = require("terser-webpack-plugin");
 
 module.exports = {
   mode: "production",
@@ -15,6 +16,17 @@ module.exports = {
     path: path.resolve(__dirname, "dist"),
     filename: "[name].js",
     clean: true,
+  },
+  optimization: {
+    minimizer: [
+      new TerserPlugin({
+        terserOptions: {
+          output: {
+            ascii_only: true,
+          },
+        },
+      }),
+    ],
   },
   resolve: {
     extensions: [".js", ".jsx"],

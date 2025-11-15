@@ -159,7 +159,7 @@ setInterval(() => {
   const currentUrl = location.href;
   if (currentUrl !== lastUrl) {
     lastUrl = currentUrl;
-    console.log("🔄 URL changed, checking chatbot...");
+    console.log("URL changed, checking chatbot...");
     setTimeout(injectChatbot, 200);
   }
 }, 500);
