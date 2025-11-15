@@ -1,6 +1,7 @@
 const path = require("path");
 const CopyPlugin = require("copy-webpack-plugin");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
+const webpack = require("webpack");
 
 module.exports = {
   mode: "production",
@@ -56,6 +57,9 @@ module.exports = {
     ],
   },
   plugins: [
+    new webpack.DefinePlugin({
+      "process.env.API_ENDPOINT": JSON.stringify(process.env.API_ENDPOINT),
+    }),
     new HtmlWebpackPlugin({
       template: "./src/popup/index.html",
       filename: "popup.html",

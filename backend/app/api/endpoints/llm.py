@@ -18,8 +18,8 @@ async def generate_llm_response(request: QueryRequest):
         
         return QueryResponse(
             query=request.query,
-            response=response,
-            model="llama-3.1-70b-versatile",
+            response=response.content,
+            model=response.model,
         )
     except Exception as e:
         raise HTTPException(
@@ -36,6 +36,6 @@ async def llm_health_check():
     api_key = os.getenv("GROQ_API_KEY")
     return {
         "status": "healthy" if api_key else "unhealthy",
-        "model": "llama-3.1-70b-versatile",
+        "model": "openai/gpt-oss-120b",
         "configured": bool(api_key),
     }

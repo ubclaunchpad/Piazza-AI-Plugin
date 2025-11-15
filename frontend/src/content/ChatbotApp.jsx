@@ -1,4 +1,8 @@
 import { useState, useRef, useEffect } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import remarkGfm from "remark-gfm";
 
 function ChatbotApp() {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -46,6 +50,27 @@ function ChatbotApp() {
     setIsExpanded(!isExpanded);
   };
 
+  // Convert LaTeX notation to markdown math format
+  const convertLatexToMarkdown = (text) => {
+    // Replace display math: \[ ... \] -> $$...$$
+    let converted = text.replace(
+      /\\\[\s*([^\]]+?)\s*\\\]/g,
+      (match, content) => {
+        return `\n$$\n${content.trim()}\n$$\n`;
+      }
+    );
+
+    // Replace inline math: \( ... \) -> $...$
+    converted = converted.replace(
+      /\\\(\s*([^)]+?)\s*\\\)/g,
+      (match, content) => {
+        return `$${content.trim()}$`;
+      }
+    );
+
+    return converted;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!inputValue.trim() || isLoading) return;
@@ -57,17 +82,50 @@ function ChatbotApp() {
     setMessages((prev) => [...prev, { role: "user", content: userMessage }]);
     setIsLoading(true);
 
-    // Simulate AI response (replace with actual API call)
-    setTimeout(() => {
+    try {
+      // Call the backend API
+      const API_ENDPOINT =
+        process.env.API_ENDPOINT || "http://localhost:8000/api/v1";
+      const response = await fetch(`${API_ENDPOINT}/llm/query`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ query: userMessage }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      // Convert LaTeX notation and add AI response
+      const convertedContent = convertLatexToMarkdown(data.response);
+      console.log("Original:", data.response);
+      console.log("Converted:", convertedContent);
+
       setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
-          content: `I received your message: "${userMessage}". This is a demo response. Connect to your AI API here!`,
+          content: convertedContent,
         },
       ]);
+    } catch (error) {
+      console.error("Failed to get AI response:", error);
+
+      // Add error message
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: "Sorry, I encountered an error. Please try again later.",
+        },
+      ]);
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   return (
@@ -91,7 +149,10 @@ function ChatbotApp() {
           </div>
         </button>
       ) : (
-        <div className="w-[380px] h-[500px] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-slideUp">
+        <div
+          className="bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-slideUp"
+          style={{ width: "50vw", height: "70vh" }}
+        >
           <div className="bg-gradient-to-r from-purple-500 to-purple-700 text-white px-5 py-4 flex justify-between items-center">
             <h3 className="m-0 text-base font-semibold">AI Assistant</h3>
             <button
@@ -116,13 +177,113 @@ function ChatbotApp() {
                   }`}
                 >
                   <div
-                    className={`max-w-[75%] px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed break-words ${
+                    className={`max-w-[80%] px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed break-words ${
                       msg.role === "user"
                         ? "bg-gradient-to-br from-purple-500 to-purple-700 text-white rounded-br-sm"
                         : "bg-white text-gray-800 rounded-bl-sm shadow-sm"
                     }`}
                   >
-                    {msg.content}
+                    {msg.role === "assistant" ? (
+                      <div className="prose prose-sm max-w-none">
+                        <ReactMarkdown
+                          remarkPlugins={[remarkMath, remarkGfm]}
+                          rehypePlugins={[rehypeKatex]}
+                          components={{
+                            // Customize code blocks
+                            code: ({
+                              node,
+                              inline,
+                              className,
+                              children,
+                              ...props
+                            }) => {
+                              return inline ? (
+                                <code
+                                  className="bg-purple-50 text-purple-600 px-1 py-0.5 rounded text-xs inline"
+                                  {...props}
+                                >
+                                  {children}
+                                </code>
+                              ) : (
+                                <code
+                                  className="block bg-gray-100 text-gray-800 p-2 rounded text-xs overflow-x-auto"
+                                  {...props}
+                                >
+                                  {children}
+                                </code>
+                              );
+                            },
+                            // Customize paragraphs
+                            p: ({ children }) => (
+                              <p className="my-1.5 leading-relaxed">
+                                {children}
+                              </p>
+                            ),
+                            // Customize lists
+                            ul: ({ children }) => (
+                              <ul className="my-1.5 ml-4 list-disc">
+                                {children}
+                              </ul>
+                            ),
+                            ol: ({ children }) => (
+                              <ol className="my-1.5 ml-4 list-decimal">
+                                {children}
+                              </ol>
+                            ),
+                            li: ({ children }) => (
+                              <li className="my-0.5">{children}</li>
+                            ),
+                            // Customize headings
+                            h1: ({ children }) => (
+                              <h1 className="text-base font-bold my-2">
+                                {children}
+                              </h1>
+                            ),
+                            h2: ({ children }) => (
+                              <h2 className="text-sm font-bold my-2">
+                                {children}
+                              </h2>
+                            ),
+                            h3: ({ children }) => (
+                              <h3 className="text-sm font-semibold my-1.5">
+                                {children}
+                              </h3>
+                            ),
+                            // Customize tables
+                            table: ({ children }) => (
+                              <div className="overflow-x-auto my-2">
+                                <table className="min-w-full text-xs border-collapse border border-gray-300">
+                                  {children}
+                                </table>
+                              </div>
+                            ),
+                            thead: ({ children }) => (
+                              <thead className="bg-gray-100">{children}</thead>
+                            ),
+                            tbody: ({ children }) => <tbody>{children}</tbody>,
+                            tr: ({ children }) => (
+                              <tr className="border-b border-gray-300">
+                                {children}
+                              </tr>
+                            ),
+                            th: ({ children }) => (
+                              <th className="border border-gray-300 px-2 py-1 text-left font-semibold">
+                                {children}
+                              </th>
+                            ),
+                            td: ({ children }) => (
+                              <td className="border border-gray-300 px-2 py-1">
+                                {children}
+                              </td>
+                            ),
+                          }}
+                        >
+                          {msg.content}
+                        </ReactMarkdown>
+                      </div>
+                    ) : (
+                      msg.content
+                    )}
                   </div>
                 </div>
               ))

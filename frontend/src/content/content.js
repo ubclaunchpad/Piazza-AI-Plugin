@@ -10,9 +10,22 @@ let observer = null;
 
 // Function to inject styles into shadow DOM
 function injectStyles(shadowRoot) {
+  // Add KaTeX CSS via link tag (since @import doesn't work in Shadow DOM when injected as text)
+  const katexLink = document.createElement("link");
+  katexLink.rel = "stylesheet";
+  katexLink.href =
+    "https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css";
+  katexLink.crossOrigin = "anonymous";
+  shadowRoot.appendChild(katexLink);
+
+  // Add our custom styles
   const style = document.createElement("style");
   style.textContent = cssText;
   shadowRoot.appendChild(style);
+
+  // Log to verify KaTeX is loading
+  katexLink.onload = () => console.log("✅ KaTeX CSS loaded in Shadow DOM");
+  katexLink.onerror = () => console.error("❌ Failed to load KaTeX CSS");
 }
 
 // Function to inject the chatbot

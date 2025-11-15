@@ -5,8 +5,8 @@ Simple LLM service using langchain-groq.
 import os
 from langchain_groq import ChatGroq
 
-
-def get_llm_response(query: str) -> str:
+MODEL = "openai/gpt-oss-120b"
+def get_llm_response(query: str) -> object:
     """
     Get LLM response using Groq.
 
@@ -17,10 +17,12 @@ def get_llm_response(query: str) -> str:
         Generated response string
     """
     llm = ChatGroq(
-        model="llama-3.1-70b-versatile",
-        api_key=os.getenv("GROQ_API_KEY"),
+        model=MODEL,
         temperature=0.7,
+        max_tokens=8192,
+        max_retries=3,
     )
     
     response = llm.invoke(query)
-    return response.content
+    response.model = MODEL
+    return response
