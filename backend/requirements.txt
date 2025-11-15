@@ -13,7 +13,7 @@ python-dotenv==1.0.0
 langchain-groq==1.0.1
 
 # Database
-psycopg2-binary==2.9.9
+psycopg2-binary==2.9.11
 
 # Database (when needed)
 # Uncomment when adding database functionality:
