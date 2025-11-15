@@ -15,7 +15,7 @@ async def generate_llm_response(request: QueryRequest):
     """Generate an LLM response to a user query."""
     try:
         response = get_llm_response(request.query)
-        
+
         return QueryResponse(
             query=request.query,
             response=response.content,
@@ -32,7 +32,7 @@ async def generate_llm_response(request: QueryRequest):
 async def llm_health_check():
     """Check if the LLM service is configured."""
     import os
-    
+
     api_key = os.getenv("GROQ_API_KEY")
     return {
         "status": "healthy" if api_key else "unhealthy",

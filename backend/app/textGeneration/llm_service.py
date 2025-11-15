@@ -2,7 +2,6 @@
 Simple LLM service using langchain-groq.
 """
 
-import os
 from langchain_groq import ChatGroq
 
 MODEL = "openai/gpt-oss-120b"
@@ -22,7 +21,7 @@ def get_llm_response(query: str) -> object:
         max_tokens=8192,
         max_retries=3,
     )
-    
+
     response = llm.invoke(query)
     response.model = MODEL
     return response
