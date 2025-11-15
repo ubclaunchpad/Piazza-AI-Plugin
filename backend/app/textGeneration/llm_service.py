@@ -5,6 +5,8 @@ Simple LLM service using langchain-groq.
 from langchain_groq import ChatGroq
 
 MODEL = "openai/gpt-oss-120b"
+
+
 def get_llm_response(query: str) -> object:
     """
     Get LLM response using Groq.
