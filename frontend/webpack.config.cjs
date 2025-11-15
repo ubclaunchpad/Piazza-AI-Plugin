@@ -35,9 +35,17 @@ module.exports = {
       },
       {
         test: /\.css$/,
-        // Handle ?raw query to import CSS as raw string
+        // Handle ?raw query to import CSS as raw string (but process through PostCSS/Tailwind first)
         resourceQuery: /raw/,
-        type: "asset/source",
+        use: [
+          {
+            loader: "css-loader",
+            options: {
+              exportType: "string",
+            },
+          },
+          "postcss-loader",
+        ],
       },
       {
         test: /\.css$/,
