@@ -9,3 +9,15 @@ class SignUpRequest(BaseModel):
 
 class SignUpResponse(BaseModel):
     user: dict[str, str]
+
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(..., min_length=1, max_length=128)
+
+
+class LoginResponse(BaseModel):
+    user: dict[str, str]
+    access_token: str
+    refresh_token: str
+    expires_in: int
