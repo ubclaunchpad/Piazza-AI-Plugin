@@ -32,13 +32,28 @@ module.exports = {
                 }
             },
             {
+                test: /\.svg$/,
+                use: ['@svgr/webpack']
+            },
+            // For getting CSS as a raw string for ShadowDOM, but also make it work with tailwindcss
+            {
                 test: /\.css$/,
+                resourceQuery: /raw/,
+                use: [
+                    'raw-loader',
+                    'postcss-loader'
+                ],
+            },
+            // For default CSS handling -> not shadowDOM
+            {
+                test: /\.css$/,
+                resourceQuery: { not: [/raw/]},
                 use: [
                     'style-loader',
                     'css-loader',
                     'postcss-loader'
-                ],
-            },
+                ]
+            }
         ]
     },
     plugins: [

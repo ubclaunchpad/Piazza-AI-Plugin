@@ -1,132 +1,100 @@
-import { useState, useRef, useEffect } from 'react';
-import './App.css';
+import { useState, useEffect, useRef } from "react";
 
-function App() {
-    const [isExpanded, setIsExpanded] = useState(false);
+export default function App() {
+
     const [isHovered, setIsHovered] = useState(false);
+    const [isClicked, setIsClicked] = useState(false);
     const [messages, setMessages] = useState([]);
-    const [inputValue, setInputValue] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    const chatRef = useRef(null);
-    const messagesEndRef = useRef(null);
+    const [inputValue, setInputValue] = useState('');
+    const messageEndRef = useRef(null);
 
-    // Handle clicking outside
-    useEffect(() => {
-        function handleClickOutside(event) {
-            if (chatRef.current && !chatRef.current.contains(event.target)) {
-                setIsExpanded(false);
-            }
-        }
+    const placeholderSrc = chrome.runtime.getURL('icons/placeholder.svg');
 
-        if (isExpanded) {
-            document.addEventListener('mousedown', handleClickOutside);
-        }
+    function handleToggle() {
+        setIsHovered(false);
+        setIsClicked(!isClicked);
+    }
 
-        return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
-        };
-    }, [isExpanded]);
+    async function handleSubmit(event) {
+        event.preventDefault();
 
-    // Auto-scroll to bottom
-    useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages]);
-
-    const handleToggle = () => {
-        setIsExpanded(!isExpanded);
-    };
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
         if (!inputValue.trim() || isLoading) return;
 
         const userMessage = inputValue.trim();
         setInputValue('');
 
-        // Add user message
-        setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+        setMessages(prev => [...prev, {content: userMessage,role: "user"}]);
+
         setIsLoading(true);
 
-        // Simulate AI response (replace with actual API call)
+        // ------------------------ MAKE API RESPONSE --------------------------- //
+        
+        // As of right now I will just try to simulate the api response here.
         setTimeout(() => {
-            setMessages(prev => [...prev, {
-                role: 'assistant',
-                content: `I received your message: "${userMessage}". This is a demo response. Connect to your AI API here!`
-            }]);
+            setMessages(prev => [...prev, {content: `I recieved your message: ${userMessage}. This is a demo response. Connect to your API here!`, role: "ai"}]);
             setIsLoading(false);
         }, 1000);
-    };
+    }
+
 
     return (
-        <div ref={chatRef} className="chatbot-container">
-            {!isExpanded ? (
-                <button
-                    className={`chatbot-button ${isHovered ? 'hovered' : ''}`}
-                    onClick={handleToggle}
-                    onMouseEnter={() => setIsHovered(true)}
-                    onMouseLeave={() => setIsHovered(false)}
-                >
-                    <div className="button-content">
-                        <div className="circle"></div>
-                        {isHovered && <span className="button-text">Ask AI!</span>}
+        <div className="chatbot-container">
+            {!isClicked ?
+                (
+                    <div className={`state-logo ${isHovered && "hover"}`}
+                        onMouseEnter={() => setIsHovered(true)}
+                        onMouseLeave={() => setIsHovered(false)}
+                        onClick={handleToggle}
+                    >
+                        <img src={placeholderSrc} alt="placeholder" />
+                        {isHovered && <p className="hover-state-description">Ask AI!</p>}
                     </div>
-                </button>
-            ) : (
-                <div className="chatbot-expanded">
-                    <div className="chat-header">
-                        <h3>AI Assistant</h3>
-                        <button className="close-button" onClick={() => setIsExpanded(false)}>
-                            ✕
-                        </button>
-                    </div>
-
-                    <div className="chat-messages">
-                        {messages.length === 0 ? (
-                            <div className="empty-state">
-                                <p>👋 Hi! How can I help you today?</p>
-                            </div>
-                        ) : (
-                            messages.map((msg, idx) => (
-                                <div key={idx} className={`message ${msg.role}`}>
-                                    <div className="message-content">
-                                        {msg.content}
+                ) : (
+                    <div className="chatbot-expanded">
+                        <div className="chatbot-header">
+                            <h3>Ask ThreadSense! ✨✨</h3>
+                            <button className="exit-chatbot" onClick={() => setIsClicked(false)}>✕</button>
+                        </div>
+                        <div className="chat-messages">
+                            {messages.length === 0 ? (
+                                <div className="empty-state">
+                                    <p>👋 Hi! How may I help you today?</p>
+                                </div>
+                            ) : (
+                                messages.map((msg, id) => (
+                                    <div key={id} className={`message ${msg.role}`}>
+                                        <div className="message-content">
+                                            {msg.content}
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                            {isLoading && (
+                                <div className="message ai">
+                                    <div className="message-content loading">
+                                        <span className="dot"></span>
+                                        <span className="dot"></span>
+                                        <span className="dot"></span>
                                     </div>
                                 </div>
-                            ))
-                        )}
-                        {isLoading && (
-                            <div className="message assistant">
-                                <div className="message-content loading">
-                                    <span className="dot"></span>
-                                    <span className="dot"></span>
-                                    <span className="dot"></span>
-                                </div>
-                            </div>
-                        )}
-                        <div ref={messagesEndRef} />
-                    </div>
+                            )}
+                            <div ref={messageEndRef}></div>
+                        </div>
 
-                    <form className="chat-input-form" onSubmit={handleSubmit}>
-                        <input
-                            type="text"
-                            value={inputValue}
-                            onChange={(e) => setInputValue(e.target.value)}
-                            placeholder="Type your message..."
-                            className="chat-input"
-                            disabled={isLoading}
-                        />
-                        <button
-                            type="submit"
-                            className="send-button"
-                            disabled={!inputValue.trim() || isLoading}
-                        >
-                            ➤
-                        </button>
-                    </form>
-                </div>
-            )}
+                        <form className="chat-input-form" onSubmit={handleSubmit}>
+                            <input type="text"
+                                value={inputValue}
+                                onChange={(event) => { setInputValue(event.target.value) }}
+                                placeholder="Type your message ..."
+                                className="chat-input"
+                                disabled={isLoading}></input>
+                            <button type="submit" className="send-button" disabled={!inputValue.trim() || isLoading}>➤</button>
+                        </form>
+                    </div>
+                )
+            }
+
         </div>
     );
 }
-
-export default App;
