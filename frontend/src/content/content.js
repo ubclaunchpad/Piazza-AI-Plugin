@@ -143,6 +143,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message.type === "GET_PIAZZA_COOKIE") {
+    // Forward request to background script since it has access to chrome.cookies API
+    chrome.runtime.sendMessage({ type: "GET_PIAZZA_COOKIE" }, (response) => {
+      sendResponse(response);
+    });
+    return true; // Keep message channel open for async response
+  }
+
   // TODO: Add more message handlers as needed
 });
 
