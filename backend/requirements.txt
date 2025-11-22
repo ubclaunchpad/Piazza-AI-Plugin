@@ -5,7 +5,7 @@ fastapi==0.104.1
 uvicorn[standard]==0.24.0
 
 # Configuration
-pydantic==2.12.4
+pydantic[email]==2.12.3
 pydantic-settings==2.0.3
 python-dotenv==1.0.0
 
@@ -13,10 +13,12 @@ python-dotenv==1.0.0
 langchain-groq==1.0.1
 
 # Database
-psycopg2-binary==2.9.9
+psycopg2-binary==2.9.11
 
 # Database (when needed)
 # Uncomment when adding database functionality:
 # asyncpg==0.29.0
 # sqlalchemy[asyncio]==2.0.23
-# supabase==2.0.3
+# websockets is required as a peer dependency for supabase==2.23.0 (even though it is not directly imported or used in this codebase).
+websockets>=12,<14
+supabase==2.23.0
