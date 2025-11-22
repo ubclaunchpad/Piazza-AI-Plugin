@@ -8,9 +8,14 @@ from hashlib import sha256
 from fastapi import APIRouter, HTTPException, status
 
 from app.core.config import settings
-from app.core.database import execute_statement
+from app.core.database import execute_query, execute_statement
 from app.core.supabase import supabase
-from app.models.auth import SignUpRequest, SignUpResponse
+from app.models.auth import (
+    LoginRequest,
+    LoginResponse,
+    SignUpRequest,
+    SignUpResponse,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -107,4 +112,101 @@ def signup(user_data: SignUpRequest):
             "name": user_data.display_name,
             "email": user_data.email,
         }
+    )
+
+
+@router.post("/login", response_model=LoginResponse, status_code=status.HTTP_200_OK)
+def login(credentials: LoginRequest):
+    """
+    Authenticate a user and return access tokens.
+
+    Workflow:
+        1. Authenticate with Supabase Auth using email and password.
+        2. Check if the user's email is confirmed.
+        3. Retrieve user profile from the local database.
+        4. Return user data with access and refresh tokens.
+
+    Args:
+        credentials (LoginRequest): Contains the user's email and password.
+
+    Returns:
+        LoginResponse: User information, access token, refresh token, and expiry time.
+
+    Raises:
+        HTTPException:
+            401 - if credentials are invalid or email is not confirmed.
+            404 - if user profile is not found in database.
+            500 - if Supabase or database operations fail.
+    """
+    try:
+        # Authenticate with Supabase
+        res = supabase.auth.sign_in_with_password(
+            {"email": credentials.email, "password": credentials.password}
+        )
+    except Exception as e:
+        msg = str(e)
+        msg_lc = msg.lower()
+        # Handle common authentication errors
+        if "invalid" in msg_lc or "credentials" in msg_lc or "wrong" in msg_lc:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid email or password",
+            )
+        if "email not confirmed" in msg_lc:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Please confirm your email before logging in. Check your inbox for the confirmation link.",
+            )
+        logger.exception("Supabase sign_in failed")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Authentication failed: " + msg,
+        )
+
+    user = res.user
+    session = res.session
+
+    if not user or not session:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication failed",
+        )
+
+    # Check if email is confirmed
+    if not user.email_confirmed_at:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Please confirm your email before logging in. Check your inbox for the confirmation link.",
+        )
+
+    # Retrieve user profile from database
+    try:
+        user_profile = execute_query(
+            "SELECT id, display_name, hashed_email FROM users WHERE id = %s",
+            (user.id,),
+            fetch_one=True,
+        )
+        if not user_profile:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User profile not found",
+            )
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Failed to retrieve user profile from database")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve user profile",
+        )
+
+    return LoginResponse(
+        user={
+            "id": user.id,
+            "name": user_profile["display_name"],
+            "email": user.email,
+        },
+        access_token=session.access_token,
+        refresh_token=session.refresh_token,
+        expires_in=session.expires_in or 3600,
     )
