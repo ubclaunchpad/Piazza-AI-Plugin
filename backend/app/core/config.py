@@ -36,6 +36,16 @@ class Settings(BaseSettings):
     # Database Configuration
     DATABASE_URL: str
 
+    # Supabase Configuration
+    SUPABASE_URL: str
+    SUPABASE_ANON_KEY: str
+    SUPABASE_SERVICE_ROLE_KEY: str
+
+    # Frontend/redirect settings (used for email confirmation redirects)
+    # Defaults are safe for local development.
+    # Note: serve the static confirmation page at /confirm-email.html (file lives in frontend/public)
+    EMAIL_CONFIRM_REDIRECT_URL: str = "http://127.0.0.1:3000/confirm-email.html"
+
     class Config:
         case_sensitive = True
 
