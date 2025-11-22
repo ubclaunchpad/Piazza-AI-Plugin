@@ -3,6 +3,7 @@ const CopyPlugin = require("copy-webpack-plugin");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
 const webpack = require("webpack");
 const TerserPlugin = require("terser-webpack-plugin");
+require("dotenv").config();
 
 module.exports = {
   mode: "production",
@@ -70,7 +71,9 @@ module.exports = {
   },
   plugins: [
     new webpack.DefinePlugin({
-      "process.env.API_ENDPOINT": JSON.stringify(process.env.API_ENDPOINT),
+      "process.env.BACKEND_API_ENDPOINT": JSON.stringify(
+        process.env.BACKEND_API_ENDPOINT || "http://localhost:8000/api/v1"
+      ),
     }),
     new HtmlWebpackPlugin({
       template: "./src/popup/index.html",

@@ -9,6 +9,7 @@ export default function DashboardPage({
   const [currentTab, setCurrentTab] = useState(null);
   const [piazzaInfo, setPiazzaInfo] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isIngesting, setIsIngesting] = useState(false);
 
   useEffect(() => {
     getCurrentTabInfo();
@@ -69,6 +70,52 @@ export default function DashboardPage({
   const handleLogout = () => {
     if (confirm("Are you sure you want to log out?")) {
       onLogout();
+    }
+  };
+
+  const handleIngestThread = async () => {
+    if (!piazzaInfo?.classId) {
+      alert("Cannot ingest thread: Missing class ID.");
+      return;
+    }
+
+    try {
+      // Get Piazza cookie from content script
+      const response = await chrome.tabs.sendMessage(currentTab.id, {
+        type: "GET_PIAZZA_COOKIE",
+      });
+
+      if (!response || !response.success || !response.cookie) {
+        throw new Error("Could not retrieve Piazza cookie");
+      }
+
+      console.log(`${process.env.BACKEND_API_ENDPOINT}/ingestion/ingest`);
+      // Call the backend API
+      const apiResponse = await fetch(
+        `${process.env.BACKEND_API_ENDPOINT}/ingestion/ingest`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            thread_id: piazzaInfo.classId,
+            piazza_cookie: response.cookie,
+          }),
+        }
+      );
+      //is
+      if (!apiResponse.ok) {
+        const errorData = await apiResponse.json();
+        throw new Error(errorData.detail || "Failed to start ingestion");
+      }
+
+      const data = await apiResponse.json();
+      alert(data.status || "Data ingestion started successfully!");
+    } catch (error) {
+      console.error("Error ingesting thread:", error);
+    } finally {
+      setIsIngesting(false);
     }
   };
 
@@ -181,9 +228,22 @@ export default function DashboardPage({
                   <span>📊</span>
                   Assistant
                 </button>
-                <button className="flex-1 px-3 py-2 bg-gray-100 border border-gray-200 rounded-md text-xs font-medium cursor-pointer flex items-center justify-center gap-1.5 transition-all hover:bg-gray-200 hover:border-gray-300">
-                  <span>📥</span>
-                  Ingest Thread
+                <button
+                  onClick={handleIngestThread}
+                  disabled={isIngesting}
+                  className="flex-1 px-3 py-2 bg-gray-100 border border-gray-200 rounded-md text-xs font-medium cursor-pointer flex items-center justify-center gap-1.5 transition-all hover:bg-gray-200 hover:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isIngesting ? (
+                    <>
+                      <span className="w-3 h-3 border-2 border-gray-400 border-t-purple-500 rounded-full animate-spin inline-block"></span>
+                      Ingesting...
+                    </>
+                  ) : (
+                    <>
+                      <span>📥</span>
+                      Ingest Thread
+                    </>
+                  )}
                 </button>
               </div>
             </div>

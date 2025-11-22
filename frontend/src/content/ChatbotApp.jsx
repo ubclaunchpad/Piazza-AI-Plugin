@@ -166,7 +166,7 @@ function ChatbotApp() {
           <div className="flex-1 overflow-y-auto p-5 bg-gray-50 flex flex-col gap-3 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
             {messages.length === 0 ? (
               <div className="flex items-center justify-center h-full text-gray-600 text-sm">
-                <p>Hi! How can I help you today?</p>
+                <p>Hi! How can I help you today? Tony is my goat</p>
               </div>
             ) : (
               messages.map((msg, idx) => (

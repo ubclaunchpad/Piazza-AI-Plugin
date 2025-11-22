@@ -31,6 +31,6 @@
   "background": {
     "service_worker": "background.js"
   },
-  "permissions": ["activeTab", "storage"],
-  "host_permissions": ["https://piazza.com/class/*", "http://localhost:8000/*"]
+  "permissions": ["activeTab", "storage", "cookies"],
+  "host_permissions": ["https://piazza.com/*", "http://localhost:8000/*"]
 }
