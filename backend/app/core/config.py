@@ -43,7 +43,8 @@ class Settings(BaseSettings):
 
     # Frontend/redirect settings (used for email confirmation redirects)
     # Defaults are safe for local development.
-    EMAIL_CONFIRM_REDIRECT_URL: str = "http://127.0.0.1:3000/confirm-email"
+    # Note: serve the static confirmation page at /confirm-email.html (file lives in frontend/public)
+    EMAIL_CONFIRM_REDIRECT_URL: str = "http://127.0.0.1:3000/confirm-email.html"
 
     class Config:
         case_sensitive = True
