@@ -9,6 +9,9 @@ pydantic[email]==2.12.3
 pydantic-settings==2.0.3
 python-dotenv==1.0.0
 
+# LLM / AI
+langchain-groq==1.0.1
+
 # Database
 psycopg2-binary==2.9.11
 
