@@ -5,9 +5,12 @@ fastapi==0.104.1
 uvicorn[standard]==0.24.0
 
 # Configuration
-pydantic==2.5.0
+pydantic==2.12.4
 pydantic-settings==2.0.3
 python-dotenv==1.0.0
+
+# LLM / AI
+langchain-groq==1.0.1
 
 # Database
 psycopg2-binary==2.9.9
