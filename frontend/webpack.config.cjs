@@ -71,8 +71,8 @@ module.exports = {
   },
   plugins: [
     new webpack.DefinePlugin({
-      "process.env.BACKEND_API_ENDPOINT": JSON.stringify(
-        process.env.BACKEND_API_ENDPOINT || "http://localhost:8000/api/v1"
+      "process.env.API_ENDPOINT": JSON.stringify(
+        process.env.API_ENDPOINT || "http://localhost:8000/api/v1"
       ),
     }),
     new HtmlWebpackPlugin({

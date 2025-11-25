@@ -89,10 +89,10 @@ export default function DashboardPage({
         throw new Error("Could not retrieve Piazza cookie");
       }
 
-      console.log(`${process.env.BACKEND_API_ENDPOINT}/ingestion/ingest`);
+      console.log(`${process.env.API_ENDPOINT}/ingestion/ingest`);
       // Call the backend API
       const apiResponse = await fetch(
-        `${process.env.BACKEND_API_ENDPOINT}/ingestion/ingest`,
+        `${process.env.API_ENDPOINT}/ingestion/ingest`,
         {
           method: "POST",
           headers: {

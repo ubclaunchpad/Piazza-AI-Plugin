@@ -1,5 +1,5 @@
 CREATE TABLE threads(
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(), 
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(), 
     thread_title VARCHAR(255),
     piazza_course_id VARCHAR(255) UNIQUE NOT NULL,
     is_indexable BOOLEAN DEFAULT FALSE,
