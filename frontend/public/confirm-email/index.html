@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Email Confirmation</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        font-family: Inter, system-ui, sans-serif;
+        margin: 0;
+        background: #fafafa;
+        color: #222;
+        display: flex;
+        min-height: 100vh;
+      }
+      .container {
+        margin: auto;
+        width: min(480px, 90%);
+        background: #fff;
+        padding: 2.5rem 2rem;
+        border-radius: 18px;
+        box-shadow: 0 8px 28px -6px rgba(80, 30, 150, 0.18),
+          0 2px 6px -1px rgba(0, 0, 0, 0.08);
+      }
+      h1 {
+        font-size: 1.6rem;
+        margin: 0 0 0.75rem;
+        background: linear-gradient(90deg, #7e3af2, #a855f7);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+      .status {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin: 1rem 0 1.25rem;
+        padding: 0.85rem 1rem;
+        border-radius: 12px;
+        font-size: 0.95rem;
+        line-height: 1.35;
+      }
+      .status.info {
+        background: #f3f0ff;
+        color: #553c9a;
+        border: 1px solid #ded3ff;
+      }
+      .status.success {
+        background: #ecfdf5;
+        color: #065f46;
+        border: 1px solid #a7f3d0;
+      }
+      .status.error {
+        background: #fef2f2;
+        color: #991b1b;
+        border: 1px solid #fecaca;
+      }
+      .spinner {
+        width: 20px;
+        height: 20px;
+        border: 3px solid #ddd;
+        border-top: 3px solid #7e3af2;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      .hidden {
+        display: none !important;
+      }
+      .small {
+        font-size: 0.75rem;
+        opacity: 0.7;
+        margin-top: 1.5rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container" role="main">
+      <div id="initial" class="status info">
+        <div class="spinner" aria-hidden="true"></div>
+        <span>Verifying your email…</span>
+      </div>
+      <div id="success" class="status success hidden">✅ Email confirmed!</div>
+      <div id="error" class="status error hidden">
+        ❌ <span id="error-msg">Something went wrong.</span>
+      </div>
+      <h1>Email Confirmation</h1>
+      <p id="details">
+        We are completing your signup. This page will automatically update.
+      </p>
+      <p class="small">
+        Return to the extension popup and log in once confirmed.
+      </p>
+    </div>
+    <script>
+      (function () {
+        // Mirror logic from original confirm-email.html for hash/query parsing
+        const hash = location.hash.startsWith("#")
+          ? location.hash.slice(1)
+          : "";
+        const params = new URLSearchParams(hash);
+        const queryParams = new URLSearchParams(location.search);
+        const pick = (n) => params.get(n) || queryParams.get(n);
+        const el = (id) => document.getElementById(id);
+        const show = (id) => el(id).classList.remove("hidden");
+        const hide = (id) => el(id).classList.add("hidden");
+
+        const accessToken = pick("access_token");
+        const type = pick("type");
+        const error = pick("error");
+        const errorDescription = pick("error_description");
+
+        function finish(success) {
+          hide("initial");
+          if (success) {
+            show("success");
+            el("details").textContent =
+              "Your email is confirmed. You can now log in inside the extension.";
+          } else {
+            show("error");
+            el("details").textContent = "We could not confirm your email.";
+          }
+        }
+
+        if (error || errorDescription) {
+          el("error-msg").textContent = decodeURIComponent(
+            errorDescription || error || "Unknown error"
+          );
+          finish(false);
+          return;
+        }
+
+        if ((type && type !== "recovery") || accessToken) {
+          finish(true);
+        } else {
+          setTimeout(() => {
+            if (pick("type") || pick("access_token")) finish(true);
+            else {
+              el("error-msg").textContent = "Confirmation tokens not found.";
+              finish(false);
+            }
+          }, 1200);
+        }
+      })();
+    </script>
+  </body>
+</html>

@@ -6,11 +6,13 @@ export default function LoginPage({ onLogin, onSignup }) {
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    setSuccessMessage("");
     setIsLoading(true);
 
     // Basic validation
@@ -39,6 +41,17 @@ export default function LoginPage({ onLogin, onSignup }) {
 
       if (!result.success) {
         setError(result.error || "Authentication failed");
+      } else if (result.message) {
+        // Show success message for signup (email confirmation required)
+        setSuccessMessage(result.message);
+        setEmail("");
+        setPassword("");
+        setName("");
+        // Switch to login mode after successful signup
+        setTimeout(() => {
+          setIsSignup(false);
+          setSuccessMessage("");
+        }, 5000);
       }
     } catch (err) {
       setError("An error occurred. Please try again.");
@@ -50,6 +63,7 @@ export default function LoginPage({ onLogin, onSignup }) {
   const toggleMode = () => {
     setIsSignup(!isSignup);
     setError("");
+    setSuccessMessage("");
     setEmail("");
     setPassword("");
     setName("");
@@ -123,6 +137,12 @@ export default function LoginPage({ onLogin, onSignup }) {
         {error && (
           <div className="px-3 py-2.5 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm text-center">
             {error}
+          </div>
+        )}
+
+        {successMessage && (
+          <div className="px-3 py-2.5 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm text-center">
+            {successMessage}
           </div>
         )}
 
