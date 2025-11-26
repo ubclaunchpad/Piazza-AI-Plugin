@@ -1,5 +1,5 @@
 """
-    ThreadSense PDF extraction script.
+ThreadSense PDF extraction script.
 """
 
 import argparse
@@ -16,6 +16,7 @@ import fitz
 
 TOOL_VERSION = "0.1.0"
 
+
 def sha256_file(path: str) -> str:
     """File hashing and unique identifier"""
 
@@ -25,15 +26,19 @@ def sha256_file(path: str) -> str:
             h.update(chunk)
     return h.hexdigest()
 
+
 def normalize_text(text: str) -> str:
     """Normalize Text"""
 
     text = unicodedata.normalize("NFKC", text)
     text = text.replace("“", '"').replace("”", '"')
     text = text.replace("’", "'")
-    text = re.sub(r"[ \t]+", " ", text)             # collapse multi-spaces/tabs
-    text = re.sub(r"\n{3,}", "\n\n", text)          # collapse triple(or more) newlines into "\n\n"
+    text = re.sub(r"[ \t]+", " ", text)  # collapse multi-spaces/tabs
+    text = re.sub(
+        r"\n{3,}", "\n\n", text
+    )  # collapse triple(or more) newlines into "\n\n"
     return text.strip()
+
 
 def fix_hyphens(a: str, b: str) -> str:
     """Hyphen patch"""
@@ -41,6 +46,7 @@ def fix_hyphens(a: str, b: str) -> str:
     if a.endswith("-") and b[:1].islower():
         return a[:-1] + b
     return a + " " + b
+
 
 def extract_pdf_pymupdf(path: str, ocr_threshold=40, page_range=None):
     """
@@ -88,7 +94,9 @@ def extract_pdf_pymupdf(path: str, ocr_threshold=40, page_range=None):
             try:
                 text = page.get_text("ocr")
             except Exception:
-                print(f"[PyMuPDF OCR] Page {page_num}: OCR Failed - retrying with language…")
+                print(
+                    f"[PyMuPDF OCR] Page {page_num}: OCR Failed - retrying with language…"
+                )
                 try:
                     text = page.get_text("ocr", ocr_language="eng")
                 except Exception:
@@ -114,8 +122,11 @@ def extract_pdf_pymupdf(path: str, ocr_threshold=40, page_range=None):
                 full_text_parts[-1] = stitched
                 lines = lines[1:]
             else:
-                if (prev_last_line.strip() and first_line.strip()
-                    and prev_last_line[-1].isalnum()):
+                if (
+                    prev_last_line.strip()
+                    and first_line.strip()
+                    and prev_last_line[-1].isalnum()
+                ):
                     full_text_parts.append(" ")
                 else:
                     full_text_parts.append("\n\n")
@@ -126,12 +137,14 @@ def extract_pdf_pymupdf(path: str, ocr_threshold=40, page_range=None):
 
         prev_last_line = full_text_parts[-1]
 
-        pages_output.append({
-            "page_num": page_num,
-            "word_count": page_wc,
-            "used_ocr": used_ocr,
-            "text": "\n".join(lines)
-        })
+        pages_output.append(
+            {
+                "page_num": page_num,
+                "word_count": page_wc,
+                "used_ocr": used_ocr,
+                "text": "\n".join(lines),
+            }
+        )
 
     # Final stitched full text
     final_text = normalize_text("\n".join(full_text_parts))
@@ -147,18 +160,14 @@ def extract_pdf_pymupdf(path: str, ocr_threshold=40, page_range=None):
         "skipped": skipped,
         "skipped_pages": skipped_pages,
         "text": final_text,
-        "pages": pages_output
+        "pages": pages_output,
     }
-
 
 
 def run_extraction(input_path, out_dir, page_range=None):
     """Extraction wrapper for CLI"""
 
-    result = extract_pdf_pymupdf(
-        path=input_path,
-        page_range=page_range
-    )
+    result = extract_pdf_pymupdf(path=input_path, page_range=page_range)
 
     # Output filename = doc_uuid.json
     out_path = f"{out_dir}/{result['doc_uuid']}.json"
@@ -181,7 +190,9 @@ def parse_page_range(r):
 
 def main():
     """Script Input"""
-    parser = argparse.ArgumentParser(prog="pdfx", description="ThreadSense PDF Extractor")
+    parser = argparse.ArgumentParser(
+        prog="pdfx", description="ThreadSense PDF Extractor"
+    )
 
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -202,9 +213,7 @@ def main():
 
         try:
             result = run_extraction(
-                input_path=args.input,
-                out_dir=args.out,
-                page_range=args.page_range
+                input_path=args.input, out_dir=args.out, page_range=args.page_range
             )
 
             # Decide return code
@@ -223,14 +232,15 @@ def main():
         if result is not None:
             print(json.dumps(result, indent=2))
         else:
-            print(json.dumps({
-                "error": "Fatal error before producing any output"
-            }, indent=2), file=sys.stderr)
+            print(
+                json.dumps(
+                    {"error": "Fatal error before producing any output"}, indent=2
+                ),
+                file=sys.stderr,
+            )
 
         sys.exit(return_code)
 
+
 if __name__ == "__main__":
     main()
-
-
-
