@@ -2,16 +2,17 @@
     ThreadSense PDF extraction script.
 """
 
-from datetime import datetime, timezone
-import sys
-import uuid
-import fitz
-import re
-import json
-import unicodedata
-import hashlib
 import argparse
+import hashlib
+import json
 import os
+import re
+import sys
+import unicodedata
+import uuid
+from datetime import datetime, timezone
+
+import fitz
 
 TOOL_VERSION = "0.1.0"
 
@@ -169,13 +170,12 @@ def run_extraction(input_path, out_dir, page_range=None):
     return result
 
 
-
 def parse_page_range(r):
     """Convert '5-10' into (5,10)."""
     try:
         a, b = r.split("-")
         return int(a), int(b)
-    except:
+    except Exception:
         raise argparse.ArgumentTypeError("Page range must be like 5-12")
 
 
