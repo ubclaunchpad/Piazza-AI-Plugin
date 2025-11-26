@@ -41,102 +41,123 @@ def fix_hyphens(a: str, b: str) -> str:
         return a[:-1] + b
     return a + " " + b
 
-def extract_pdf_pymupdf(path: str, ocr_threshold=40):
-    """String to JSON extraction"""
+def extract_pdf_pymupdf(path: str, ocr_threshold=40, page_range=None):
+    """
+    Extract and process text using PyMuPDF.
+    Only pages in `page_range` (1-indexed inclusive) are processed.
+    If page_range=None → process all pages.
+    """
 
+    # Prepare metadata
     doc_hash = sha256_file(path)
     doc_uuid = str(uuid.uuid5(uuid.NAMESPACE_URL, doc_hash))
-    doc = fitz.open(path) 
+    doc = fitz.open(path)
+    page_count = doc.page_count
+
+    # Determine which pages to process
+    if page_range:
+        start, end = page_range
+        # Ensure it stays within document bounds
+        start = max(1, start)
+        end = min(page_count, end)
+        pages_to_process = range(start, end + 1)
+    else:
+        pages_to_process = range(1, page_count + 1)
 
     total_word_count = 0
     skipped = False
+    skipped_pages = []
     pages_output = []
     full_text_parts = []
-    skipped_pages = []
     prev_last_line = None
 
-    for i, page in enumerate(doc):
+    for page_num in pages_to_process:
+        page = doc[page_num - 1]  # PyMuPDF is 0-indexed
         used_ocr = False
 
-        # 1. Normal PyMuPDF extraction
-        text = page.get_text("text") 
-        page_wc = len(page.get_text("words")) 
+        # 1. Normal extraction
+        text = page.get_text("text")
+        page_wc = len(page.get_text("words"))
         total_word_count += page_wc
 
-        # 2. Trigger OCR fallback
+        # 2. OCR fallback
         if len(text.strip()) < ocr_threshold:
-            print(f"[PyMuPDF OCR] Page {i+1}: low text → using OCR…")
+            print(f"[PyMuPDF OCR] Page {page_num}: low text → using OCR…")
             used_ocr = True
-            text = page.get_text("ocr")  # <-- PyMuPDF OCR using Tesseract
+            try:
+                text = page.get_text("ocr")
+            except Exception:
+                print(f"[PyMuPDF OCR] Page {page_num}: OCR Failed - retrying with language…")
+                try:
+                    text = page.get_text("ocr", ocr_language="eng")
+                except Exception:
+                    print(f"[PyMuPDF OCR] Page {page_num}: OCR Failed - Skipped")
+                    text = ""
 
-        # 2.5 Skip process if empty extraction and update flag
-        if len(text) == 0:
+        # 2.5 Skip page if final text is empty
+        if len(text.strip()) == 0:
             skipped = True
-            skipped_pages.append(i+1)
+            skipped_pages.append(page_num)
             continue
 
-        # 3. Normalize and break into lines
+        # 3. Normalize + split
         text = normalize_text(text)
         lines = text.split("\n")
 
-        # ---- Cross-page stitching ----
+        # 4. Cross-page stitching
         if prev_last_line is not None and lines:
             first_line = lines[0]
 
-            # Hyphen repair
             if prev_last_line.endswith("-"):
                 stitched = fix_hyphens(prev_last_line, first_line)
                 full_text_parts[-1] = stitched
                 lines = lines[1:]
             else:
-                # Same paragraph detection
                 if (prev_last_line.strip() and first_line.strip()
                     and prev_last_line[-1].isalnum()):
                     full_text_parts.append(" ")
                 else:
                     full_text_parts.append("\n\n")
 
-        # Save lines
+        # 5. Append lines
         for line in lines:
             full_text_parts.append(line)
 
-        prev_last_line = full_text_parts[-1] if full_text_parts else None
+        prev_last_line = full_text_parts[-1]
 
         pages_output.append({
-            "page_num": i + 1,
+            "page_num": page_num,
             "word_count": page_wc,
             "used_ocr": used_ocr,
             "text": "\n".join(lines)
         })
 
-    # Final normalized stitched PDF text
-    final_text = "\n".join(full_text_parts)
-    final_text = normalize_text(final_text)
-    print(final_text)
+    # Final stitched full text
+    final_text = normalize_text("\n".join(full_text_parts))
+
     return {
         "doc_uuid": doc_uuid,
-        "page_count": doc.page_count,
+        "page_count": page_count,
+        "processed_page_range": page_range,
+        "processed_pages": list(pages_to_process),
         "total_word_count": total_word_count,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "tool_version": TOOL_VERSION,
-        "skipped":skipped,
-        "skipped_pages":skipped_pages,
+        "skipped": skipped,
+        "skipped_pages": skipped_pages,
         "text": final_text,
         "pages": pages_output
     }
 
 
+
 def run_extraction(input_path, out_dir, page_range=None):
     """Extraction wrapper for CLI"""
-    result = extract_pdf_pymupdf(input_path)
 
-    # Apply page range slicing if requested
-    if page_range:
-        start, end = page_range
-        result["pages"] = [
-            p for p in result["pages"] 
-            if start <= p["page_num"] <= end
-        ]
+    result = extract_pdf_pymupdf(
+        path=input_path,
+        page_range=page_range
+    )
 
     # Output filename = doc_uuid.json
     out_path = f"{out_dir}/{result['doc_uuid']}.json"
