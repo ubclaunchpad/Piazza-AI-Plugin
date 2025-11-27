@@ -36,6 +36,18 @@ class Settings(BaseSettings):
     # Database Configuration
     DATABASE_URL: str
 
+    # Supabase Configuration
+    SUPABASE_URL: str = ""
+    SUPABASE_ANON_KEY: str = ""
+    SUPABASE_SERVICE_ROLE_KEY: str = ""
+    SUPABASE_STORAGE_BUCKET: str = "documents"
+
+    # File Upload Configuration
+    MAX_FILE_SIZE: int = 10 * 1024 * 1024  # 10MB default
+    ALLOWED_FILE_TYPES: List[str] = [
+        "application/pdf",
+    ]
+
     class Config:
         case_sensitive = True
 

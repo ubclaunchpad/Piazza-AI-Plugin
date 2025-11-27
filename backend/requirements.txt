@@ -17,6 +17,10 @@ psycopg2-binary==2.9.9
 
 # Database (when needed)
 # Uncomment when adding database functionality:
-# asyncpg==0.29.0
-# sqlalchemy[asyncio]==2.0.23
-# supabase==2.0.3
+asyncpg==0.29.0
+sqlalchemy[asyncio]==2.0.23
+supabase==2.0.3
+
+# File Handling
+python-multipart==0.0.6
+aiofiles==23.2.1
