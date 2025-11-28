@@ -26,7 +26,7 @@ export function UserAuthProvider({ children }) {
     });
   }, []);
 
-  const login = async () => {
+  const login = async (email, password) => {
     // TODO: Replace with actual API call to your backend
     try {
       // Simulated login - replace with actual API call
@@ -49,7 +49,7 @@ export function UserAuthProvider({ children }) {
       return { success: true };
     } catch (error) {
       console.error("Login error:", error);
-      return { success: false, error: "Login failed" };
+      return { success: false, error: "Login failed" + error.message };
     }
   };
 

@@ -1,68 +1,13 @@
-import { useEffect, useState } from "react";
 import { useUser } from "../context/UserAuthContext";
+import { usePiazza } from "../context/PiazzaContext";
 
 /* global chrome */
 export default function DashboardPage({ onNavigateToAssistant }) {
-  const [currentTab, setCurrentTab] = useState(null);
-  const [piazzaInfo, setPiazzaInfo] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  const { user, logout: logout } = useUser();
-
-  useEffect(() => {
-    getCurrentTabInfo();
-  }, []);
-
-  const getCurrentTabInfo = async () => {
-    try {
-      const [tab] = await chrome.tabs.query({
-        active: true,
-        currentWindow: true,
-      });
-
-      setCurrentTab(tab);
-
-      if (tab && tab.url && tab.url.includes("piazza.com")) {
-        // Parse Piazza URL
-        const url = new URL(tab.url);
-        const pathParts = url.pathname.split("/").filter(Boolean);
-
-        const info = {
-          isPiazza: true,
-          fullUrl: tab.url,
-          classId: pathParts[1] || null,
-          postId: url.searchParams.get("cid") || null,
-          pathname: url.pathname,
-          threadName: null,
-        };
-
-        // Try to get thread name from content script
-        try {
-          const response = await chrome.tabs.sendMessage(tab.id, {
-            type: "GET_PIAZZA_INFO",
-          });
-          if (response && response.success && response.threadName) {
-            info.threadName = response.threadName;
-          }
-        } catch (error) {
-          console.log("Could not get thread name from content script:", error);
-        }
-
-        setPiazzaInfo(info);
-      } else {
-        setPiazzaInfo({ isPiazza: false });
-      }
-    } catch (error) {
-      console.error("Error getting tab info:", error);
-      setPiazzaInfo({ isPiazza: false, error: true });
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const { user, logout } = useUser();
+  const { currentTab, piazzaInfo, isLoading, refreshPiazzaInfo } = usePiazza();
 
   const handleRefresh = () => {
-    setIsLoading(true);
-    getCurrentTabInfo();
+    refreshPiazzaInfo();
   };
 
   const handleLogout = () => {
