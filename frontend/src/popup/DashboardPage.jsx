@@ -1,14 +1,13 @@
 import { useEffect, useState } from "react";
+import { useUser } from "../context/UserAuthContext";
 
 /* global chrome */
-export default function DashboardPage({
-  user,
-  onLogout,
-  onNavigateToAssistant,
-}) {
+export default function DashboardPage({ onNavigateToAssistant }) {
   const [currentTab, setCurrentTab] = useState(null);
   const [piazzaInfo, setPiazzaInfo] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  const { user, logout: logout } = useUser();
 
   useEffect(() => {
     getCurrentTabInfo();
@@ -68,7 +67,7 @@ export default function DashboardPage({
 
   const handleLogout = () => {
     if (confirm("Are you sure you want to log out?")) {
-      onLogout();
+      logout();
     }
   };
 

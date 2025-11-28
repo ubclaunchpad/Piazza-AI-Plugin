@@ -1,12 +1,14 @@
 import { useState } from "react";
-
-export default function LoginPage({ onLogin, onSignup }) {
+import { useUser } from "../context/UserAuthContext";
+export default function LoginPage() {
   const [isSignup, setIsSignup] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  const { login, signup } = useUser();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -34,8 +36,8 @@ export default function LoginPage({ onLogin, onSignup }) {
 
     try {
       const result = isSignup
-        ? await onSignup(email, password, name)
-        : await onLogin(email, password);
+        ? await signup(email, password, name)
+        : await login(email, password);
 
       if (!result.success) {
         setError(result.error || "Authentication failed");

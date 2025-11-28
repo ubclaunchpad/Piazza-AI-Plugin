@@ -1,7 +1,8 @@
 import { useState } from "react";
 
 /* global chrome */
-export default function AssistantPage({ user, onBack }) {
+export default function AssistantPage({ onBack }) {
+  const { user } = useUser();
   const [activeTab, setActiveTab] = useState("chats"); // 'chats' or 'files'
 
   // Dummy chat data
