@@ -1,0 +1,15 @@
+fastapi
+uvicorn[standard]
+pydantic[email]
+pydantic-settings
+python-dotenv
+psycopg2-binary
+sqlalchemy
+websockets
+supabase
+langchain
+langchain-community
+langchain-openai
+langchain-groq
+langchain-postgres
+pgvector

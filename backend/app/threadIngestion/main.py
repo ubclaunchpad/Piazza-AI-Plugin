@@ -5,9 +5,17 @@ This module handles the orchestration of ingesting Piazza posts,
 processing them into chunks, and preparing them for storage.
 """
 
+import os
 from typing import List, Dict, Any, Optional
 from .helpers import ThreadIngestionService, PostChunk
 import time
+
+# LangChain & Database imports
+from langchain_postgres import PGVector
+from langchain_openai import OpenAIEmbeddings
+from langchain.schema import Document
+from app.core.config import settings
+from app.core.database import execute_statement
 
 class ThreadIngestionOrchestrator:
     """
@@ -31,6 +39,15 @@ class ThreadIngestionOrchestrator:
             ValueError: If required cookies are missing
         """
         self.service = ThreadIngestionService.from_cookie_string(cookie_string)
+        
+        # Initialize Embeddings
+        openai_api_key = os.environ.get("OPENAI_API_KEY")
+        if not openai_api_key:
+             raise ValueError("OPENAI_API_KEY must be set")
+        self.embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
+        
+        # Database Connection String for PGVector
+        self.db_connection = settings.DATABASE_URL
     
     def ingest_by_thread_id(
         self,
@@ -46,45 +63,97 @@ class ThreadIngestionOrchestrator:
             Dictionary containing processed chunks and summary
         """
         try:
-            # Check if it's a single post ingestion
-            if '@' in thread_id:
-                chunks = self.service.ingest_thread_by_id(thread_id)
-                posts_processed = [chunk.metadata.post_number for chunk in chunks]
-                return {
-                    "success": True,
-                    "thread_id": thread_id,
-                    "total_chunks": len(posts_processed),
-                    "posts_processed": posts_processed,
-                }
+            # 1. Insert/Update thread in database
+            # We use the network_id (thread_id) as the unique identifier
+            
+            upsert_query = """
+                INSERT INTO threads (piazza_course_id, thread_title, is_indexable, updated_at)
+                VALUES (%s, %s, %s, NOW())
+                ON CONFLICT (piazza_course_id) 
+                DO UPDATE SET updated_at = NOW();
+            """
+            execute_statement(upsert_query, (
+                thread_id,
+                f"Course {thread_id}",
+                True
+            ))
+            
+            # 2. Initialize PGVector store
+            # Collection name is the thread_id
+            vector_store = PGVector(
+                collection_name=thread_id,
+                connection=self.db_connection,
+                embeddings=self.embeddings,
+                use_jsonb=True,
+            )
 
-            # Otherwise, paginated ingestion for the whole feed
+            # 3. Process posts (Paginated)
             offset = 0
             limit = 50 
             posts_processed = set()
+            total_chunks_ingested = 0
+            max_ingested_post_id = 0
             
             while True:
+                # Fetch chunks from service
                 chunks = self.service.ingest_thread_by_id(thread_id, offset=offset, limit=limit)
                 
                 if not chunks:
                     break
                 
-                # Add processed posts to the set
-                current_batch_posts = {chunk.metadata.post_number for chunk in chunks}
-                posts_processed.update(current_batch_posts)
+                # Convert chunks to LangChain Documents
+                documents = []
+                current_batch_post_nums = set()
+                
+                for chunk in chunks:
+                    metadata = chunk.metadata.to_dict()
+                    # Add extra metadata if needed
+                    metadata["chunk_id"] = chunk.chunk_id
+                    metadata["chunk_type"] = chunk.chunk_type
+                    
+                    doc = Document(
+                        page_content=chunk.text,
+                        metadata=metadata
+                    )
+                    documents.append(doc)
+                    current_batch_post_nums.add(chunk.metadata.post_number)
+                
+                # Insert into PGVector
+                if documents:
+                    vector_store.add_documents(documents)
+                    total_chunks_ingested += len(documents)
+                
+                # Update processed set
+                posts_processed.update(current_batch_post_nums)
+                
+                # Update last_ingested_post_id in DB
+                if current_batch_post_nums:
+                    batch_max = max(current_batch_post_nums)
+                    max_ingested_post_id = max(max_ingested_post_id, batch_max)
+                    
+
                 
                 # Move to next page
                 offset += limit
-                
-                # Optional: Add a small delay between pages if needed, 
-                # though User.py already has delays between requests.
+            
+            # Update last_ingested_post_id in DB with the max ingested post id
+            if max_ingested_post_id > 0:
+                update_query = """
+                    UPDATE threads 
+                    SET last_ingested_post_id = %s 
+                    WHERE piazza_course_id = %s
+                """
+                execute_statement(update_query, (max_ingested_post_id, thread_id))
             
             return {
                 "success": True,
                 "thread_id": thread_id,
-                "total_chunks": len(posts_processed),
+                "total_chunks": total_chunks_ingested,
                 "posts_processed": list(posts_processed),
             }
+            
         except Exception as e:
+            print(f"Ingestion error: {e}")
             return {
                 "success": False,
                 "thread_id": thread_id,
