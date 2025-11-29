@@ -122,7 +122,6 @@ class ThreadIngestionService:
         # Get post list
         posts_feed = self.user.getPosts(offset, limit, network_id)
         feed_items = posts_feed.get("feed", [])
-        
         # Process each post
         for item in feed_items:
             post_number = item.get("nr")
@@ -142,7 +141,7 @@ class ThreadIngestionService:
         self,
         thread_id: str,
         offset: int = 0,
-        limit: int = 20,
+        limit: int = 9999,
     ) -> List[PostChunk]:
         """
         Ingest a thread using its ID (could be post number or class ID).

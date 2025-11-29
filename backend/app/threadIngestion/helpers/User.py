@@ -1,4 +1,6 @@
 import requests
+import time
+
 class User():
 
     #csrf_token: "session_id" found in the user's cookies in local storage
@@ -53,9 +55,29 @@ class User():
             }
         }
 
-        response = requests.post("https://piazza.com/logic/api?method=network.get_my_feed", headers=headers, json=data)
-        print(response.status_code)
-        return response.json()["result"]
+        max_retries = 5
+        base_delay = 2
+
+        for attempt in range(max_retries):
+            response = requests.post("https://piazza.com/logic/api?method=network.get_my_feed", headers=headers, json=data)
+            print(response.status_code)
+            
+            try:
+                resp_json = response.json()
+                error = resp_json.get("error")
+                if error and "too fast" in str(error):
+                    delay = base_delay * (attempt + 1)
+                    print(f"Rate limited (getPosts). Waiting {delay}s...")
+                    time.sleep(delay)
+                    continue
+                return resp_json["result"]
+            except Exception as e:
+                print(f"Error parsing response: {e}")
+                if attempt == max_retries - 1:
+                    raise e
+                time.sleep(1)
+        
+        return None
 
 
     #post_num: used to identify the post, defined as "nr" when fetching posts in getPosts
@@ -85,9 +107,32 @@ class User():
             }
         }
 
-        response = requests.post("https://piazza.com/logic/api?method=content.get", headers=headers, json=payload)
-        print(response.status_code)
-        return response.json()["result"]
+        max_retries = 5
+        base_delay = 2
+
+        for attempt in range(max_retries):
+            response = requests.post("https://piazza.com/logic/api?method=content.get", headers=headers, json=payload)
+            print(response.status_code)
+            
+            try:
+                resp_json = response.json()
+                error = resp_json.get("error")
+                if error and "too fast" in str(error):
+                    delay = base_delay * (attempt + 1)
+                    print(f"Rate limited (getPostContent {post_num}). Waiting {delay}s...")
+                    time.sleep(delay)
+                    continue
+                
+                # Add a small delay after success to be nice
+                time.sleep(1)
+                return resp_json["result"]
+            except Exception as e:
+                print(f"Error parsing response: {e}")
+                if attempt == max_retries - 1:
+                    raise e
+                time.sleep(1)
+        
+        return None
 
 
 

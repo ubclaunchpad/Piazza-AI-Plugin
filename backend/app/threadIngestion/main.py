@@ -7,7 +7,7 @@ processing them into chunks, and preparing them for storage.
 
 from typing import List, Dict, Any, Optional
 from .helpers import ThreadIngestionService, PostChunk
-
+import time
 
 class ThreadIngestionOrchestrator:
     """
@@ -46,23 +46,43 @@ class ThreadIngestionOrchestrator:
             Dictionary containing processed chunks and summary
         """
         try:
+            # Check if it's a single post ingestion
+            if '@' in thread_id:
+                chunks = self.service.ingest_thread_by_id(thread_id)
+                posts_processed = [chunk.metadata.post_number for chunk in chunks]
+                return {
+                    "success": True,
+                    "thread_id": thread_id,
+                    "total_chunks": len(posts_processed),
+                    "posts_processed": posts_processed,
+                }
 
+            # Otherwise, paginated ingestion for the whole feed
             offset = 0
-            limit = 20
+            limit = 50 
             posts_processed = set()
+            
             while True:
-                chunks = self.service.ingest_thread_by_id(thread_id, offset, limit)
-                if len(chunks) == 0:
+                chunks = self.service.ingest_thread_by_id(thread_id, offset=offset, limit=limit)
+                
+                if not chunks:
                     break
-
-                posts_processed.update(chunk.metadata.post_number for chunk in chunks)
+                
+                # Add processed posts to the set
+                current_batch_posts = {chunk.metadata.post_number for chunk in chunks}
+                posts_processed.update(current_batch_posts)
+                
+                # Move to next page
                 offset += limit
+                
+                # Optional: Add a small delay between pages if needed, 
+                # though User.py already has delays between requests.
             
             return {
                 "success": True,
                 "thread_id": thread_id,
                 "total_chunks": len(posts_processed),
-                "posts_processed": sorted(list(posts_processed)),
+                "posts_processed": list(posts_processed),
             }
         except Exception as e:
             return {
