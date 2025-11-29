@@ -4,6 +4,37 @@ import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
 
+function SourcesDropdown({ sources, threadId }) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="mt-1 ml-1">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="text-xs text-purple-600 hover:text-purple-800 bg-transparent border-none cursor-pointer flex items-center gap-1 p-0 font-medium transition-colors"
+      >
+        {isOpen ? "▼" : "▶"} Sources ({sources.length})
+      </button>
+
+      {isOpen && (
+        <div className="mt-1 ml-2 flex flex-col gap-1 animate-fadeIn">
+          {sources.map((source, idx) => (
+            <a
+              key={idx}
+              href={`https://piazza.com/class/${threadId}/post/${source}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-blue-600 hover:text-purple-600 hover:underline transition-colors block"
+            >
+              Post {source}
+            </a>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ChatbotApp() {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
@@ -83,6 +114,15 @@ function ChatbotApp() {
     setIsLoading(true);
 
     try {
+      // Extract thread_id (network_id) from URL
+      // Example: /class/l8j1j1j1j1j1 -> l8j1j1j1j1j1
+      const threadIdMatch = window.location.pathname.match(/\/class\/([^/?]+)/);
+      const threadId = threadIdMatch ? threadIdMatch[1] : null;
+
+      if (!threadId) {
+        throw new Error("Could not determine course ID from URL");
+      }
+
       // Call the backend API
       const API_ENDPOINT =
         process.env.API_ENDPOINT || "http://localhost:8000/api/v1";
@@ -91,7 +131,10 @@ function ChatbotApp() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ query: userMessage }),
+        body: JSON.stringify({
+          query: userMessage,
+          thread_id: threadId,
+        }),
       });
 
       if (!response.ok) {
@@ -110,6 +153,8 @@ function ChatbotApp() {
         {
           role: "assistant",
           content: convertedContent,
+          sources: data.sources || [],
+          threadId: threadId,
         },
       ]);
     } catch (error) {
@@ -167,13 +212,13 @@ function ChatbotApp() {
             {messages.length === 0 ? (
               <div className="flex items-center justify-center h-full text-gray-600 text-sm">
                 <p>Hi! How can I help you today?</p>
-              </div>  
+              </div>
             ) : (
               messages.map((msg, idx) => (
                 <div
                   key={idx}
-                  className={`flex mb-2 ${
-                    msg.role === "user" ? "justify-end" : "justify-start"
+                  className={`flex mb-2 flex-col ${
+                    msg.role === "user" ? "items-end" : "items-start"
                   }`}
                 >
                   <div
@@ -285,6 +330,14 @@ function ChatbotApp() {
                       msg.content
                     )}
                   </div>
+                  {msg.role === "assistant" &&
+                    msg.sources &&
+                    msg.sources.length > 0 && (
+                      <SourcesDropdown
+                        sources={msg.sources}
+                        threadId={msg.threadId}
+                      />
+                    )}
                 </div>
               ))
             )}
