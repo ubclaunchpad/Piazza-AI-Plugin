@@ -70,13 +70,16 @@ class ThreadIngestionOrchestrator:
                 INSERT INTO threads (piazza_course_id, thread_title, is_indexable, updated_at)
                 VALUES (%s, %s, %s, NOW())
                 ON CONFLICT (piazza_course_id) 
-                DO UPDATE SET updated_at = NOW();
+                DO UPDATE SET updated_at = NOW()
+                RETURNING last_ingested_post_id;
             """
-            execute_statement(upsert_query, (
+            result = execute_statement(upsert_query, (
                 thread_id,
                 f"Course {thread_id}",
                 True
-            ))
+            ), fetch_result=True)
+            
+            last_ingested_id = result[0]['last_ingested_post_id'] if result and result[0]['last_ingested_post_id'] is not None else 0
             
             # 2. Initialize PGVector store
             # Collection name is the thread_id
@@ -92,11 +95,16 @@ class ThreadIngestionOrchestrator:
             limit = 50 
             posts_processed = set()
             total_chunks_ingested = 0
-            max_ingested_post_id = 0
+            max_ingested_post_id = last_ingested_id
             
             while True:
                 # Fetch chunks from service
-                chunks = self.service.ingest_thread_by_id(thread_id, offset=offset, limit=limit)
+                chunks = self.service.ingest_thread_by_id(
+                    thread_id, 
+                    offset=offset, 
+                    limit=limit,
+                    last_ingested_id=last_ingested_id
+                )
                 
                 if not chunks:
                     break
@@ -106,6 +114,12 @@ class ThreadIngestionOrchestrator:
                 current_batch_post_nums = set()
                 
                 for chunk in chunks:
+                    post_num = chunk.metadata.post_number
+                    
+                    # Skip if already ingested
+                    if post_num <= last_ingested_id:
+                        continue
+                        
                     metadata = chunk.metadata.to_dict()
                     # Add extra metadata if needed
                     metadata["chunk_id"] = chunk.chunk_id
@@ -116,7 +130,7 @@ class ThreadIngestionOrchestrator:
                         metadata=metadata
                     )
                     documents.append(doc)
-                    current_batch_post_nums.add(chunk.metadata.post_number)
+                    current_batch_post_nums.add(post_num)
                 
                 # Insert into PGVector
                 if documents:
@@ -126,18 +140,16 @@ class ThreadIngestionOrchestrator:
                 # Update processed set
                 posts_processed.update(current_batch_post_nums)
                 
-                # Update last_ingested_post_id in DB
+                # Update max ingested post id
                 if current_batch_post_nums:
                     batch_max = max(current_batch_post_nums)
                     max_ingested_post_id = max(max_ingested_post_id, batch_max)
-                    
-
                 
                 # Move to next page
                 offset += limit
             
             # Update last_ingested_post_id in DB with the max ingested post id
-            if max_ingested_post_id > 0:
+            if max_ingested_post_id > last_ingested_id:
                 update_query = """
                     UPDATE threads 
                     SET last_ingested_post_id = %s 
@@ -150,6 +162,7 @@ class ThreadIngestionOrchestrator:
                 "thread_id": thread_id,
                 "total_chunks": total_chunks_ingested,
                 "posts_processed": list(posts_processed),
+                "last_ingested_post_id": max_ingested_post_id
             }
             
         except Exception as e:

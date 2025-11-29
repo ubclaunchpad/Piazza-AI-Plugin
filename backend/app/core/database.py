@@ -185,16 +185,17 @@ def test_connection() -> bool:
 # Helper functions for common database operations
 
 
-def execute_statement(query: str, params=None):
+def execute_statement(query: str, params=None, fetch_result: bool = False):
     """
     Execute a non-SELECT statement (INSERT, UPDATE, DELETE).
 
     Args:
         query: SQL statement to execute
         params: Query parameters (optional)
+        fetch_result: If True, fetch and return the result (e.g., for RETURNING clauses)
 
     Returns:
-        Number of affected rows
+        Number of affected rows (default) or the fetched result if fetch_result=True
 
     Example:
         # Delete records
@@ -202,10 +203,15 @@ def execute_statement(query: str, params=None):
 
         # Update records
         affected = execute_statement("UPDATE example SET name = %s WHERE id = %s", ("New Name", 1))
+        
+        # Insert and return
+        result = execute_statement("INSERT ... RETURNING id", (...), fetch_result=True)
     """
     with get_db() as db:
         cursor = db.cursor()
         cursor.execute(query, params)
+        if fetch_result:
+            return cursor.fetchall()
         return cursor.rowcount
 
 

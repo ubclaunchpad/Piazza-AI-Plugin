@@ -24,6 +24,7 @@ class IngestResponse(BaseModel):
     thread_id: str
     chunks_processed: int = 0
     post_numbers: List[int] = []
+    last_ingested_post_id: int = 0
 
 
 class ChunkData(BaseModel):
@@ -71,6 +72,7 @@ async def ingest_thread(request: IngestRequest):
             thread_id=request.thread_id,
             chunks_processed=result["total_chunks"],
             post_numbers=result["posts_processed"],
+            last_ingested_post_id=result.get("last_ingested_post_id", 0),
         )
     except ValueError as e:
         raise HTTPException(
@@ -217,7 +219,6 @@ async def get_ingestion_status(request: IngestRequest):
             WHERE piazza_course_id = %s
         """
         db_result = execute_query(db_query, (request.thread_id,))
-        print(db_result)
         last_id = db_result[0]['last_ingested_post_id'] if db_result and db_result[0]['last_ingested_post_id'] is not None else 0
         
         

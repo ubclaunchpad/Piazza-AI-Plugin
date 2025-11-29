@@ -1,6 +1,38 @@
 import { useEffect, useState } from "react";
 
 /* global chrome */
+function IngestionStatus({ status }) {
+  if (!status) return null;
+
+  const percentage =
+    status.total_posts_count > 0
+      ? Math.round(
+          (status.ingested_posts_count / status.total_posts_count) * 100
+        )
+      : 0;
+
+  return (
+    <div className="flex flex-col gap-1 mt-2 p-2 bg-gray-50 rounded-md border border-gray-200">
+      <div className="flex justify-between items-center text-xs">
+        <span className="font-medium text-gray-700">Ingestion Status</span>
+        <span className="font-bold text-purple-600">{percentage}%</span>
+      </div>
+      <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+        <div
+          className="bg-purple-500 h-full rounded-full transition-all duration-500"
+          style={{ width: `${percentage}%` }}
+        />
+      </div>
+      <div className="flex justify-between text-[10px] text-gray-500">
+        <span>
+          {status.ingested_posts_count} / {status.total_posts_count} posts
+        </span>
+        <span>Last ID: {status.last_ingested_post_id}</span>
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardPage({
   user,
   onLogout,
@@ -10,10 +42,62 @@ export default function DashboardPage({
   const [piazzaInfo, setPiazzaInfo] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isIngesting, setIsIngesting] = useState(false);
+  const [ingestionStatus, setIngestionStatus] = useState(null);
 
   useEffect(() => {
     getCurrentTabInfo();
   }, []);
+
+  // Poll for ingestion status if we have a class ID
+  useEffect(() => {
+    let interval;
+    if (piazzaInfo?.classId) {
+      fetchIngestionStatus(piazzaInfo.classId);
+      interval = setInterval(
+        () => fetchIngestionStatus(piazzaInfo.classId),
+        10000
+      );
+    }
+    return () => clearInterval(interval);
+  }, [piazzaInfo?.classId]);
+
+  const fetchIngestionStatus = async (classId) => {
+    try {
+      // Get cookie first
+      const [tab] = await chrome.tabs.query({
+        active: true,
+        currentWindow: true,
+      });
+      if (!tab) return;
+
+      const response = await chrome.tabs.sendMessage(tab.id, {
+        type: "GET_PIAZZA_COOKIE",
+      });
+
+      if (response && response.cookie) {
+        const API_ENDPOINT =
+          process.env.API_ENDPOINT || "http://localhost:8000/api/v1";
+        const statusResponse = await fetch(
+          `${API_ENDPOINT}/ingestion/ingest/status`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              thread_id: classId,
+              piazza_cookie: response.cookie,
+            }),
+          }
+        );
+
+        if (statusResponse.ok) {
+          const data = await statusResponse.json();
+          setIngestionStatus(data);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to fetch status:", error);
+    }
+  };
 
   const getCurrentTabInfo = async () => {
     try {
@@ -79,6 +163,8 @@ export default function DashboardPage({
       return;
     }
 
+    setIsIngesting(true); // Start loading state immediately
+
     try {
       // Get Piazza cookie from content script
       const response = await chrome.tabs.sendMessage(currentTab.id, {
@@ -104,16 +190,27 @@ export default function DashboardPage({
           }),
         }
       );
-      //is
+
       if (!apiResponse.ok) {
         const errorData = await apiResponse.json();
         throw new Error(errorData.detail || "Failed to start ingestion");
       }
 
       const data = await apiResponse.json();
-      alert(data.status || "Data ingestion started successfully!");
+
+      // Refresh status immediately
+      fetchIngestionStatus(piazzaInfo.classId);
+
+      if (data.chunks_processed === 0) {
+        alert("Thread is already up to date! No new posts to ingest.");
+      } else {
+        alert(
+          `Ingestion complete! Processed ${data.chunks_processed} new chunks.`
+        );
+      }
     } catch (error) {
       console.error("Error ingesting thread:", error);
+      alert(`Ingestion failed: ${error.message}`);
     } finally {
       setIsIngesting(false);
     }
@@ -206,17 +303,10 @@ export default function DashboardPage({
                   </div>
                 )}
 
-                <div className="flex flex-col gap-1 text-sm">
-                  <span className="text-gray-600 font-medium">URL:</span>
-                  <a
-                    href={piazzaInfo.fullUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-purple-600 no-underline break-all text-xs hover:underline"
-                  >
-                    {piazzaInfo.pathname}
-                  </a>
-                </div>
+                {/* Ingestion Status */}
+                {ingestionStatus && (
+                  <IngestionStatus status={ingestionStatus} />
+                )}
               </div>
 
               {/* Quick Actions */}

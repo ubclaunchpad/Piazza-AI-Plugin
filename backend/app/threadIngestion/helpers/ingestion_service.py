@@ -105,6 +105,7 @@ class ThreadIngestionService:
         network_id: str,
         offset: int = 0,
         limit: int = 9999,
+        last_ingested_id: int = 0,
     ) -> List[PostChunk]:
         """
         Ingest multiple posts from a network.
@@ -113,6 +114,7 @@ class ThreadIngestionService:
             network_id: Course/network ID
             offset: Starting offset for posts
             limit: Number of posts to fetch
+            last_ingested_id: ID of the last successfully ingested post
             
         Returns:
             List of PostChunk objects (one unified chunk per post)
@@ -126,6 +128,10 @@ class ThreadIngestionService:
         for item in feed_items:
             post_number = item.get("nr")
             if not post_number:
+                continue
+                
+            # Skip if already ingested
+            if post_number <= last_ingested_id:
                 continue
             
             try:
@@ -142,12 +148,16 @@ class ThreadIngestionService:
         thread_id: str,
         offset: int = 0,
         limit: int = 9999,
+        last_ingested_id: int = 0,
     ) -> List[PostChunk]:
         """
         Ingest a thread using its ID (could be post number or class ID).
         
         Args:
             thread_id: Thread identifier (can be "classId@postNum" or just classId)
+            offset: Starting offset for posts
+            limit: Number of posts to fetch
+            last_ingested_id: ID of the last successfully ingested post
             
         Returns:
             List of PostChunk objects (one unified chunk per post)
@@ -170,7 +180,8 @@ class ThreadIngestionService:
         return self.ingest_multiple_posts(
             network_id=network_id,
             offset=offset,
-            limit=limit
+            limit=limit,
+            last_ingested_id=last_ingested_id
         )
     
     def get_post_summary(self, post_number: int, network_id: str) -> Dict[str, Any]:
