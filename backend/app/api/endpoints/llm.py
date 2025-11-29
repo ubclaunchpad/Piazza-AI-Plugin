@@ -14,12 +14,13 @@ router = APIRouter()
 async def generate_llm_response(request: QueryRequest):
     """Generate an LLM response to a user query."""
     try:
-        response = get_llm_response(request.query)
+        response = get_llm_response(request.query, request.thread_id)
 
         return QueryResponse(
             query=request.query,
             response=response.content,
             model=response.model,
+            sources=getattr(response, "sources", []),
         )
     except Exception as e:
         raise HTTPException(
