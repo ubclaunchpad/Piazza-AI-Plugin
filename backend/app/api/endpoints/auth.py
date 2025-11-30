@@ -21,6 +21,11 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def hash_email(email: str) -> str:
+    """Hash an email address for storage (lowercase + SHA-256)."""
+    return sha256(email.lower().encode("utf-8")).hexdigest()
+
+
 @router.post(
     "/signup", response_model=SignUpResponse, status_code=status.HTTP_201_CREATED
 )
@@ -63,15 +68,21 @@ def signup(user_data: SignUpRequest):
         msg_lc = msg.lower()
         # Handle common Supabase errors gracefully
         if "user already registered" in msg_lc:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=msg)
-        if "password" in msg_lc and ("invalid" in msg_lc or "weak" in msg_lc):
+            logger.exception(f"Supabase sign_up failed: {msg}")
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=msg
+                status_code=status.HTTP_409_CONFLICT,
+                detail="This email is already registered",
             )
-        logger.exception("Supabase sign_up failed")
+        if "password" in msg_lc and ("invalid" in msg_lc or "weak" in msg_lc):
+            logger.exception(f"Password validation failed: {msg}")
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Password must be at least 8 characters long and meet security requirements",
+            )
+        logger.exception(f"Supabase sign_up failed: {msg}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Supabase signup failed: " + msg,
+            detail="Signup failed. Please try again later.",
         )
 
     user = res.user
@@ -84,7 +95,7 @@ def signup(user_data: SignUpRequest):
     try:
         # Store the user profile locally.
         # The email is hashed (lowercased, SHA-256) for privacy and consistency.
-        email_hash = sha256(user_data.email.lower().encode("utf-8")).hexdigest()
+        email_hash = hash_email(user_data.email)
         execute_statement(
             (
                 "INSERT INTO users (id, display_name, hashed_email) "
@@ -93,18 +104,18 @@ def signup(user_data: SignUpRequest):
             ),
             (user.id, user_data.display_name, email_hash),
         )
-    except Exception:
+    except Exception as db_error:
         # If DB insertion fails, delete the Supabase Auth user to prevent orphaned records
         if user and getattr(user, "id", None):
             try:
                 supabase.auth.admin.delete_user(user.id)
             except Exception:
                 logger.exception("Failed to rollback Supabase user after DB error")
-        logger.exception("Failed to persist user profile to database")
+        logger.exception("Failed to persist user profile to database: %s", db_error)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Database error while creating user profile",
-        )
+        ) from db_error
 
     return SignUpResponse(
         user={
@@ -157,10 +168,10 @@ def login(credentials: LoginRequest):
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Please confirm your email before logging in. Check your inbox for the confirmation link.",
             )
-        logger.exception("Supabase sign_in failed")
+        logger.exception(f"Supabase sign_in failed: {msg}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Authentication failed: " + msg,
+            detail="Authentication failed. Please try again later.",
         )
 
     user = res.user
@@ -172,7 +183,8 @@ def login(credentials: LoginRequest):
             detail="Authentication failed",
         )
 
-    # Check if email is confirmed
+    # Email confirmation is already checked in the exception handler above.
+    # This check serves as a safety net for edge cases where the exception might not be raised.
     if not user.email_confirmed_at:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
