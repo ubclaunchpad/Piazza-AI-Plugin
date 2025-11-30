@@ -36,6 +36,7 @@
         margin: 0 0 0.75rem;
         background: linear-gradient(90deg, #7e3af2, #a855f7);
         -webkit-background-clip: text;
+        background-clip: text;
         color: transparent;
       }
       .status {
@@ -121,7 +122,7 @@
   </head>
   <body>
     <div class="container" role="main">
-      <div id="initial" class="status info">
+      <div id="initial" class="status info" aria-live="polite" aria-atomic="true">
         <div class="spinner" aria-hidden="true"></div>
         <span>Verifying your email…</span>
       </div>
@@ -171,6 +172,11 @@
       (function () {
         // ===== Configuration =====
         // TODO: Replace with your real extension ID from chrome://extensions (Developer mode)
+        // To find your extension ID:
+        // 1. Open chrome://extensions in Chrome
+        // 2. Enable "Developer mode" toggle in the top-right
+        // 3. Find your extension and copy the ID shown under its name
+        // 4. Replace "REPLACE_WITH_EXTENSION_ID" below with your actual extension ID
         const EXTENSION_ID = "REPLACE_WITH_EXTENSION_ID";
         const ENABLE_TOKEN_DISPLAY = location.hostname === "127.0.0.1"; // hide tokens outside local dev
         const hash = window.location.hash.startsWith("#")

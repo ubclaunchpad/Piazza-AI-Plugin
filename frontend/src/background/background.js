@@ -3,17 +3,15 @@ chrome.runtime.onInstalled.addListener(() => {
   console.log("ThreadSense extension installed");
 });
 
-// Handle messages from content script if needed
+// Handle messages from content script and popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === "GET_RESPONSE") {
     // Handle chat API calls here
     sendResponse({ message: "Response from background" });
+    return true;
   }
-  return true;
-});
 
-// (Optional) Helper for popup scripts to query preconfirmation quickly
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  // (Optional) Helper for popup scripts to query preconfirmation quickly
   if (request.type === "CHECK_PRECONFIRMED") {
     chrome.storage.local.get(["preconfirmed", "preconfirmedAt"], (data) => {
       sendResponse({

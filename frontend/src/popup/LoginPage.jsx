@@ -1,5 +1,7 @@
 import { useState } from "react";
 
+const SUCCESS_MESSAGE_TIMEOUT = 5000; // 5 seconds
+
 export default function LoginPage({ onLogin, onSignup }) {
   const [isSignup, setIsSignup] = useState(false);
   const [email, setEmail] = useState("");
@@ -51,7 +53,7 @@ export default function LoginPage({ onLogin, onSignup }) {
         setTimeout(() => {
           setIsSignup(false);
           setSuccessMessage("");
-        }, 5000);
+        }, SUCCESS_MESSAGE_TIMEOUT);
       }
     } catch (err) {
       setError("An error occurred. Please try again.");

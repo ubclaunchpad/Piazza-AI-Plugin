@@ -4,6 +4,9 @@ import DashboardPage from "./DashboardPage";
 import AssistantPage from "./AssistantPage";
 
 /* global chrome */
+
+const API_ENDPOINT = process.env.API_ENDPOINT || "http://localhost:8000/api/v1";
+
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -24,8 +27,6 @@ export default function App() {
   const handleLogin = async (email, password) => {
     try {
       // Call the backend API
-      const API_ENDPOINT =
-        process.env.API_ENDPOINT || "http://localhost:8000/api/v1";
       const response = await fetch(`${API_ENDPOINT}/auth/login`, {
         method: "POST",
         headers: {
@@ -87,8 +88,6 @@ export default function App() {
   const handleSignup = async (email, password, name) => {
     try {
       // Call the backend API
-      const API_ENDPOINT =
-        process.env.API_ENDPOINT || "http://localhost:8000/api/v1";
       const response = await fetch(`${API_ENDPOINT}/auth/signup`, {
         method: "POST",
         headers: {

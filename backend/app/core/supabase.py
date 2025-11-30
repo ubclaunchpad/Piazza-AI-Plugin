@@ -6,9 +6,8 @@ variables provided through Pydantic settings. Import `supabase` from this module
 whenever you need to interact with Supabase (authentication, storage, or
 database).
 
-The client uses the public (anon) key by default. For admin-level operations,
-use a service key via `create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)`
-in a separate context.
+The client uses the service role key, which bypasses Row Level Security (RLS).
+Use with caution in user-facing operations.
 """
 
 from __future__ import annotations
