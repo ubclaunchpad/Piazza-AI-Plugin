@@ -39,50 +39,47 @@ class ChunkData(BaseModel):
 router = APIRouter()
 
 
-@router.post("/ingest", response_model=IngestResponse)
-async def ingest_thread(request: IngestRequest):
+def run_ingestion_task(thread_id: str, piazza_cookie: str):
     """
-    Start data ingestion for a Piazza thread.
-    
-    Each post is converted to a unified chunk with the format:
-    - Main Post
-    - Instructor Response(s)
-    - Student Response(s)
-    - Follow-up Discussion(s) with replies
-    
-    Args:
-        request: IngestRequest containing thread_id and piazza_cookie
-        
-    Returns:
-        IngestResponse with success message and processing details
+    Background task to run the ingestion process.
     """
     try:
-        # Create orchestrator from cookies
-        orchestrator = ThreadIngestionOrchestrator(request.piazza_cookie)
-        
-        result = orchestrator.ingest_by_thread_id(thread_id=request.thread_id)
-        
-        if not result["success"]:
-            raise Exception(result.get("error", "Unknown error"))
-        
+        orchestrator = ThreadIngestionOrchestrator(piazza_cookie)
+        orchestrator.ingest_by_thread_id(thread_id=thread_id)
+        # We could log success here or update a status in DB if we had a jobs table
+    except Exception as e:
+        print(f"Background ingestion failed for thread {thread_id}: {e}")
+
+@router.post("/ingest", response_model=IngestResponse)
+async def ingest_thread(
+    request: IngestRequest, 
+    background_tasks: BackgroundTasks
+):
+    """
+    Start data ingestion for a Piazza thread in the background.
+    
+    Returns immediately with a status message.
+    """
+    try:
+        # Add ingestion task to background queue
+        background_tasks.add_task(
+            run_ingestion_task, 
+            thread_id=request.thread_id, 
+            piazza_cookie=request.piazza_cookie
+        )
         
         return IngestResponse(
-            message="Data ingestion completed successfully",
-            status="success",
+            message="Data ingestion started in background",
+            status="started",
             thread_id=request.thread_id,
-            chunks_processed=result["total_chunks"],
-            post_numbers=result["posts_processed"],
-            last_ingested_post_id=result.get("last_ingested_post_id", 0),
-        )
-    except ValueError as e:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid request: {str(e)}",
+            chunks_processed=0,
+            post_numbers=[],
+            last_ingested_post_id=0,
         )
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to ingest thread: {str(e)}",
+            detail=f"Failed to start ingestion: {str(e)}",
         )
 
 
@@ -164,15 +161,17 @@ async def get_ingestion_status(request: IngestRequest):
         # We count distinct documents (posts) in the collection
         # Table: langchain_pg_embedding
         # Join: langchain_pg_collection on collection_id
-        
-        count_query = """
-            SELECT COUNT(DISTINCT (CAST(e.cmetadata->>'post_number' AS INTEGER)))
-            FROM langchain_pg_embedding e
-            JOIN langchain_pg_collection c ON e.collection_id = c.uuid
-            WHERE c.name = %s
-        """
-        result = execute_query(count_query, (request.thread_id,))
-        ingested_count = result[0]['count'] if result else 0
+        try:
+            count_query = """
+                SELECT COUNT(DISTINCT (CAST(e.cmetadata->>'post_number' AS INTEGER)))
+                FROM langchain_pg_embedding e
+                JOIN langchain_pg_collection c ON e.collection_id = c.uuid
+                WHERE c.name = %s
+            """
+            result = execute_query(count_query, (request.thread_id,))
+            ingested_count = result[0]['count'] if result else 0
+        except Exception as e:
+            ingested_count = 0
 
         
         # 2. Get total posts count from Piazza API
