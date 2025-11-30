@@ -74,7 +74,7 @@ def signup(user_data: SignUpRequest):
                 detail="This email is already registered",
             )
         if "password" in msg_lc and ("invalid" in msg_lc or "weak" in msg_lc):
-            logger.exception(f"Password validation failed: {msg}")
+            logger.warning(f"Password validation failed: {msg}")
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="Password must be at least 8 characters long and meet security requirements",
