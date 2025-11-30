@@ -1,40 +1,116 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 /* global chrome */
 export default function AssistantPage({ user, onBack }) {
   const [activeTab, setActiveTab] = useState("chats"); // 'chats' or 'files'
+  const [chats, setChats] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [piazzaClassId, setPiazzaClassId] = useState(null);
+  const [isCreating, setIsCreating] = useState(false);
 
-  // Dummy chat data
-  const dummyChats = [
-    {
-      id: 1,
-      title: "Understanding recursion in @95",
-      lastMessage: "Thanks! That makes sense now.",
-      timestamp: "2 hours ago",
-      messageCount: 8,
-    },
-    {
-      id: 2,
-      title: "Question about async/await",
-      lastMessage: "Can you explain the difference?",
-      timestamp: "Yesterday",
-      messageCount: 5,
-    },
-    {
-      id: 3,
-      title: "Help with Project 2",
-      lastMessage: "How do I implement the cache?",
-      timestamp: "2 days ago",
-      messageCount: 12,
-    },
-    {
-      id: 4,
-      title: "Clarification on lecture notes",
-      lastMessage: "What does this diagram mean?",
-      timestamp: "3 days ago",
-      messageCount: 3,
-    },
-  ];
+  useEffect(() => {
+    fetchPiazzaInfo();
+  }, []);
+
+  useEffect(() => {
+    if (piazzaClassId) {
+      fetchChats();
+    }
+  }, [piazzaClassId]);
+
+  const fetchPiazzaInfo = async () => {
+    try {
+      const [tab] = await chrome.tabs.query({
+        active: true,
+        currentWindow: true,
+      });
+      if (tab && tab.url && tab.url.includes("piazza.com")) {
+        const url = new URL(tab.url);
+        const pathParts = url.pathname.split("/").filter(Boolean);
+        const classId = pathParts[1];
+        setPiazzaClassId(classId);
+      }
+    } catch (error) {
+      console.error("Error getting Piazza info:", error);
+    }
+  };
+
+  const fetchChats = async () => {
+    setIsLoading(true);
+    try {
+      const API_ENDPOINT =
+        process.env.API_ENDPOINT || "http://localhost:8000/api/v1";
+      const response = await fetch(
+        `${API_ENDPOINT}/chat-sessions?piazza_course_id=${piazzaClassId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${user.access_token}`,
+          },
+        }
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setChats(data);
+      }
+    } catch (error) {
+      console.error("Error fetching chats:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCreateChat = async () => {
+    if (!piazzaClassId) return;
+    setIsCreating(true);
+    try {
+      const API_ENDPOINT =
+        process.env.API_ENDPOINT || "http://localhost:8000/api/v1";
+      const response = await fetch(`${API_ENDPOINT}/chat-sessions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${user.access_token}`,
+        },
+        body: JSON.stringify({
+          piazza_course_id: piazzaClassId,
+          title: "New Chat",
+        }),
+      });
+
+      if (response.ok) {
+        const newChat = await response.json();
+        setChats([newChat, ...chats]);
+      } else {
+        console.error("Failed to create chat");
+      }
+    } catch (error) {
+      console.error("Error creating chat:", error);
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const handleDeleteChat = async (e, chatId) => {
+    e.stopPropagation();
+    if (!confirm("Are you sure you want to delete this chat?")) return;
+
+    try {
+      const API_ENDPOINT =
+        process.env.API_ENDPOINT || "http://localhost:8000/api/v1";
+      const response = await fetch(`${API_ENDPOINT}/chat-sessions/${chatId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${user.access_token}`,
+        },
+      });
+
+      if (response.ok) {
+        setChats(chats.filter((c) => c.id !== chatId));
+      }
+    } catch (error) {
+      console.error("Error deleting chat:", error);
+    }
+  };
 
   const handleChatClick = (chatId) => {
     console.log("Opening chat:", chatId);
@@ -99,34 +175,53 @@ export default function AssistantPage({ user, onBack }) {
       <div className="flex-1 overflow-y-auto bg-gray-50">
         {activeTab === "chats" ? (
           <div className="p-4">
-            <div className="flex flex-col gap-2">
-              {dummyChats.map((chat) => (
-                <div
-                  key={chat.id}
-                  onClick={() => handleChatClick(chat.id)}
-                  className="bg-white p-4 rounded-lg shadow-sm cursor-pointer transition-all hover:shadow-md hover:-translate-y-0.5 border border-gray-100"
-                >
-                  <div className="flex items-start justify-between mb-2">
-                    <h4 className="text-sm font-semibold text-gray-900 m-0 flex-1">
-                      {chat.title}
-                    </h4>
-                    <span className="text-xs text-gray-500 ml-2">
-                      {chat.timestamp}
-                    </span>
-                  </div>
-                  <p className="text-xs text-gray-600 m-0 mb-2">
-                    {chat.lastMessage}
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <span className="inline-flex items-center gap-1 text-xs text-gray-500">
-                      <span>💬</span>
-                      {chat.messageCount} messages
-                    </span>
-                  </div>
-                </div>
-              ))}
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-sm font-semibold text-gray-700 m-0">
+                Recent Chats
+              </h3>
+              <button
+                onClick={handleCreateChat}
+                disabled={isCreating || !piazzaClassId}
+                className="bg-purple-600 text-white border-none px-3 py-1.5 rounded-md text-xs font-medium cursor-pointer transition-colors hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isCreating ? "Creating..." : "+ New Chat"}
+              </button>
             </div>
-            {dummyChats.length === 0 && (
+
+            {isLoading ? (
+              <div className="text-center py-8 text-gray-500 text-sm">
+                Loading chats...
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {chats.map((chat) => (
+                  <div
+                    key={chat.id}
+                    onClick={() => handleChatClick(chat.id)}
+                    className="bg-white p-4 rounded-lg shadow-sm cursor-pointer transition-all hover:shadow-md hover:-translate-y-0.5 border border-gray-100 group relative"
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <h4 className="text-sm font-semibold text-gray-900 m-0 flex-1 truncate pr-6">
+                        {chat.title || "Untitled Chat"}
+                      </h4>
+                      <span className="text-xs text-gray-500 ml-2 whitespace-nowrap">
+                        {new Date(chat.updated_at).toLocaleDateString()}
+                      </span>
+                    </div>
+
+                    <button
+                      onClick={(e) => handleDeleteChat(e, chat.id)}
+                      className="absolute top-2 right-2 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-1 bg-transparent border-none cursor-pointer"
+                      title="Delete chat"
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {!isLoading && chats.length === 0 && (
               <div className="text-center py-12">
                 <p className="text-gray-500 text-sm">No chats yet</p>
                 <p className="text-gray-400 text-xs mt-1">

@@ -14,7 +14,7 @@ export default function App() {
   useEffect(() => {
     chrome.storage.local.get(["user", "authToken"], (result) => {
       if (result.user && result.authToken) {
-        setUser(result.user);
+        setUser({ ...result.user, access_token: result.authToken });
         setIsAuthenticated(true);
       }
       setIsLoading(false);
@@ -72,6 +72,7 @@ export default function App() {
         id: userData.id,
         email: userData.email,
         name: userData.name,
+        access_token: access_token,
       });
       setIsAuthenticated(true);
       return { success: true };

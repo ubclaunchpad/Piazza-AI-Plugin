@@ -201,7 +201,11 @@ export default function DashboardPage({
       // Refresh status immediately
       fetchIngestionStatus(piazzaInfo.classId);
 
-      if (data.chunks_processed === 0) {
+      if (data.status === "started") {
+        alert(
+          "Ingestion started in background. You can continue using the extension."
+        );
+      } else if (data.chunks_processed === 0) {
         alert("Thread is already up to date! No new posts to ingest.");
       } else {
         alert(
