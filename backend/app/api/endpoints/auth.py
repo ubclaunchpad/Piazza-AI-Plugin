@@ -184,12 +184,6 @@ def login(credentials: LoginRequest):
         )
 
     # Email confirmation is already checked in the exception handler above.
-    # This check serves as a safety net for edge cases where the exception might not be raised.
-    if not user.email_confirmed_at:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Please confirm your email before logging in. Check your inbox for the confirmation link.",
-        )
 
     # Retrieve user profile from database
     try:
