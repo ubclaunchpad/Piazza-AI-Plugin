@@ -11,5 +11,5 @@ langchain
 langchain-community
 langchain-openai
 langchain-groq
-langchain-postgres
+langchain-postgres==0.0.16
 pgvector
