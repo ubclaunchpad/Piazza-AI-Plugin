@@ -22,5 +22,5 @@ sqlalchemy[asyncio]==2.0.23
 supabase==2.0.3
 
 # File Handling
-python-multipart==0.0.7
+python-multipart==0.0.18
 aiofiles==23.2.1
