@@ -44,44 +44,54 @@ function ChatbotApp() {
   const chatRef = useRef(null);
   const messagesEndRef = useRef(null);
 
-  // Handle clicking outside (works with Shadow DOM)
+  const [sessionId, setSessionId] = useState(null);
+  const [user, setUser] = useState(null);
+
+  // Fetch user info on mount
   useEffect(() => {
-    function handleClickOutside(event) {
-      if (chatRef.current && !chatRef.current.contains(event.target)) {
-        setIsExpanded(false);
+    /* global chrome */
+    chrome.storage.local.get(["user", "authToken", "tokenExpiry"], (result) => {
+      if (result.user && result.authToken) {
+        // Check if token is expired
+        if (result.tokenExpiry && Date.now() > result.tokenExpiry) {
+          console.warn("Token expired");
+          setMessages([
+            {
+              role: "assistant",
+              content:
+                "Session expired. Please open the extension icon to log in again.",
+            },
+          ]);
+          return;
+        }
+        setUser({ ...result.user, access_token: result.authToken });
       }
-    }
+    });
 
-    if (isExpanded) {
-      // Add listener to the shadow root where the component lives
-      const shadowRoot = chatRef.current?.getRootNode();
+    // Listen for messages from popup
+    const messageListener = (request, sender, sendResponse) => {
+      if (request.type === "OPEN_CHAT_SESSION") {
+        setSessionId(request.sessionId);
+        setIsExpanded(true);
+      }
+    };
+    chrome.runtime.onMessage.addListener(messageListener);
+    return () => chrome.runtime.onMessage.removeListener(messageListener);
+  }, []);
 
-      // Small delay to prevent the click that opens the chat from immediately triggering the close
-      const timer = setTimeout(() => {
-        if (shadowRoot) {
-          shadowRoot.addEventListener("mousedown", handleClickOutside);
-        }
-      }, 100);
-
-      return () => {
-        clearTimeout(timer);
-        if (shadowRoot) {
-          shadowRoot.removeEventListener("mousedown", handleClickOutside);
-        }
-      };
-    }
-  }, [isExpanded]);
-
-  // Auto-scroll to bottom
+  // Fetch most recent session or messages when needed
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    if (isExpanded && user && !sessionId) {
+      fetchMostRecentSession();
+    } else if (isExpanded && user && sessionId) {
+      fetchMessages(sessionId);
+    }
+  }, [isExpanded, user, sessionId]);
 
   const handleToggle = () => {
     setIsExpanded(!isExpanded);
   };
 
-  // Convert LaTeX notation to markdown math format
   const convertLatexToMarkdown = (text) => {
     // Replace display math: \[ ... \] -> $$...$$
     let converted = text.replace(
@@ -101,6 +111,124 @@ function ChatbotApp() {
 
     return converted;
   };
+  const handleAuthError = () => {
+    setMessages((prev) => [
+      ...prev,
+      {
+        role: "assistant",
+        content:
+          "Authentication failed. Please open the extension icon to log in again.",
+      },
+    ]);
+    // Optionally clear user state
+    // setUser(null);
+  };
+
+  const fetchMostRecentSession = async () => {
+    try {
+      const threadIdMatch = window.location.pathname.match(/\/class\/([^/?]+)/);
+      const threadId = threadIdMatch ? threadIdMatch[1] : null;
+      if (!threadId) return;
+
+      const API_ENDPOINT =
+        process.env.API_ENDPOINT || "http://localhost:8000/api/v1";
+      const response = await fetch(
+        `${API_ENDPOINT}/chat-sessions?piazza_course_id=${threadId}`,
+        {
+          headers: { Authorization: `Bearer ${user.access_token}` },
+        }
+      );
+
+      if (response.status === 401) {
+        handleAuthError();
+        return;
+      }
+
+      if (response.ok) {
+        const sessions = await response.json();
+        if (sessions.length > 0) {
+          setSessionId(sessions[0].id);
+        } else {
+          // Create a new session automatically if none exist?
+          // Or just let the first message create it?
+          // For now, let's create one.
+          createNewSession(threadId);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching sessions:", error);
+    }
+  };
+
+  const createNewSession = async (courseId) => {
+    try {
+      const API_ENDPOINT =
+        process.env.API_ENDPOINT || "http://localhost:8000/api/v1";
+      const response = await fetch(`${API_ENDPOINT}/chat-sessions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${user.access_token}`,
+        },
+        body: JSON.stringify({
+          piazza_course_id: courseId,
+          title: "New Chat",
+        }),
+      });
+
+      if (response.status === 401) {
+        handleAuthError();
+        return;
+      }
+
+      if (response.ok) {
+        const newChat = await response.json();
+        setSessionId(newChat.id);
+      }
+    } catch (error) {
+      console.error("Error creating session:", error);
+    }
+  };
+
+  const fetchMessages = async (sid) => {
+    setIsLoading(true);
+    try {
+      const API_ENDPOINT =
+        process.env.API_ENDPOINT || "http://localhost:8000/api/v1";
+      const response = await fetch(
+        `${API_ENDPOINT}/chat-sessions/${sid}/messages`,
+        {
+          headers: { Authorization: `Bearer ${user.access_token}` },
+        }
+      );
+
+      if (response.status === 401) {
+        handleAuthError();
+        return;
+      }
+
+      if (response.ok) {
+        const data = await response.json();
+        // Transform messages to UI format
+        const formattedMessages = data.map((msg) => {
+          const content = msg.message.data
+            ? msg.message.data.content
+            : msg.message.content;
+          const type = msg.message.type;
+
+          return {
+            role: type === "human" ? "user" : "assistant",
+            content: content,
+          };
+        });
+        setMessages(formattedMessages);
+      }
+    } catch (error) {
+      console.error("Error fetching messages:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -115,12 +243,20 @@ function ChatbotApp() {
 
     try {
       // Extract thread_id (network_id) from URL
-      // Example: /class/l8j1j1j1j1j1 -> l8j1j1j1j1j1
       const threadIdMatch = window.location.pathname.match(/\/class\/([^/?]+)/);
       const threadId = threadIdMatch ? threadIdMatch[1] : null;
 
       if (!threadId) {
         throw new Error("Could not determine course ID from URL");
+      }
+
+      // Ensure we have a session
+      let currentSessionId = sessionId;
+      if (!currentSessionId) {
+        // Should have been created by fetchMostRecentSession, but just in case
+        await createNewSession(threadId);
+        // We can't easily wait for state update here, so we might fail this first request's history
+        // But fetchMostRecentSession is called on expand, so it should be fine.
       }
 
       // Call the backend API
@@ -130,12 +266,19 @@ function ChatbotApp() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${user?.access_token}`,
         },
         body: JSON.stringify({
           query: userMessage,
           thread_id: threadId,
+          session_id: sessionId, // Pass the session ID
         }),
       });
+
+      if (response.status === 401) {
+        handleAuthError();
+        return;
+      }
 
       if (!response.ok) {
         throw new Error(`API error: ${response.status}`);
@@ -145,8 +288,6 @@ function ChatbotApp() {
 
       // Convert LaTeX notation and add AI response
       const convertedContent = convertLatexToMarkdown(data.response);
-      console.log("Original:", data.response);
-      console.log("Converted:", convertedContent);
 
       setMessages((prev) => [
         ...prev,

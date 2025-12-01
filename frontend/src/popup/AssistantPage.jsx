@@ -112,9 +112,24 @@ export default function AssistantPage({ user, onBack }) {
     }
   };
 
-  const handleChatClick = (chatId) => {
+  const handleChatClick = async (chatId) => {
     console.log("Opening chat:", chatId);
-    // TODO: Navigate to chat detail view
+    try {
+      const [tab] = await chrome.tabs.query({
+        active: true,
+        currentWindow: true,
+      });
+      if (tab) {
+        await chrome.tabs.sendMessage(tab.id, {
+          type: "OPEN_CHAT_SESSION",
+          sessionId: chatId,
+        });
+        // Close popup
+        window.close();
+      }
+    } catch (error) {
+      console.error("Error opening chat:", error);
+    }
   };
 
   const handleFileUpload = (event) => {
