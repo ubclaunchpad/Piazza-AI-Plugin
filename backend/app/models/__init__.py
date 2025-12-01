@@ -10,21 +10,21 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
-# Import LLM models
-from app.models.llm import QueryRequest, QueryResponse
-
 # Import Document models
 from app.models.document import (
-    PermissionEnum,
     DocumentBase,
     DocumentCreate,
-    DocumentUpdate,
+    DocumentDeleteResponse,
+    DocumentListResponse,
     DocumentResponse,
+    DocumentUpdate,
     DocumentUploadRequest,
     DocumentUploadResponse,
-    DocumentListResponse,
-    DocumentDeleteResponse,
+    PermissionEnum,
 )
+
+# Import LLM models
+from app.models.llm import QueryRequest, QueryResponse
 
 
 class UserStatus(str, Enum):

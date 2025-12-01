@@ -13,7 +13,7 @@ from uuid import UUID
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
 
 from app.core.config import settings
-from app.core.database import execute_insert, execute_query, execute_statement
+from app.core.database import execute_query, execute_statement
 from app.models.document import (
     DocumentDeleteResponse,
     DocumentListResponse,
@@ -46,16 +46,16 @@ async def upload_document(
 ):
     """
     Upload a document to Supabase Storage and save metadata to database.
-    
+
     Args:
         file: The file to upload
         thread_id: UUID of the thread to attach document to
         uploader_id: UUID of the user uploading the document
         permission: Permission level (private, thread, instructor)
-        
+
     Returns:
         DocumentUploadResponse with document details
-        
+
     Raises:
         HTTPException: 400 for invalid file, 413 for file too large, 500 for server errors
     """
@@ -69,7 +69,7 @@ async def upload_document(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid thread_id or uploader_id format. Must be valid UUIDs."
             )
-        
+
         # Validate permission
         try:
             permission_enum = PermissionEnum(permission)
@@ -78,27 +78,27 @@ async def upload_document(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Invalid permission. Must be one of: {[e.value for e in PermissionEnum]}"
             )
-        
+
         # Read file content
         file_content = await file.read()
         file_size = len(file_content)
         file_type = file.content_type or "application/octet-stream"
         file_name = file.filename or "unnamed_file"
-        
+
         # Validate file size
         if not validate_file_size(file_size):
             raise HTTPException(
                 status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
                 detail=f"File too large. Maximum size is {settings.MAX_FILE_SIZE // (1024 * 1024)}MB"
             )
-        
+
         # Validate file type
         if not validate_file_type(file_type):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"File type '{file_type}' not allowed. Allowed types: {settings.ALLOWED_FILE_TYPES}"
             )
-        
+
         # Upload to Supabase Storage
         storage_ref, actual_size = await upload_to_supabase(
             file_content=file_content,
@@ -106,20 +106,20 @@ async def upload_document(
             file_type=file_type,
             uploader_id=str(uploader_uuid)
         )
-        
+
         # Insert document metadata into database
         current_time = datetime.now(timezone.utc)
-        
+
         insert_query = """
             INSERT INTO documents (
-                thread_id, uploader_id, file_name, file_type, 
-                file_size, storage_ref, indexed, permission, 
+                thread_id, uploader_id, file_name, file_type,
+                file_size, storage_ref, indexed, permission,
                 created_at, updated_at, metadata
             )
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id, created_at
         """
-        
+
         result = execute_query(
             insert_query,
             (
@@ -137,21 +137,21 @@ async def upload_document(
             ),
             fetch_one=True
         )
-        
+
         if not result:
             # Rollback storage upload if database insert fails
             try:
                 await delete_file(storage_ref)
             except StorageError:
                 logger.error(f"Failed to rollback storage upload: {storage_ref}")
-            
+
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to save document metadata"
             )
-        
+
         logger.info(f"Document uploaded successfully: {result['id']}")
-        
+
         return DocumentUploadResponse(
             id=result["id"],
             file_name=file_name,
@@ -163,7 +163,7 @@ async def upload_document(
             created_at=result["created_at"],
             message="File uploaded successfully"
         )
-        
+
     except HTTPException:
         raise
     except StorageError as e:
@@ -184,13 +184,13 @@ async def upload_document(
 async def get_document(document_id: str):
     """
     Get document metadata and signed URL for download.
-    
+
     Args:
         document_id: UUID of the document
-        
+
     Returns:
         DocumentResponse with document details and download URL
-        
+
     Raises:
         HTTPException: 404 if document not found
     """
@@ -203,24 +203,24 @@ async def get_document(document_id: str):
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid document_id format. Must be a valid UUID."
             )
-        
+
         # Fetch document from database
         query = """
-            SELECT id, thread_id, uploader_id, file_name, file_type, 
-                   file_size, storage_ref, indexed, permission, 
+            SELECT id, thread_id, uploader_id, file_name, file_type,
+                   file_size, storage_ref, indexed, permission,
                    created_at, updated_at, metadata
             FROM documents
             WHERE id = %s
         """
-        
+
         document = execute_query(query, (str(doc_uuid),), fetch_one=True)
-        
+
         if not document:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Document not found"
             )
-        
+
         return DocumentResponse(
             id=document["id"],
             thread_id=document["thread_id"],
@@ -235,7 +235,7 @@ async def get_document(document_id: str):
             updated_at=document["updated_at"],
             metadata=document["metadata"]
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -250,14 +250,14 @@ async def get_document(document_id: str):
 async def get_document_download_url(document_id: str, expires_in: int = 3600):
     """
     Get a signed URL for downloading a document.
-    
+
     Args:
         document_id: UUID of the document
         expires_in: URL expiration time in seconds (default: 1 hour)
-        
+
     Returns:
         Object with signed download URL
-        
+
     Raises:
         HTTPException: 404 if document not found
     """
@@ -270,30 +270,30 @@ async def get_document_download_url(document_id: str, expires_in: int = 3600):
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid document_id format. Must be a valid UUID."
             )
-        
+
         # Fetch document storage_ref from database
         query = "SELECT storage_ref, file_name FROM documents WHERE id = %s"
         document = execute_query(query, (str(doc_uuid),), fetch_one=True)
-        
+
         if not document:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Document not found"
             )
-        
+
         # Generate signed URL
         signed_url = await get_signed_url(
             storage_ref=document["storage_ref"],
             expires_in=expires_in
         )
-        
+
         return {
             "document_id": str(doc_uuid),
             "file_name": document["file_name"],
             "download_url": signed_url,
             "expires_in": expires_in
         }
-        
+
     except HTTPException:
         raise
     except StorageError as e:
@@ -314,13 +314,13 @@ async def get_document_download_url(document_id: str, expires_in: int = 3600):
 async def delete_document(document_id: str):
     """
     Delete a document from storage and database.
-    
+
     Args:
         document_id: UUID of the document to delete
-        
+
     Returns:
         DocumentDeleteResponse with deletion confirmation
-        
+
     Raises:
         HTTPException: 404 if document not found
     """
@@ -333,42 +333,42 @@ async def delete_document(document_id: str):
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid document_id format. Must be a valid UUID."
             )
-        
+
         # Fetch document to get storage_ref
         query = "SELECT storage_ref, file_name FROM documents WHERE id = %s"
         document = execute_query(query, (str(doc_uuid),), fetch_one=True)
-        
+
         if not document:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Document not found"
             )
-        
+
         # Delete from Supabase Storage
         try:
             await delete_file(document["storage_ref"])
         except StorageError as e:
             logger.warning(f"Failed to delete from storage (continuing with DB delete): {e}")
-        
+
         # Delete from database
         delete_query = "DELETE FROM documents WHERE id = %s"
         affected_rows = execute_statement(delete_query, (str(doc_uuid),))
-        
+
         if affected_rows == 0:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to delete document from database"
             )
-        
+
         logger.info(f"Document deleted successfully: {doc_uuid}")
-        
+
         return DocumentDeleteResponse(
             id=doc_uuid,
             file_name=document["file_name"],
             deleted=True,
             message="Document deleted successfully"
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -388,28 +388,28 @@ async def list_documents(
 ):
     """
     List documents with optional filtering.
-    
+
     Args:
         thread_id: Filter by thread ID (optional)
         uploader_id: Filter by uploader ID (optional)
         page: Page number (default: 1)
         per_page: Items per page (default: 20)
-        
+
     Returns:
         DocumentListResponse with paginated documents
     """
     try:
         # Build query with optional filters
         query = """
-            SELECT id, thread_id, uploader_id, file_name, file_type, 
-                   file_size, storage_ref, indexed, permission, 
+            SELECT id, thread_id, uploader_id, file_name, file_type,
+                   file_size, storage_ref, indexed, permission,
                    created_at, updated_at, metadata
             FROM documents
             WHERE 1=1
         """
         count_query = "SELECT COUNT(*) as total FROM documents WHERE 1=1"
         params = []
-        
+
         if thread_id:
             try:
                 UUID(thread_id)
@@ -421,7 +421,7 @@ async def list_documents(
             query += " AND thread_id = %s"
             count_query += " AND thread_id = %s"
             params.append(thread_id)
-        
+
         if uploader_id:
             try:
                 UUID(uploader_id)
@@ -433,19 +433,19 @@ async def list_documents(
             query += " AND uploader_id = %s"
             count_query += " AND uploader_id = %s"
             params.append(uploader_id)
-        
+
         # Add pagination
         offset = (page - 1) * per_page
         query += " ORDER BY created_at DESC LIMIT %s OFFSET %s"
-        
+
         # Get total count
         total_result = execute_query(count_query, tuple(params) if params else None, fetch_one=True)
         total = total_result["total"] if total_result else 0
-        
+
         # Get documents
         params.extend([per_page, offset])
         documents = execute_query(query, tuple(params))
-        
+
         # Convert to response models
         document_responses = [
             DocumentResponse(
@@ -464,14 +464,14 @@ async def list_documents(
             )
             for doc in (documents or [])
         ]
-        
+
         return DocumentListResponse(
             documents=document_responses,
             total=total,
             page=page,
             per_page=per_page
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:
