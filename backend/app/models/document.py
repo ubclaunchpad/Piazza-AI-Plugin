@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 
 class PermissionEnum(str, Enum):
     """Permission levels for document access."""
+
     PRIVATE = "private"
     THREAD = "thread"
     INSTRUCTOR = "instructor"
@@ -21,21 +22,23 @@ class PermissionEnum(str, Enum):
 
 class DocumentBase(BaseModel):
     """Base document model with common fields."""
-    thread_id: UUID = Field(..., description="ID of the thread this document belongs to")
+
+    thread_id: UUID = Field(
+        ..., description="ID of the thread this document belongs to"
+    )
     file_name: str = Field(..., max_length=255, description="Original filename")
     file_type: str = Field(..., max_length=255, description="MIME type of the file")
     permission: PermissionEnum = Field(
-        default=PermissionEnum.PRIVATE,
-        description="Access permission level"
+        default=PermissionEnum.PRIVATE, description="Access permission level"
     )
     metadata: Optional[Dict[str, Any]] = Field(
-        default=None,
-        description="Additional metadata (version, tags, etc.)"
+        default=None, description="Additional metadata (version, tags, etc.)"
     )
 
 
 class DocumentCreate(DocumentBase):
     """Model for creating a new document record."""
+
     uploader_id: UUID = Field(..., description="ID of the user uploading the document")
     file_size: int = Field(..., ge=0, description="File size in bytes")
     storage_ref: str = Field(..., max_length=255, description="Storage reference path")
@@ -43,6 +46,7 @@ class DocumentCreate(DocumentBase):
 
 class DocumentUpdate(BaseModel):
     """Model for updating document fields."""
+
     file_name: Optional[str] = Field(None, max_length=255)
     permission: Optional[PermissionEnum] = None
     indexed: Optional[bool] = None
@@ -51,6 +55,7 @@ class DocumentUpdate(BaseModel):
 
 class DocumentResponse(BaseModel):
     """Response model for document data."""
+
     id: UUID
     thread_id: UUID
     uploader_id: UUID
@@ -70,19 +75,19 @@ class DocumentResponse(BaseModel):
 
 class DocumentUploadRequest(BaseModel):
     """Request model for file upload endpoint."""
+
     thread_id: UUID = Field(..., description="Thread to attach document to")
     permission: PermissionEnum = Field(
-        default=PermissionEnum.PRIVATE,
-        description="Access permission level"
+        default=PermissionEnum.PRIVATE, description="Access permission level"
     )
     metadata: Optional[Dict[str, Any]] = Field(
-        default=None,
-        description="Additional metadata"
+        default=None, description="Additional metadata"
     )
 
 
 class DocumentUploadResponse(BaseModel):
     """Response model for successful file upload."""
+
     id: UUID
     file_name: str
     file_type: str
@@ -99,6 +104,7 @@ class DocumentUploadResponse(BaseModel):
 
 class DocumentListResponse(BaseModel):
     """Response model for listing documents."""
+
     documents: list[DocumentResponse]
     total: int
     page: int = 1
@@ -107,6 +113,7 @@ class DocumentListResponse(BaseModel):
 
 class DocumentDeleteResponse(BaseModel):
     """Response model for document deletion."""
+
     id: UUID
     file_name: str
     deleted: bool = True

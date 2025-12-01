@@ -67,7 +67,7 @@ async def upload_document(
         except ValueError:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid thread_id or uploader_id format. Must be valid UUIDs."
+                detail="Invalid thread_id or uploader_id format. Must be valid UUIDs.",
             )
 
         # Validate permission
@@ -76,7 +76,7 @@ async def upload_document(
         except ValueError:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Invalid permission. Must be one of: {[e.value for e in PermissionEnum]}"
+                detail=f"Invalid permission. Must be one of: {[e.value for e in PermissionEnum]}",
             )
 
         # Read file content
@@ -89,14 +89,14 @@ async def upload_document(
         if not validate_file_size(file_size):
             raise HTTPException(
                 status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                detail=f"File too large. Maximum size is {settings.MAX_FILE_SIZE // (1024 * 1024)}MB"
+                detail=f"File too large. Maximum size is {settings.MAX_FILE_SIZE // (1024 * 1024)}MB",
             )
 
         # Validate file type
         if not validate_file_type(file_type):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"File type '{file_type}' not allowed. Allowed types: {settings.ALLOWED_FILE_TYPES}"
+                detail=f"File type '{file_type}' not allowed. Allowed types: {settings.ALLOWED_FILE_TYPES}",
             )
 
         # Upload to Supabase Storage
@@ -104,7 +104,7 @@ async def upload_document(
             file_content=file_content,
             file_name=file_name,
             file_type=file_type,
-            uploader_id=str(uploader_uuid)
+            uploader_id=str(uploader_uuid),
         )
 
         # Insert document metadata into database
@@ -135,7 +135,7 @@ async def upload_document(
                 current_time,
                 None,  # metadata
             ),
-            fetch_one=True
+            fetch_one=True,
         )
 
         if not result:
@@ -147,7 +147,7 @@ async def upload_document(
 
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to save document metadata"
+                detail="Failed to save document metadata",
             )
 
         logger.info(f"Document uploaded successfully: {result['id']}")
@@ -161,7 +161,7 @@ async def upload_document(
             permission=permission_enum,
             indexed=False,
             created_at=result["created_at"],
-            message="File uploaded successfully"
+            message="File uploaded successfully",
         )
 
     except HTTPException:
@@ -169,14 +169,13 @@ async def upload_document(
     except StorageError as e:
         logger.error(f"Storage error during upload: {e}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
         )
     except Exception as e:
         logger.error(f"Unexpected error during upload: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to upload document: {str(e)}"
+            detail=f"Failed to upload document: {str(e)}",
         )
 
 
@@ -201,7 +200,7 @@ async def get_document(document_id: str):
         except ValueError:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid document_id format. Must be a valid UUID."
+                detail="Invalid document_id format. Must be a valid UUID.",
             )
 
         # Fetch document from database
@@ -217,8 +216,7 @@ async def get_document(document_id: str):
 
         if not document:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Document not found"
+                status_code=status.HTTP_404_NOT_FOUND, detail="Document not found"
             )
 
         return DocumentResponse(
@@ -233,7 +231,7 @@ async def get_document(document_id: str):
             permission=PermissionEnum(document["permission"]),
             created_at=document["created_at"],
             updated_at=document["updated_at"],
-            metadata=document["metadata"]
+            metadata=document["metadata"],
         )
 
     except HTTPException:
@@ -242,7 +240,7 @@ async def get_document(document_id: str):
         logger.error(f"Error fetching document: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to fetch document: {str(e)}"
+            detail=f"Failed to fetch document: {str(e)}",
         )
 
 
@@ -268,7 +266,7 @@ async def get_document_download_url(document_id: str, expires_in: int = 3600):
         except ValueError:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid document_id format. Must be a valid UUID."
+                detail="Invalid document_id format. Must be a valid UUID.",
             )
 
         # Fetch document storage_ref from database
@@ -277,21 +275,19 @@ async def get_document_download_url(document_id: str, expires_in: int = 3600):
 
         if not document:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Document not found"
+                status_code=status.HTTP_404_NOT_FOUND, detail="Document not found"
             )
 
         # Generate signed URL
         signed_url = await get_signed_url(
-            storage_ref=document["storage_ref"],
-            expires_in=expires_in
+            storage_ref=document["storage_ref"], expires_in=expires_in
         )
 
         return {
             "document_id": str(doc_uuid),
             "file_name": document["file_name"],
             "download_url": signed_url,
-            "expires_in": expires_in
+            "expires_in": expires_in,
         }
 
     except HTTPException:
@@ -299,14 +295,13 @@ async def get_document_download_url(document_id: str, expires_in: int = 3600):
     except StorageError as e:
         logger.error(f"Storage error generating download URL: {e}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
         )
     except Exception as e:
         logger.error(f"Error generating download URL: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to generate download URL: {str(e)}"
+            detail=f"Failed to generate download URL: {str(e)}",
         )
 
 
@@ -331,7 +326,7 @@ async def delete_document(document_id: str):
         except ValueError:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid document_id format. Must be a valid UUID."
+                detail="Invalid document_id format. Must be a valid UUID.",
             )
 
         # Fetch document to get storage_ref
@@ -340,15 +335,16 @@ async def delete_document(document_id: str):
 
         if not document:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Document not found"
+                status_code=status.HTTP_404_NOT_FOUND, detail="Document not found"
             )
 
         # Delete from Supabase Storage
         try:
             await delete_file(document["storage_ref"])
         except StorageError as e:
-            logger.warning(f"Failed to delete from storage (continuing with DB delete): {e}")
+            logger.warning(
+                f"Failed to delete from storage (continuing with DB delete): {e}"
+            )
 
         # Delete from database
         delete_query = "DELETE FROM documents WHERE id = %s"
@@ -357,7 +353,7 @@ async def delete_document(document_id: str):
         if affected_rows == 0:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to delete document from database"
+                detail="Failed to delete document from database",
             )
 
         logger.info(f"Document deleted successfully: {doc_uuid}")
@@ -366,7 +362,7 @@ async def delete_document(document_id: str):
             id=doc_uuid,
             file_name=document["file_name"],
             deleted=True,
-            message="Document deleted successfully"
+            message="Document deleted successfully",
         )
 
     except HTTPException:
@@ -375,7 +371,7 @@ async def delete_document(document_id: str):
         logger.error(f"Error deleting document: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to delete document: {str(e)}"
+            detail=f"Failed to delete document: {str(e)}",
         )
 
 
@@ -384,7 +380,7 @@ async def list_documents(
     thread_id: Optional[str] = None,
     uploader_id: Optional[str] = None,
     page: int = 1,
-    per_page: int = 20
+    per_page: int = 20,
 ):
     """
     List documents with optional filtering.
@@ -416,7 +412,7 @@ async def list_documents(
             except ValueError:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid thread_id format"
+                    detail="Invalid thread_id format",
                 )
             query += " AND thread_id = %s"
             count_query += " AND thread_id = %s"
@@ -428,7 +424,7 @@ async def list_documents(
             except ValueError:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid uploader_id format"
+                    detail="Invalid uploader_id format",
                 )
             query += " AND uploader_id = %s"
             count_query += " AND uploader_id = %s"
@@ -439,7 +435,9 @@ async def list_documents(
         query += " ORDER BY created_at DESC LIMIT %s OFFSET %s"
 
         # Get total count
-        total_result = execute_query(count_query, tuple(params) if params else None, fetch_one=True)
+        total_result = execute_query(
+            count_query, tuple(params) if params else None, fetch_one=True
+        )
         total = total_result["total"] if total_result else 0
 
         # Get documents
@@ -460,16 +458,13 @@ async def list_documents(
                 permission=PermissionEnum(doc["permission"]),
                 created_at=doc["created_at"],
                 updated_at=doc["updated_at"],
-                metadata=doc["metadata"]
+                metadata=doc["metadata"],
             )
             for doc in (documents or [])
         ]
 
         return DocumentListResponse(
-            documents=document_responses,
-            total=total,
-            page=page,
-            per_page=per_page
+            documents=document_responses, total=total, page=page, per_page=per_page
         )
 
     except HTTPException:
@@ -478,7 +473,7 @@ async def list_documents(
         logger.error(f"Error listing documents: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to list documents: {str(e)}"
+            detail=f"Failed to list documents: {str(e)}",
         )
 
 
@@ -490,5 +485,5 @@ async def documents_health_check():
         "service": "documents",
         "storage_bucket": settings.SUPABASE_STORAGE_BUCKET,
         "max_file_size_mb": settings.MAX_FILE_SIZE // (1024 * 1024),
-        "allowed_file_types": settings.ALLOWED_FILE_TYPES
+        "allowed_file_types": settings.ALLOWED_FILE_TYPES,
     }

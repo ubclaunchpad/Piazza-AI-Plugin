@@ -23,6 +23,7 @@ _supabase_client: Optional[Client] = None
 
 class StorageError(Exception):
     """Custom exception for storage-related errors."""
+
     pass
 
 
@@ -39,7 +40,11 @@ def get_supabase_client() -> Client:
     global _supabase_client
 
     if _supabase_client is None:
-        if not settings.SUPABASE_URL or not settings.SUPABASE_SERVICE_ROLE_KEY or not settings.SUPABASE_ANON_KEY:
+        if (
+            not settings.SUPABASE_URL
+            or not settings.SUPABASE_SERVICE_ROLE_KEY
+            or not settings.SUPABASE_ANON_KEY
+        ):
             raise StorageError(
                 "Supabase credentials not configured. "
                 "Please set SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, and SUPABASE_ANON_KEY environment variables."
@@ -47,8 +52,7 @@ def get_supabase_client() -> Client:
 
         try:
             _supabase_client = create_client(
-                settings.SUPABASE_URL,
-                settings.SUPABASE_SERVICE_ROLE_KEY
+                settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY
             )
             logger.info("Supabase client initialized successfully")
         except Exception as e:
@@ -82,7 +86,7 @@ async def upload_to_supabase(
     file_name: str,
     file_type: str,
     uploader_id: str,
-    bucket: Optional[str] = None
+    bucket: Optional[str] = None,
 ) -> Tuple[str, int]:
     """
     Upload a file to Supabase Storage.
@@ -113,8 +117,8 @@ async def upload_to_supabase(
             file=file_content,
             file_options={
                 "content-type": file_type,
-                "upsert": "false"  # Don't overwrite existing files
-            }
+                "upsert": "false",  # Don't overwrite existing files
+            },
         )
 
         logger.info(f"File uploaded successfully: {storage_path}")
@@ -126,9 +130,7 @@ async def upload_to_supabase(
 
 
 async def get_signed_url(
-    storage_ref: str,
-    expires_in: int = 3600,
-    bucket: Optional[str] = None
+    storage_ref: str, expires_in: int = 3600, bucket: Optional[str] = None
 ) -> str:
     """
     Generate a signed URL for accessing a file.
@@ -151,8 +153,7 @@ async def get_signed_url(
 
         # Generate signed URL
         response = client.storage.from_(bucket).create_signed_url(
-            path=storage_ref,
-            expires_in=expires_in
+            path=storage_ref, expires_in=expires_in
         )
 
         if response and "signedURL" in response:
@@ -168,10 +169,7 @@ async def get_signed_url(
         raise StorageError(f"Failed to generate signed URL: {e}")
 
 
-async def delete_file(
-    storage_ref: str,
-    bucket: Optional[str] = None
-) -> bool:
+async def delete_file(storage_ref: str, bucket: Optional[str] = None) -> bool:
     """
     Delete a file from Supabase Storage.
 
@@ -201,10 +199,7 @@ async def delete_file(
         raise StorageError(f"Failed to delete file: {e}")
 
 
-async def get_public_url(
-    storage_ref: str,
-    bucket: Optional[str] = None
-) -> str:
+async def get_public_url(storage_ref: str, bucket: Optional[str] = None) -> str:
     """
     Get public URL for a file (if bucket is public).
 
