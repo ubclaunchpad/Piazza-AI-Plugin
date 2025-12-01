@@ -14,7 +14,11 @@ router = APIRouter()
 async def generate_llm_response(request: QueryRequest):
     """Generate an LLM response to a user query."""
     try:
-        response = get_llm_response(request.query, request.thread_id)
+        response = get_llm_response(
+            query=request.query, 
+            thread_id=request.thread_id,
+            session_id=request.session_id
+        )
 
         return QueryResponse(
             query=request.query,
@@ -23,6 +27,7 @@ async def generate_llm_response(request: QueryRequest):
             sources=getattr(response, "sources", []),
         )
     except Exception as e:
+        print(e)
         raise HTTPException(
             status_code=500,
             detail=f"Failed to generate response: {str(e)}",

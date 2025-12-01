@@ -10,6 +10,7 @@ class QueryRequest(BaseModel):
 
     query: str = Field(..., min_length=1, max_length=5000)
     thread_id: str = Field(..., description="Thread ID to retrieve context from")
+    session_id: str = Field(None, description="Chat session ID for history")
 
 
 class QueryResponse(BaseModel):

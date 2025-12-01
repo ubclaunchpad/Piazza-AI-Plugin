@@ -19,6 +19,8 @@ async def get_current_user(authorization: Optional[str] = Header(None)):
             raise HTTPException(status_code=401, detail="Invalid token")
         return user.user
     except Exception as e:
+        import logging
+        logging.error(f"Authentication failed: {str(e)}")
         raise HTTPException(status_code=401, detail=f"Authentication failed: {str(e)}")
 
 @router.post("/chat-sessions", response_model=ChatSessionResponse)
@@ -151,3 +153,36 @@ async def update_chat_session(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to update session: {str(e)}")
+
+@router.get("/chat-sessions/{session_id}/messages")
+async def get_chat_session_messages(
+    session_id: UUID,
+    user=Depends(get_current_user)
+):
+    """
+    Get messages for a specific chat session.
+    """
+    try:
+        # Verify session ownership
+        session_check = execute_query(
+            "SELECT id FROM chat_sessions WHERE id = %s AND user_id = %s",
+            (str(session_id), user.id),
+            fetch_one=True
+        )
+        if not session_check:
+            raise HTTPException(status_code=404, detail="Session not found or not authorized")
+
+        # Fetch messages
+        # The message column is JSONB, so we can return it directly
+        query = """
+            SELECT id, message, created_at
+            FROM chat_messages
+            WHERE session_id = %s
+            ORDER BY created_at ASC
+        """
+        messages = execute_query(query, (str(session_id),))
+        return messages
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch messages: {str(e)}")
