@@ -163,7 +163,7 @@ export default function AssistantPage({ user, onBack, onLogout }) {
   return (
     <div className="flex flex-col min-h-[500px]">
       {/* Header */}
-      <div className="bg-gradient-to-r from-purple-500 to-purple-700 p-5 flex items-center gap-3 text-white">
+      <div className="bg-gradient-to-r from-blue-500 to-blue-700 p-5 flex items-center gap-3 text-white">
         <button
           onClick={onBack}
           className="bg-white/20 border-none text-white w-8 h-8 rounded-md cursor-pointer text-base flex items-center justify-center transition-colors hover:bg-white/30"
@@ -184,7 +184,7 @@ export default function AssistantPage({ user, onBack, onLogout }) {
             onClick={() => setActiveTab("chats")}
             className={`flex-1 px-4 py-3 text-sm font-medium border-none cursor-pointer transition-all ${
               activeTab === "chats"
-                ? "text-purple-600 border-b-2 border-purple-600 bg-purple-50/50"
+                ? "text-blue-600 border-b-2 border-blue-600 bg-blue-50/50"
                 : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
             }`}
           >
@@ -194,7 +194,7 @@ export default function AssistantPage({ user, onBack, onLogout }) {
             onClick={() => setActiveTab("files")}
             className={`flex-1 px-4 py-3 text-sm font-medium border-none cursor-pointer transition-all ${
               activeTab === "files"
-                ? "text-purple-600 border-b-2 border-purple-600 bg-purple-50/50"
+                ? "text-blue-600 border-b-2 border-blue-600 bg-blue-50/50"
                 : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
             }`}
           >
@@ -214,7 +214,7 @@ export default function AssistantPage({ user, onBack, onLogout }) {
               <button
                 onClick={handleCreateChat}
                 disabled={isCreating || !piazzaClassId}
-                className="bg-purple-600 text-white border-none px-3 py-1.5 rounded-md text-xs font-medium cursor-pointer transition-colors hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="bg-blue-600 text-white border-none px-3 py-1.5 rounded-md text-xs font-medium cursor-pointer transition-colors hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isCreating ? "Creating..." : "+ New Chat"}
               </button>

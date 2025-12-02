@@ -15,11 +15,11 @@ function IngestionStatus({ status }) {
     <div className="flex flex-col gap-1 mt-2 p-2 bg-gray-50 rounded-md border border-gray-200">
       <div className="flex justify-between items-center text-xs">
         <span className="font-medium text-gray-700">Ingestion Status</span>
-        <span className="font-bold text-purple-600">{percentage}%</span>
+        <span className="font-bold text-blue-600">{percentage}%</span>
       </div>
       <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
         <div
-          className="bg-purple-500 h-full rounded-full transition-all duration-500"
+          className="bg-blue-500 h-full rounded-full transition-all duration-500"
           style={{ width: `${percentage}%` }}
         />
       </div>
@@ -243,7 +243,7 @@ export default function DashboardPage({
   return (
     <div className="flex flex-col min-h-[500px]">
       {/* Header */}
-      <div className="bg-gradient-to-r from-purple-500 to-purple-700 p-5 flex items-center justify-between text-white">
+      <div className="bg-gradient-to-r from-blue-500 to-blue-700 p-5 flex items-center justify-between text-white">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center font-bold text-base border-2 border-white/30">
             {user.name?.charAt(0).toUpperCase() || "U"}
@@ -294,7 +294,7 @@ export default function DashboardPage({
 
           {isLoading ? (
             <div className="flex items-center gap-2 p-3 text-gray-600 text-sm">
-              <span className="w-4 h-4 border-2 border-gray-300 border-t-purple-500 rounded-full animate-spin inline-block"></span>
+              <span className="w-4 h-4 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin inline-block"></span>
               <span>Loading...</span>
             </div>
           ) : piazzaInfo?.isPiazza ? (
@@ -323,7 +323,7 @@ export default function DashboardPage({
                     <span className="text-gray-600 font-medium min-w-[70px]">
                       Thread:
                     </span>
-                    <span className="text-gray-900 font-semibold bg-purple-50 px-1.5 py-0.5 rounded">
+                    <span className="text-gray-900 font-semibold bg-blue-50 px-1.5 py-0.5 rounded">
                       {piazzaInfo.threadName}
                     </span>
                   </div>
@@ -362,7 +362,7 @@ export default function DashboardPage({
                 >
                   {isIngesting ? (
                     <>
-                      <span className="w-3 h-3 border-2 border-gray-400 border-t-purple-500 rounded-full animate-spin inline-block"></span>
+                      <span className="w-3 h-3 border-2 border-gray-400 border-t-blue-500 rounded-full animate-spin inline-block"></span>
                       Ingesting...
                     </>
                   ) : (

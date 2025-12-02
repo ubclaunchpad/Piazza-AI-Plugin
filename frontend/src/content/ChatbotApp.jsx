@@ -407,7 +407,7 @@ function ChatbotApp() {
           onMouseLeave={() => setIsHovered(false)}
         >
           <div className="flex items-center p-3 gap-2">
-            <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-purple-700 rounded-full flex-shrink-0"></div>
+            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-700 rounded-full flex-shrink-0"></div>
             {isHovered && (
               <span className="text-white font-semibold text-sm whitespace-nowrap transition-all duration-300">
                 Ask AI!
@@ -420,7 +420,7 @@ function ChatbotApp() {
           className="bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-slideUp"
           style={{ width: "50vw", height: "70vh" }}
         >
-          <div className="bg-gradient-to-r from-purple-500 to-purple-700 text-white px-5 py-4 flex justify-between items-center">
+          <div className="bg-gradient-to-r from-blue-600 to-blue-800 text-white px-5 py-4 flex justify-between items-center">
             <div className="flex flex-col">
               <h3 className="m-0 text-base font-semibold">AI Assistant</h3>
               {sessionTitle && sessionTitle !== "New Chat" && (
@@ -453,7 +453,7 @@ function ChatbotApp() {
                   <div
                     className={`max-w-[80%] px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed break-words ${
                       msg.role === "user"
-                        ? "bg-gradient-to-br from-purple-500 to-purple-700 text-white rounded-br-sm"
+                        ? "bg-gradient-to-br from-blue-500 to-blue-700 text-white rounded-br-sm"
                         : "bg-white text-gray-800 rounded-bl-sm shadow-sm"
                     }`}
                   >
@@ -493,7 +493,7 @@ function ChatbotApp() {
                                 </SyntaxHighlighter>
                               ) : isInline ? (
                                 <code
-                                  className="bg-purple-50 text-purple-600 px-1 py-0.5 rounded text-xs inline-block"
+                                  className="bg-blue-50 text-blue-600 px-1 py-0.5 rounded text-xs inline-block"
                                   {...props}
                                 >
                                   {children}
@@ -623,12 +623,12 @@ function ChatbotApp() {
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               placeholder="Type your message..."
-              className="flex-1 border border-gray-200 rounded-full px-4 py-2.5 text-sm outline-none transition-colors focus:border-purple-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+              className="flex-1 border border-gray-200 rounded-full px-4 py-2.5 text-sm outline-none transition-colors focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
               disabled={isLoading}
             />
             <button
               type="submit"
-              className="w-10 h-10 rounded-full border-none bg-gradient-to-br from-purple-500 to-purple-700 text-white text-lg cursor-pointer flex items-center justify-center flex-shrink-0 transition-transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-10 h-10 rounded-full border-none bg-gradient-to-br from-blue-500 to-blue-700 text-white text-lg cursor-pointer flex items-center justify-center flex-shrink-0 transition-transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={!inputValue.trim() || isLoading}
             >
               &rarr;
