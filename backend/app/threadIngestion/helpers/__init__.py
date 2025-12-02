@@ -2,9 +2,9 @@
 Helpers module for thread ingestion.
 """
 
-from .User import User
-from .post_processor import PostProcessor, PostChunk, PostMetadata
 from .ingestion_service import ThreadIngestionService
+from .post_processor import PostChunk, PostMetadata, PostProcessor
+from .User import User
 
 __all__ = [
     "User",

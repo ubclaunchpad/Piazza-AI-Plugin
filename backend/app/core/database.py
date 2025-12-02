@@ -203,7 +203,7 @@ def execute_statement(query: str, params=None, fetch_result: bool = False):
 
         # Update records
         affected = execute_statement("UPDATE example SET name = %s WHERE id = %s", ("New Name", 1))
-        
+
         # Insert and return
         result = execute_statement("INSERT ... RETURNING id", (...), fetch_result=True)
     """

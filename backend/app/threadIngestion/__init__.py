@@ -2,7 +2,13 @@
 Thread ingestion module for Piazza posts.
 """
 
-from .helpers import User, PostProcessor, PostChunk, PostMetadata, ThreadIngestionService
+from .helpers import (
+    PostChunk,
+    PostMetadata,
+    PostProcessor,
+    ThreadIngestionService,
+    User,
+)
 from .main import ThreadIngestionOrchestrator, create_orchestrator
 
 __all__ = [

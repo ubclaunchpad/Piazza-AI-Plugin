@@ -2,9 +2,10 @@
 Data ingestion API endpoint for Piazza threads.
 """
 
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from typing import Any, Dict, List
+
+from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel, Field
-from typing import List, Dict, Any
 
 from app.threadIngestion import ThreadIngestionOrchestrator
 
@@ -29,7 +30,7 @@ class IngestResponse(BaseModel):
 
 class ChunkData(BaseModel):
     """Model for returning chunk data."""
-    
+
     chunk_id: str
     text: str
     metadata: Dict[str, Any]
@@ -50,24 +51,22 @@ def run_ingestion_task(thread_id: str, piazza_cookie: str):
     except Exception as e:
         print(f"Background ingestion failed for thread {thread_id}: {e}")
 
+
 @router.post("/ingest", response_model=IngestResponse)
-async def ingest_thread(
-    request: IngestRequest, 
-    background_tasks: BackgroundTasks
-):
+async def ingest_thread(request: IngestRequest, background_tasks: BackgroundTasks):
     """
     Start data ingestion for a Piazza thread in the background.
-    
+
     Returns immediately with a status message.
     """
     try:
         # Add ingestion task to background queue
         background_tasks.add_task(
-            run_ingestion_task, 
-            thread_id=request.thread_id, 
-            piazza_cookie=request.piazza_cookie
+            run_ingestion_task,
+            thread_id=request.thread_id,
+            piazza_cookie=request.piazza_cookie,
         )
-        
+
         return IngestResponse(
             message="Data ingestion started in background",
             status="started",
@@ -87,29 +86,29 @@ async def ingest_thread(
 async def preview_ingestion(request: IngestRequest):
     """
     Preview what chunks would be generated without storing them.
-    
+
     Each chunk contains:
     - Main Post content
     - All Instructor Responses
-    - All Student Responses  
+    - All Student Responses
     - All Follow-up Discussions with replies
-    
+
     Args:
         request: IngestRequest containing thread_id and piazza_cookie
-        
+
     Returns:
         List of unified chunks that would be generated
     """
     try:
         # Create orchestrator
         orchestrator = ThreadIngestionOrchestrator(request.piazza_cookie)
-        
+
         # Ingest and get result
         result = orchestrator.ingest_by_thread_id(thread_id=request.thread_id)
-        
+
         if not result["success"]:
             raise Exception(result.get("error", "Unknown error"))
-        
+
         # Convert to response format
         chunk_data = [
             ChunkData(
@@ -120,7 +119,7 @@ async def preview_ingestion(request: IngestRequest):
             )
             for chunk in result["chunks"]
         ]
-        
+
         return chunk_data
     except ValueError as e:
         raise HTTPException(
@@ -136,7 +135,7 @@ async def preview_ingestion(request: IngestRequest):
 
 class IngestionStatusResponse(BaseModel):
     """Response model for ingestion status."""
-    
+
     ingested_posts_count: int
     total_posts_count: int
     last_ingested_post_id: int
@@ -147,7 +146,7 @@ class IngestionStatusResponse(BaseModel):
 async def get_ingestion_status(request: IngestRequest):
     """
     Get the ingestion status for a thread/course.
-    
+
     Returns:
     - ingested_posts_count: Number of posts currently in the vector store
     - total_posts_count: Total number of posts in the Piazza feed
@@ -156,7 +155,7 @@ async def get_ingestion_status(request: IngestRequest):
     try:
         from app.core.database import execute_query
         from app.threadIngestion.helpers import User
-        
+
         # 1. Get ingested posts count (count embeddings)
         # We count distinct documents (posts) in the collection
         # Table: langchain_pg_embedding
@@ -169,65 +168,67 @@ async def get_ingestion_status(request: IngestRequest):
                 WHERE c.name = %s
             """
             result = execute_query(count_query, (request.thread_id,))
-            ingested_count = result[0]['count'] if result else 0
-        except Exception as e:
+            ingested_count = result[0]["count"] if result else 0
+        except Exception:
             ingested_count = 0
 
-        
         # 2. Get total posts count from Piazza API
         # We need to parse the cookie string to get session_id and piazza_session
         # Expected format: "piazza_session=...; session_id=..."
-        
+
         cookies = {}
-        for cookie in request.piazza_cookie.split(';'):
-            if '=' in cookie:
-                key, value = cookie.strip().split('=', 1)
+        for cookie in request.piazza_cookie.split(";"):
+            if "=" in cookie:
+                key, value = cookie.strip().split("=", 1)
                 cookies[key] = value
-                
+
         user = User(
-            csrf_token=cookies.get('session_id', ''),
-            piazza_session=cookies.get('piazza_session', '')
+            csrf_token=cookies.get("session_id", ""),
+            piazza_session=cookies.get("piazza_session", ""),
         )
-        
+
         # Fetch total posts count using pagination to save RAM
         total_posts = 0
         offset = 0
-        batch_size = 2000 # Safe batch size
-        
+        batch_size = 2000  # Safe batch size
+
         while True:
             feed_data = user.getPosts(offset, batch_size, request.thread_id)
             if not feed_data:
                 break
-                
-            posts = feed_data.get('feed', [])
+
+            posts = feed_data.get("feed", [])
             if not posts:
                 break
-                
+
             total_posts += len(posts)
-            
+
             # If we got fewer posts than requested, we've reached the end
             if len(posts) < batch_size:
                 break
-                
+
             offset += batch_size
-        
+
         # 3. Get last ingested post ID from database
         db_query = """
-            SELECT last_ingested_post_id 
-            FROM threads 
+            SELECT last_ingested_post_id
+            FROM threads
             WHERE piazza_course_id = %s
         """
         db_result = execute_query(db_query, (request.thread_id,))
-        last_id = db_result[0]['last_ingested_post_id'] if db_result and db_result[0]['last_ingested_post_id'] is not None else 0
-        
-        
+        last_id = (
+            db_result[0]["last_ingested_post_id"]
+            if db_result and db_result[0]["last_ingested_post_id"] is not None
+            else 0
+        )
+
         return IngestionStatusResponse(
             ingested_posts_count=ingested_count,
             total_posts_count=total_posts,
             last_ingested_post_id=last_id,
-            status="success"
+            status="success",
         )
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=500,

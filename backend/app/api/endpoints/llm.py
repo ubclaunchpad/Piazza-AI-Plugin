@@ -15,9 +15,9 @@ async def generate_llm_response(request: QueryRequest):
     """Generate an LLM response to a user query."""
     try:
         response = get_llm_response(
-            query=request.query, 
+            query=request.query,
             thread_id=request.thread_id,
-            session_id=request.session_id
+            session_id=request.session_id,
         )
 
         return QueryResponse(
