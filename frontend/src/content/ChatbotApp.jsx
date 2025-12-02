@@ -45,6 +45,7 @@ function ChatbotApp() {
   const messagesEndRef = useRef(null);
 
   const [sessionId, setSessionId] = useState(null);
+  const [sessionTitle, setSessionTitle] = useState(null);
   const [user, setUser] = useState(null);
 
   // Fetch user info on mount
@@ -148,6 +149,7 @@ function ChatbotApp() {
         const sessions = await response.json();
         if (sessions.length > 0) {
           setSessionId(sessions[0].id);
+          setSessionTitle(sessions[0].title);
         } else {
           // Create a new session automatically if none exist?
           // Or just let the first message create it?
@@ -184,6 +186,7 @@ function ChatbotApp() {
       if (response.ok) {
         const newChat = await response.json();
         setSessionId(newChat.id);
+        setSessionTitle(newChat.title);
       }
     } catch (error) {
       console.error("Error creating session:", error);
@@ -358,7 +361,14 @@ function ChatbotApp() {
           style={{ width: "50vw", height: "70vh" }}
         >
           <div className="bg-gradient-to-r from-purple-500 to-purple-700 text-white px-5 py-4 flex justify-between items-center">
-            <h3 className="m-0 text-base font-semibold">AI Assistant</h3>
+            <div className="flex flex-col">
+              <h3 className="m-0 text-base font-semibold">AI Assistant</h3>
+              {sessionTitle && sessionTitle !== "New Chat" && (
+                <span className="text-xs opacity-80 font-medium truncate max-w-[200px]">
+                  {sessionTitle}
+                </span>
+              )}
+            </div>
             <button
               className="bg-white/20 border-none text-white w-7 h-7 rounded-full cursor-pointer text-base flex items-center justify-center transition-colors hover:bg-white/30"
               onClick={() => setIsExpanded(false)}
