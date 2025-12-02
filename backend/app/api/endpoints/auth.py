@@ -208,5 +208,5 @@ def login(credentials: LoginRequest):
         },
         access_token=session.access_token,
         refresh_token=session.refresh_token,
-        expires_in=session.expires_in or 3600,
+        expires_in=session.expires_in or 604800,
     )
