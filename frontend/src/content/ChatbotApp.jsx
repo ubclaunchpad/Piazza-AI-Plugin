@@ -216,9 +216,27 @@ function ChatbotApp() {
             : msg.message.content;
           const type = msg.message.type;
 
+          // Extract sources from metadata
+          let sources = [];
+          if (type === "ai") {
+            const metadata = msg.message.data
+              ? msg.message.data.response_metadata
+              : msg.message.response_metadata;
+            if (metadata && metadata.sources) {
+              sources = metadata.sources;
+            }
+          }
+
+          // Get current threadId from URL for links
+          const threadIdMatch =
+            window.location.pathname.match(/\/class\/([^/?]+)/);
+          const currentThreadId = threadIdMatch ? threadIdMatch[1] : null;
+
           return {
             role: type === "human" ? "user" : "assistant",
             content: content,
+            sources: sources,
+            threadId: currentThreadId,
           };
         });
         setMessages(formattedMessages);

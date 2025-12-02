@@ -12,10 +12,22 @@ export default function App() {
 
   // Check if user is already logged in
   useEffect(() => {
-    chrome.storage.local.get(["user", "authToken"], (result) => {
+    chrome.storage.local.get(["user", "authToken", "tokenExpiry"], (result) => {
       if (result.user && result.authToken) {
-        setUser({ ...result.user, access_token: result.authToken });
-        setIsAuthenticated(true);
+        // Check if token is expired
+        if (result.tokenExpiry && Date.now() > result.tokenExpiry) {
+          console.log("Token expired, clearing session");
+          chrome.storage.local.remove([
+            "user",
+            "authToken",
+            "refreshToken",
+            "tokenExpiry",
+          ]);
+          setIsAuthenticated(false);
+        } else {
+          setUser({ ...result.user, access_token: result.authToken });
+          setIsAuthenticated(true);
+        }
       }
       setIsLoading(false);
     });
@@ -168,6 +180,7 @@ export default function App() {
           <AssistantPage
             user={user}
             onBack={() => setCurrentPage("dashboard")}
+            onLogout={handleLogout}
           />
         )
       ) : (

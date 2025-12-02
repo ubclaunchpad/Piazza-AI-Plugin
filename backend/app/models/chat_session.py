@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 from uuid import UUID
 
@@ -18,3 +18,8 @@ class ChatSessionResponse(BaseModel):
     title: Optional[str]
     created_at: datetime
     updated_at: datetime
+
+class ChatMessage(BaseModel):
+    id: UUID
+    message: Dict[str, Any]
+    created_at: datetime

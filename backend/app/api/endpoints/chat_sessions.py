@@ -3,7 +3,7 @@ from typing import List, Optional
 from uuid import UUID
 
 from app.core.database import execute_query, execute_insert, execute_statement
-from app.models.chat_session import ChatSessionCreate, ChatSessionResponse, ChatSessionUpdate
+from app.models.chat_session import ChatSessionCreate, ChatSessionResponse, ChatSessionUpdate, ChatMessage
 from app.core.supabase import supabase
 
 router = APIRouter()
@@ -154,7 +154,7 @@ async def update_chat_session(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to update session: {str(e)}")
 
-@router.get("/chat-sessions/{session_id}/messages")
+@router.get("/chat-sessions/{session_id}/messages", response_model=List[ChatMessage])
 async def get_chat_session_messages(
     session_id: UUID,
     user=Depends(get_current_user)

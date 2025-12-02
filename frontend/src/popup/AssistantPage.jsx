@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 
 /* global chrome */
-export default function AssistantPage({ user, onBack }) {
+export default function AssistantPage({ user, onBack, onLogout }) {
   const [activeTab, setActiveTab] = useState("chats"); // 'chats' or 'files'
   const [chats, setChats] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -48,6 +48,10 @@ export default function AssistantPage({ user, onBack }) {
           },
         }
       );
+      if (response.status === 401) {
+        onLogout();
+        return;
+      }
       if (response.ok) {
         const data = await response.json();
         setChats(data);
@@ -77,6 +81,11 @@ export default function AssistantPage({ user, onBack }) {
         }),
       });
 
+      if (response.status === 401) {
+        onLogout();
+        return;
+      }
+
       if (response.ok) {
         const newChat = await response.json();
         setChats([newChat, ...chats]);
@@ -103,6 +112,11 @@ export default function AssistantPage({ user, onBack }) {
           Authorization: `Bearer ${user.access_token}`,
         },
       });
+
+      if (response.status === 401) {
+        onLogout();
+        return;
+      }
 
       if (response.ok) {
         setChats(chats.filter((c) => c.id !== chatId));
