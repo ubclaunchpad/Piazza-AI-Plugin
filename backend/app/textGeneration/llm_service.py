@@ -11,11 +11,13 @@ from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_core.messages import HumanMessage, AIMessage
 from langchain_core.output_parsers import StrOutputParser
 from app.core.config import settings
-from app.core.database import execute_statement
+from app.core.config import settings
+from app.core.database import execute_statement, execute_query
 
 logger = logging.getLogger(__name__)
 
 MODEL = "openai/gpt-oss-120b"
+CHAT_SESSION_MODEL="llama-3.1-8b-instant"
 
 def ensure_chat_history_tables():
     """Ensure chat history tables exist using raw SQL."""
@@ -50,6 +52,73 @@ def get_session_history(session_id: str):
         session_id,
         sync_connection=sync_connection
     )
+def update_session_title(session_id: str):
+    """
+    Updates the session title if it is currently 'New Chat'.
+    Uses the LLM to generate a concise title based on the first interaction found in history.
+    """
+    try:
+        # 1. Check current title
+        check_query = "SELECT title FROM chat_sessions WHERE id = %s"
+        result = execute_query(check_query, (session_id,), fetch_one=True)
+        
+        if not result or result['title'] != "New Chat":
+            return
+
+        # 2. Get first user query and AI response directly from DB
+        # We query for the message JSON to be safe about content location (top-level vs inside data)
+        msg_query = """
+            SELECT message
+            FROM chat_messages
+            WHERE session_id = %s AND message ->> 'type' = %s
+            ORDER BY created_at ASC
+            LIMIT 1
+        """
+        
+        first_user_result = execute_query(msg_query, (session_id, "human"), fetch_one=True)
+        first_ai_result = execute_query(msg_query, (session_id, "ai"), fetch_one=True)
+        
+        if not first_user_result or not first_ai_result:
+            return
+            
+        # Helper to extract content safely
+        def get_content(msg_json):
+            if "content" in msg_json:
+                return msg_json["content"]
+            if "data" in msg_json and "content" in msg_json["data"]:
+                return msg_json["data"]["content"]
+            return None
+
+        first_user_query = get_content(first_user_result["message"])
+        first_ai_response = get_content(first_ai_result["message"])
+        
+        if not first_user_query or not first_ai_response:
+            return
+
+        # 3. Generate new title
+        llm = ChatGroq(
+            model=CHAT_SESSION_MODEL,
+            temperature=0.5,
+            max_tokens=20,
+            max_retries=3,
+        )
+        
+        title_prompt = ChatPromptTemplate.from_messages([
+            ("system", "Generate a very concise title (3-5 words) for this chat session based on the first user query and AI response. Do not use quotes. Respond with ONLY the title, no additional text. The title (which will be your entire response) should be less than 35 characters."),
+            ("human", f"User: {first_user_query}\nAI: {first_ai_response}"),
+        ])
+        
+        chain = title_prompt | llm | StrOutputParser()
+        new_title = chain.invoke({})
+        
+        # Clean up title
+        new_title = new_title.strip().strip('"').strip("'")
+        # 4. Update database
+        update_query = "UPDATE chat_sessions SET title = %s, updated_at = NOW() WHERE id = %s"
+        execute_statement(update_query, (new_title, session_id))
+        
+    except Exception as e:
+        logger.error(f"Failed to update session title: {e}")
 
 def get_llm_response(query: str, thread_id: str, session_id: str) -> object:
     
@@ -173,6 +242,10 @@ def get_llm_response(query: str, thread_id: str, session_id: str) -> object:
         response_metadata={"sources": unique_sources}
     )
     history.add_message(ai_message)
+
+    # --- 8. Update Session Title (if needed) ---
+    # We do this asynchronously or just fire-and-forget here
+    update_session_title(session_id)
 
     # Create a simple object or dict to return to your API
     class ResponseObj:
