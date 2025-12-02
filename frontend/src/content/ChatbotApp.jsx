@@ -503,9 +503,18 @@ function ChatbotApp() {
             {isLoading && (
               <div className="flex justify-start mb-2">
                 <div className="bg-white px-3.5 py-3 rounded-2xl rounded-bl-sm shadow-sm flex gap-1">
-                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounceDot [animation-delay:-0.32s]"></span>
-                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounceDot [animation-delay:-0.16s]"></span>
-                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounceDot"></span>
+                  <span
+                    className="w-2 h-2 bg-gray-400 rounded-full animate-bounceDot"
+                    style={{ animationDelay: "0s" }}
+                  ></span>
+                  <span
+                    className="w-2 h-2 bg-gray-400 rounded-full animate-bounceDot"
+                    style={{ animationDelay: "0.15s" }}
+                  ></span>
+                  <span
+                    className="w-2 h-2 bg-gray-400 rounded-full animate-bounceDot"
+                    style={{ animationDelay: "0.3s" }}
+                  ></span>
                 </div>
               </div>
             )}
