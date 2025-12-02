@@ -134,9 +134,12 @@ export default function AssistantPage({ user, onBack, onLogout }) {
         currentWindow: true,
       });
       if (tab) {
+        // Find the chat object to get the title
+        const chat = chats.find((c) => c.id === chatId);
         await chrome.tabs.sendMessage(tab.id, {
           type: "OPEN_CHAT_SESSION",
           sessionId: chatId,
+          title: chat ? chat.title : null,
         });
         // Close popup
         window.close();

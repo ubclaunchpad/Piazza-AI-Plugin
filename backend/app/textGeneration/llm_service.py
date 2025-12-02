@@ -246,6 +246,13 @@ def get_llm_response(query: str, thread_id: str, session_id: str) -> object:
     # --- 8. Update Session Title (if needed) ---
     # We do this asynchronously or just fire-and-forget here
     update_session_title(session_id)
+    
+    # --- 9. Update Session Timestamp ---
+    try:
+        update_time_query = "UPDATE chat_sessions SET updated_at = NOW() WHERE id = %s"
+        execute_statement(update_time_query, (session_id,))
+    except Exception as e:
+        logger.error(f"Failed to update session timestamp: {e}")
 
     # Create a simple object or dict to return to your API
     class ResponseObj:

@@ -73,6 +73,9 @@ function ChatbotApp() {
     const messageListener = (request, sender, sendResponse) => {
       if (request.type === "OPEN_CHAT_SESSION") {
         setSessionId(request.sessionId);
+        if (request.title) {
+          setSessionTitle(request.title);
+        }
         setIsExpanded(true);
       }
     };
@@ -91,6 +94,10 @@ function ChatbotApp() {
 
   const handleToggle = () => {
     setIsExpanded(!isExpanded);
+  };
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
   const convertLatexToMarkdown = (text) => {
@@ -243,6 +250,8 @@ function ChatbotApp() {
           };
         });
         setMessages(formattedMessages);
+        // Scroll to bottom after loading messages
+        setTimeout(scrollToBottom, 100);
       }
     } catch (error) {
       console.error("Error fetching messages:", error);
