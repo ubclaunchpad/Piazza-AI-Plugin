@@ -3,6 +3,8 @@ import ReactMarkdown from "react-markdown";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 
 function SourcesDropdown({ sources, threadId }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -420,20 +422,43 @@ function ChatbotApp() {
                               children,
                               ...props
                             }) => {
-                              return inline ? (
+                              const isInline =
+                                inline ||
+                                (node &&
+                                  node.position &&
+                                  node.position.start.line ===
+                                    node.position.end.line);
+                              const match = /language-(\w+)/.exec(
+                                className || ""
+                              );
+
+                              return !isInline && match ? (
+                                <SyntaxHighlighter
+                                  style={vscDarkPlus}
+                                  language={match[1]}
+                                  PreTag="div"
+                                  className="rounded-md text-xs"
+                                  {...props}
+                                >
+                                  {String(children).replace(/\n$/, "")}
+                                </SyntaxHighlighter>
+                              ) : isInline ? (
                                 <code
-                                  className="bg-purple-50 text-purple-600 px-1 py-0.5 rounded text-xs inline"
+                                  className="bg-purple-50 text-purple-600 px-1 py-0.5 rounded text-xs inline-block"
                                   {...props}
                                 >
                                   {children}
                                 </code>
                               ) : (
-                                <code
-                                  className="block bg-gray-100 text-gray-800 p-2 rounded text-xs overflow-x-auto"
+                                <SyntaxHighlighter
+                                  style={vscDarkPlus}
+                                  language="text"
+                                  PreTag="div"
+                                  className="rounded-md text-xs"
                                   {...props}
                                 >
-                                  {children}
-                                </code>
+                                  {String(children).replace(/\n$/, "")}
+                                </SyntaxHighlighter>
                               );
                             },
                             // Customize paragraphs
