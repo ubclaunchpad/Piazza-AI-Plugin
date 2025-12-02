@@ -3,6 +3,7 @@ import ReactMarkdown from "react-markdown";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
+import rehypeRaw from "rehype-raw";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 
@@ -294,6 +295,7 @@ function ChatbotApp() {
       // Call the backend API
       const API_ENDPOINT =
         process.env.API_ENDPOINT || "http://localhost:8000/api/v1";
+
       const response = await fetch(`${API_ENDPOINT}/llm/query`, {
         method: "POST",
         headers: {
@@ -316,20 +318,67 @@ function ChatbotApp() {
         throw new Error(`API error: ${response.status}`);
       }
 
-      const data = await response.json();
-
-      // Convert LaTeX notation and add AI response
-      const convertedContent = convertLatexToMarkdown(data.response);
-
+      // Initialize empty AI message
       setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
-          content: convertedContent,
-          sources: data.sources || [],
+          content: "",
+          sources: [],
           threadId: threadId,
         },
       ]);
+
+      // Read the stream
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let aiResponseContent = "";
+      let aiSources = [];
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split("\n").filter((line) => line.trim() !== "");
+
+        for (const line of lines) {
+          try {
+            const data = JSON.parse(line);
+
+            if (data.type === "content") {
+              aiResponseContent += data.content;
+
+              // Update the last message with new content
+              setMessages((prev) => {
+                const newMessages = [...prev];
+                const lastMsg = newMessages[newMessages.length - 1];
+                if (lastMsg.role === "assistant") {
+                  lastMsg.content = convertLatexToMarkdown(aiResponseContent);
+                }
+                return newMessages;
+              });
+
+              // Scroll to bottom periodically or on every chunk
+              scrollToBottom();
+            } else if (data.type === "sources") {
+              aiSources = data.sources;
+
+              // Update sources
+              setMessages((prev) => {
+                const newMessages = [...prev];
+                const lastMsg = newMessages[newMessages.length - 1];
+                if (lastMsg.role === "assistant") {
+                  lastMsg.sources = aiSources;
+                }
+                return newMessages;
+              });
+            }
+          } catch (e) {
+            console.error("Error parsing JSON chunk", e);
+          }
+        }
+      }
     } catch (error) {
       console.error("Failed to get AI response:", error);
 
@@ -412,7 +461,7 @@ function ChatbotApp() {
                       <div className="prose prose-sm max-w-none">
                         <ReactMarkdown
                           remarkPlugins={[remarkMath, remarkGfm]}
-                          rehypePlugins={[rehypeKatex]}
+                          rehypePlugins={[rehypeKatex, rehypeRaw]}
                           components={{
                             // Customize code blocks
                             code: ({

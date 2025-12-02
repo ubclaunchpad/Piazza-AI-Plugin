@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 
@@ -271,3 +272,147 @@ def get_llm_response(query: str, thread_id: str, session_id: str) -> object:
     result.model = MODEL
 
     return result
+
+
+def stream_llm_response(query: str, thread_id: str, session_id: str):
+    """
+    Generator that yields streaming response chunks.
+    """
+    # 1. Setup Models & Embeddings
+    openai_api_key = os.environ.get("OPENAI_API_KEY")
+    if not openai_api_key:
+        raise ValueError("OPENAI_API_KEY must be set")
+
+    embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
+
+    llm = ChatGroq(
+        model=MODEL,
+        temperature=0.5,
+        max_tokens=8192,
+        max_retries=3,
+    )
+
+    # 2. Setup Vector Store as Retriever
+    vector_store = PGVector(
+        collection_name=thread_id,
+        connection=settings.DATABASE_URL,
+        embeddings=embeddings,
+        use_jsonb=True,
+    )
+    retriever = vector_store.as_retriever(search_kwargs={"k": 5})
+
+    # --- 3. Construct the History-Aware Retriever ---
+    contextualize_q_system_prompt = """Given a chat history and the latest user question which might reference context in the chat history,
+        formulate a standalone question which can be understood without the chat history.
+        Do NOT answer the question, just reformulate it if needed and otherwise return it as is.
+        If the latest user question is a completely new topic and does not reference the chat history, return the question exactly as is.
+        Do NOT combine the new question with previous topics if they are unrelated."""
+
+    contextualize_q_prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", contextualize_q_system_prompt),
+            MessagesPlaceholder("chat_history"),
+            ("human", "{input}"),
+        ]
+    )
+
+    history_aware_retriever = create_history_aware_retriever(
+        llm, retriever, contextualize_q_prompt
+    )
+
+    # --- 4. Construct the QA Chain ---
+    qa_system_prompt = """You are an intelligent Teaching Assistant for a university course.
+        Your task is to answer the student's question based on the provided context from Piazza posts and the conversation history.
+
+        **Context Analysis:**
+        The context below contains the top 5 most similar posts found in the database.
+        - Note: High similarity does not guarantee relevance. The posts might be completely unrelated to the specific question.
+
+        **Response Guidelines:**
+        - **Answer ONLY the latest question from the user.** Do not attempt to answer previous questions in the chat history.
+        - **If the context is relevant:** Synthesize the information to provide a helpful, accurate answer.
+        - **If the context is NOT relevant:** Do not attempt to answer. Simply state that the current course threads do not appear to contain the answer.
+        - **Style:** Be polite, professional, and concise.
+
+        **Context:**
+
+        {context}"""
+
+    qa_prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", qa_system_prompt),
+            MessagesPlaceholder("chat_history"),
+            ("human", "{input}"),
+        ]
+    )
+
+    question_answer_chain = create_stuff_documents_chain(llm, qa_prompt)
+    rag_chain = create_retrieval_chain(history_aware_retriever, question_answer_chain)
+
+    # --- 5. Manual History Management ---
+    history = get_session_history(session_id)
+
+    # --- 6. Stream ---
+    # We'll accumulate the answer to save it later
+    full_answer = ""
+    sources = []
+    
+    # Add user message to history immediately
+    history.add_user_message(query)
+
+    try:
+        # Stream the response
+        for chunk in rag_chain.stream({"input": query, "chat_history": history.messages}):
+            if "answer" in chunk:
+                content = chunk["answer"]
+                full_answer += content
+                # Yield text chunk
+                yield json.dumps({"type": "content", "content": content}) + "\n"
+            
+            if "context" in chunk:
+                for doc in chunk["context"]:
+                    if "post_number" in doc.metadata:
+                        sources.append(str(doc.metadata["post_number"]))
+                    elif "post_id" in doc.metadata:
+                        sources.append(str(doc.metadata["post_id"]))
+
+        # --- 7. Finalize ---
+        unique_sources = list(dict.fromkeys(sources))
+        
+        # Send sources
+        yield json.dumps({"type": "sources", "sources": unique_sources}) + "\n"
+
+        # Save AI message to history
+        ai_message = AIMessage(
+            content=full_answer, response_metadata={"sources": unique_sources}
+        )
+        history.add_message(ai_message)
+
+        # Update title and timestamp
+        update_session_title(session_id)
+        try:
+            update_time_query = "UPDATE chat_sessions SET updated_at = NOW() WHERE id = %s"
+            execute_statement(update_time_query, (session_id,))
+        except Exception as e:
+            logger.error(f"Failed to update session timestamp: {e}")
+
+    except GeneratorExit:
+        logger.info(f"Stream disconnected for session {session_id}")
+        # Save partial response if disconnected
+        if full_answer:
+            unique_sources = list(dict.fromkeys(sources))
+            ai_message = AIMessage(
+                content=full_answer + " [Interrupted]", 
+                response_metadata={"sources": unique_sources}
+            )
+            history.add_message(ai_message)
+    except Exception as e:
+        logger.error(f"Error during streaming: {e}")
+        # Try to save what we have
+        if full_answer:
+             ai_message = AIMessage(
+                content=full_answer + " [Error]", 
+                response_metadata={"sources": []}
+            )
+             history.add_message(ai_message)
+        raise e
