@@ -186,3 +186,25 @@ async def get_chat_session_messages(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch messages: {str(e)}")
+
+@router.get("/stats/daily-queries")
+async def get_daily_query_count(
+    user=Depends(get_current_user)
+):
+    """
+    Get the number of queries made by the user today.
+    """
+    try:
+        query = """
+            SELECT COUNT(*)
+            FROM chat_messages cm
+            JOIN chat_sessions cs ON cm.session_id::text = cs.id::text
+            WHERE cs.user_id = %s
+              AND cm.message->>'type' = 'human'
+              AND cm.created_at >= CURRENT_DATE
+        """
+        result = execute_query(query, (user.id,), fetch_one=True)
+        count = result['count'] if result else 0
+        return {"count": count}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch stats: {str(e)}")

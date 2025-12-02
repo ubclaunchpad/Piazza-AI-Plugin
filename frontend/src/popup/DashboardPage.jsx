@@ -43,9 +43,11 @@ export default function DashboardPage({
   const [isLoading, setIsLoading] = useState(true);
   const [isIngesting, setIsIngesting] = useState(false);
   const [ingestionStatus, setIngestionStatus] = useState(null);
+  const [dailyQueries, setDailyQueries] = useState(0);
 
   useEffect(() => {
     getCurrentTabInfo();
+    fetchDailyQueries();
   }, []);
 
   // Poll for ingestion status if we have a class ID
@@ -96,6 +98,24 @@ export default function DashboardPage({
       }
     } catch (error) {
       console.error("Failed to fetch status:", error);
+    }
+  };
+
+  const fetchDailyQueries = async () => {
+    try {
+      const API_ENDPOINT =
+        process.env.API_ENDPOINT || "http://localhost:8000/api/v1";
+      const response = await fetch(`${API_ENDPOINT}/stats/daily-queries`, {
+        headers: {
+          Authorization: `Bearer ${user.access_token}`,
+        },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setDailyQueries(data.count);
+      }
+    } catch (error) {
+      console.error("Error fetching daily queries:", error);
     }
   };
 
@@ -372,7 +392,9 @@ export default function DashboardPage({
           </h3>
           <div className="grid grid-cols-2 gap-3">
             <div className="text-center p-4 bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg">
-              <div className="text-2xl font-bold text-gray-900 mb-1">0</div>
+              <div className="text-2xl font-bold text-gray-900 mb-1">
+                {dailyQueries}
+              </div>
               <div className="text-[11px] text-gray-600 font-medium uppercase tracking-wider">
                 Queries Today
               </div>
