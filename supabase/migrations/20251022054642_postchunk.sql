@@ -1,5 +1,5 @@
 CREATE TABLE post_chunks (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     post_id UUID NOT NULL,
     thread_id UUID NOT NULL,
     chunk_index INTEGER,

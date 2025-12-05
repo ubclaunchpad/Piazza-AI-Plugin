@@ -6,7 +6,7 @@ CREATE TYPE source_type_enum AS ENUM ('post_chunk', 'doc_chunk', 'external');
 
 -- Partition Table For Generalized Embeddings
 CREATE TABLE embeddings (
-    id UUID NOT NULL DEFAULT uuid_generate_v4(),
+    id UUID NOT NULL DEFAULT gen_random_uuid(),
     source_type source_type_enum NOT NULL,
     source_id UUID NOT NULL,
     thread_id UUID NOT NULL,
