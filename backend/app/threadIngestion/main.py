@@ -8,7 +8,7 @@ processing them into chunks, and preparing them for storage.
 import os
 from typing import Any, Dict
 
-from langchain.schema import Document
+from langchain_core.documents import Document
 from langchain_openai import OpenAIEmbeddings
 
 # LangChain & Database imports

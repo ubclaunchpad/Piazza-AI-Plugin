@@ -3,9 +3,9 @@ LLM API endpoint for text generation.
 """
 
 from fastapi import APIRouter, HTTPException
-
-from app.models import QueryRequest, QueryResponse
 from fastapi.responses import StreamingResponse
+
+from app.models import QueryRequest
 from app.textGeneration import stream_llm_response
 
 router = APIRouter()

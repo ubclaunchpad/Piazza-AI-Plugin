@@ -3,11 +3,14 @@ import logging
 import os
 
 import psycopg
-from langchain.chains import create_history_aware_retriever, create_retrieval_chain
-from langchain.chains.combine_documents import create_stuff_documents_chain
-from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_classic.chains.combine_documents import create_stuff_documents_chain
+from langchain_classic.chains.history_aware_retriever import (
+    create_history_aware_retriever,
+)
+from langchain_classic.chains.retrieval import create_retrieval_chain
 from langchain_core.messages import AIMessage
 from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_groq import ChatGroq
 from langchain_openai import OpenAIEmbeddings
 from langchain_postgres import PGVector, PostgresChatMessageHistory
@@ -193,7 +196,9 @@ def get_llm_response(query: str, thread_id: str, session_id: str) -> object:
         **Response Guidelines:**
         - **Answer ONLY the latest question from the user.** Do not attempt to answer previous questions in the chat history.
         - **If the context is relevant:** Synthesize the information to provide a helpful, accurate answer.
-        - **If the context is NOT relevant:** Do not attempt to answer. Simply state that the current course threads do not appear to contain the answer.
+        - **If the context is NOT relevant:**
+            - If you can answer the question regardless of course context (e.g., general programming questions like "How do I write hello world in python?"), please do so.
+            - If the question requires course-specific information and the context is missing, state that the current course threads do not appear to contain the answer you are looking for.
         - **Style:** Be polite, professional, and concise.
 
         **Context:**
@@ -331,7 +336,9 @@ def stream_llm_response(query: str, thread_id: str, session_id: str):
         **Response Guidelines:**
         - **Answer ONLY the latest question from the user.** Do not attempt to answer previous questions in the chat history.
         - **If the context is relevant:** Synthesize the information to provide a helpful, accurate answer.
-        - **If the context is NOT relevant:** Do not attempt to answer. Simply state that the current course threads do not appear to contain the answer.
+        - **If the context is NOT relevant:**
+            - If you can answer the question regardless of course context (e.g., general programming questions like "How do I write hello world in python?"), please do so.
+            - If the question requires course-specific information and the context is missing, state that the current course threads do not appear to contain the answer you are looking for.
         - **Style:** Be polite, professional, and concise.
 
         **Context:**
@@ -356,7 +363,7 @@ def stream_llm_response(query: str, thread_id: str, session_id: str):
     # We'll accumulate the answer to save it later
     full_answer = ""
     sources = []
-    
+
     # Add user message to history immediately
     history.add_user_message(query)
 
@@ -368,7 +375,7 @@ def stream_llm_response(query: str, thread_id: str, session_id: str):
                 full_answer += content
                 # Yield text chunk
                 yield json.dumps({"type": "content", "content": content}) + "\n"
-            
+
             if "context" in chunk:
                 for doc in chunk["context"]:
                     if "post_number" in doc.metadata:
@@ -378,7 +385,7 @@ def stream_llm_response(query: str, thread_id: str, session_id: str):
 
         # --- 7. Finalize ---
         unique_sources = list(dict.fromkeys(sources))
-        
+
         # Send sources
         yield json.dumps({"type": "sources", "sources": unique_sources}) + "\n"
 
@@ -402,7 +409,7 @@ def stream_llm_response(query: str, thread_id: str, session_id: str):
         if full_answer:
             unique_sources = list(dict.fromkeys(sources))
             ai_message = AIMessage(
-                content=full_answer + " [Interrupted]", 
+                content=full_answer + " [Interrupted]",
                 response_metadata={"sources": unique_sources}
             )
             history.add_message(ai_message)
@@ -411,7 +418,7 @@ def stream_llm_response(query: str, thread_id: str, session_id: str):
         # Try to save what we have
         if full_answer:
              ai_message = AIMessage(
-                content=full_answer + " [Error]", 
+                content=full_answer + " [Error]",
                 response_metadata={"sources": []}
             )
              history.add_message(ai_message)

@@ -1,4 +1,4 @@
-fastapi
+fastapi==0.123.10
 uvicorn[standard]
 pydantic[email]
 pydantic-settings
@@ -7,8 +7,8 @@ psycopg2-binary
 sqlalchemy
 websockets
 supabase
-langchain
-langchain-community
+langchain==1.1.2
+langchain-community==0.4.1
 langchain-openai
 langchain-groq
 langchain-postgres==0.0.16
