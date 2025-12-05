@@ -369,7 +369,9 @@ def stream_llm_response(query: str, thread_id: str, session_id: str):
 
     try:
         # Stream the response
-        for chunk in rag_chain.stream({"input": query, "chat_history": history.messages}):
+        for chunk in rag_chain.stream(
+            {"input": query, "chat_history": history.messages}
+        ):
             if "answer" in chunk:
                 content = chunk["answer"]
                 full_answer += content
@@ -398,7 +400,9 @@ def stream_llm_response(query: str, thread_id: str, session_id: str):
         # Update title and timestamp
         update_session_title(session_id)
         try:
-            update_time_query = "UPDATE chat_sessions SET updated_at = NOW() WHERE id = %s"
+            update_time_query = (
+                "UPDATE chat_sessions SET updated_at = NOW() WHERE id = %s"
+            )
             execute_statement(update_time_query, (session_id,))
         except Exception as e:
             logger.error(f"Failed to update session timestamp: {e}")
@@ -410,16 +414,15 @@ def stream_llm_response(query: str, thread_id: str, session_id: str):
             unique_sources = list(dict.fromkeys(sources))
             ai_message = AIMessage(
                 content=full_answer + " [Interrupted]",
-                response_metadata={"sources": unique_sources}
+                response_metadata={"sources": unique_sources},
             )
             history.add_message(ai_message)
     except Exception as e:
         logger.error(f"Error during streaming: {e}")
         # Try to save what we have
         if full_answer:
-             ai_message = AIMessage(
-                content=full_answer + " [Error]",
-                response_metadata={"sources": []}
+            ai_message = AIMessage(
+                content=full_answer + " [Error]", response_metadata={"sources": []}
             )
-             history.add_message(ai_message)
+            history.add_message(ai_message)
         raise e

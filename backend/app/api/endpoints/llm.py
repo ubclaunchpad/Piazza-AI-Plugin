@@ -10,6 +10,7 @@ from app.textGeneration import stream_llm_response
 
 router = APIRouter()
 
+
 @router.post("/query")
 async def generate_llm_response(request: QueryRequest):
     """Generate an LLM response to a user query (Streaming)."""
@@ -20,7 +21,7 @@ async def generate_llm_response(request: QueryRequest):
                 thread_id=request.thread_id,
                 session_id=request.session_id,
             ),
-            media_type="application/x-ndjson"
+            media_type="application/x-ndjson",
         )
     except Exception as e:
         print(e)
