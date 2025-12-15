@@ -120,7 +120,7 @@ langchain-core==1.1.1
     #   langgraph
     #   langgraph-checkpoint
     #   langgraph-prebuilt
-langchain-groq==1.1.0
+langchain-groq==1.1.1
     # via -r requirements.in
 langchain-openai==1.1.0
     # via -r requirements.in
