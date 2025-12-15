@@ -174,7 +174,7 @@ pgvector==0.3.6
     # via
     #   -r requirements.in
     #   langchain-postgres
-postgrest==2.25.0
+postgrest==2.25.1
     # via supabase
 propcache==0.4.1
     # via
@@ -225,7 +225,7 @@ pyyaml==6.0.3
     #   langchain-community
     #   langchain-core
     #   uvicorn
-realtime==2.25.0
+realtime==2.25.1
     # via supabase
 regex==2025.11.3
     # via tiktoken
@@ -250,15 +250,15 @@ sqlalchemy[asyncio]==2.0.44
     #   langchain-postgres
 starlette==0.50.0
     # via fastapi
-storage3==2.25.0
+storage3==2.25.1
     # via supabase
 strenum==0.4.15
     # via supabase-functions
-supabase==2.25.0
+supabase==2.25.1
     # via -r requirements.in
-supabase-auth==2.25.0
+supabase-auth==2.25.1
     # via supabase
-supabase-functions==2.25.0
+supabase-functions==2.25.1
     # via supabase
 tenacity==9.1.2
     # via
