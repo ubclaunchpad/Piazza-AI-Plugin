@@ -108,7 +108,7 @@ langchain-classic==1.0.0
     # via langchain-community
 langchain-community==0.4.1
     # via -r requirements.in
-langchain-core==1.1.1
+langchain-core==1.2.4
     # via
     #   langchain
     #   langchain-classic
@@ -122,7 +122,7 @@ langchain-core==1.1.1
     #   langgraph-prebuilt
 langchain-groq==1.1.0
     # via -r requirements.in
-langchain-openai==1.1.0
+langchain-openai==1.1.6
     # via -r requirements.in
 langchain-postgres==0.0.16
     # via -r requirements.in
