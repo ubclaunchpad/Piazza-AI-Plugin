@@ -112,7 +112,7 @@ After completing the above steps, verify your setup:
 - Go to **Project Settings → API**, then under **Project API keys** copy the values labeled **anon public** and **service_role secret** into `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` in your `backend/.env` file.
 
 **Verify Database Connection:**
-- Ensure you have set your `DATABASE_URL` variable in the .env. To do so, navigate to your Supabase dashboard → Project Settings → Database → Connection String. Select the "URI" tab and copy the connection string. Replace `[YOUR-PASSWORD]` with your database password (the password you set when creating the project). Add this to your `backend/.env` file as `DATABASE_URL`.
+- Ensure you have set your `DATABASE_URL` variable in the .env. To do so, navigate to your Supabase dashboard → Project Settings → Database → Connection String. Select the "URI" tab and select the `SESSION_POOLER` connection string under Methods. Copy that string. Replace `[YOUR-PASSWORD]` with your database password (the password you set when creating the project). Add this to your `backend/.env` file as `DATABASE_URL`.
 
 ```bash
 # Test the connection using the PostgreSQL client (psql)
