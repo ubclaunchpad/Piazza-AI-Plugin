@@ -109,7 +109,7 @@ After completing the above steps, verify your setup:
 - Get the `SUPABASE_URL` from this page and add to the `backend/.env` file
 - Navigate to your project and check the "Project Status" section
 - Ensure all services (Database, Auth, Storage, Realtime) show as healthy
-- Go to the settings page, then navigate to API keys, then click on `Legacy anon, service role key` to get the `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY`.
+- Go to **Project Settings → API**, then under **Project API keys** copy the values labeled **anon public** and **service_role secret** into `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` in your `backend/.env` file.
 
 **Verify Database Connection:**
 - Ensure you have set your `DATABASE_URL` variable in the .env. To do so, navigate to your Supabase dashboard → Project Settings → Database → Connection String. Select the "URI" tab and copy the connection string. Replace `[YOUR-PASSWORD]` with your database password (the password you set when creating the project). Add this to your `backend/.env` file as `DATABASE_URL`.
