@@ -67,7 +67,9 @@ OPENAI_API_KEY=your_openai_api_key_here
 ### 3. Link Cloud Supabase Project
 
 To connect your local development environment to a remote Supabase project:
-
+1. **Create a Supabase cloud project**
+Visit the URL below and after signing in, click on Create New Project.
+https://supabase.com/dashboard
 1. **Navigate to the Supabase directory:**
 
    ```bash
