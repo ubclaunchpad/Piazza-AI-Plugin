@@ -115,8 +115,8 @@ After completing the above steps, verify your setup:
 - Ensure you have set your `DATABASE_URL` variable in the .env. To do so, navigate to your Supabase dashboard → Project Settings → Database → Connection String. Select the "URI" tab and copy the connection string. Replace `[YOUR-PASSWORD]` with your database password (the password you set when creating the project). Add this to your `backend/.env` file as `DATABASE_URL`.
 
 ```bash
-# Test the connection from your backend
-python backend/test_supabase_connection.py
+# Test the connection using the PostgreSQL client (psql)
+psql "$DATABASE_URL" -c '\dt'
 ```
 
 **Note:** The `supabase status` CLI command only works for local development stacks. For cloud projects, use the dashboard or status page above.
