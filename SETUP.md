@@ -17,7 +17,7 @@ API_PREFIX=/api/v1
 ALLOWED_ORIGINS=["http://localhost:3000", "chrome-extension://*", "https://piazza.com"]
 
 # Database Configuration (Supabase)
-# Get these values from: supabase status
+# Get these values from: Supabase Dashboard → Project Settings → Database/API
 DATABASE_URL=postgresql://postgres:YOUR_PASSWORD@db.YOUR_PROJECT_REF.supabase.co:5432/postgres
 
 SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
@@ -67,8 +67,10 @@ OPENAI_API_KEY=your_openai_api_key_here
 ### 3. Link Cloud Supabase Project
 
 To connect your local development environment to a remote Supabase project:
-
-1. **Navigate to the Supabase directory:**
+1. **Create a Supabase cloud project**
+Visit the URL below and after signing in, click on Create New Project.
+https://supabase.com/dashboard
+2. **Navigate to the Supabase directory:**
 
    ```bash
    cd supabase
@@ -102,13 +104,22 @@ To connect your local development environment to a remote Supabase project:
 
 After completing the above steps, verify your setup:
 
-```bash
-# Check Supabase status
-supabase status
+**Check Cloud Project Status:**
+- Visit your Supabase dashboard at https://supabase.com/dashboard
+- Get the `SUPABASE_URL` from this page and add to the `backend/.env` file
+- Navigate to your project and check the "Project Status" section
+- Ensure all services (Database, Auth, Storage, Realtime) show as healthy
+- Go to **Project Settings → API**, then under **Project API keys** copy the values labeled **anon public** and **service_role secret** into `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` in your `backend/.env` file.
 
-# Verify database connection
-# The output should show your linked project details
+**Verify Database Connection:**
+- Ensure you have set your `DATABASE_URL` variable in the .env. To do so, navigate to your Supabase dashboard → Project Settings → Database → Connection String. Select the "URI" tab and copy the connection string. Replace `[YOUR-PASSWORD]` with your database password (the password you set when creating the project). Add this to your `backend/.env` file as `DATABASE_URL`.
+
+```bash
+# Test the connection using the PostgreSQL client (psql)
+psql "$DATABASE_URL" -c '\dt'
 ```
+
+**Note:** The `supabase status` CLI command only works for local development stacks. For cloud projects, use the dashboard or status page above.
 
 ---
 
@@ -127,9 +138,10 @@ supabase status
 
 ### Database Connection Issues
 
-- Verify your `DATABASE_URL` is correct
-- Check if your IP is whitelisted in Supabase dashboard (for cloud connections)
-- Ensure Supabase project is running (`supabase status`)
+- Verify your `DATABASE_URL` is correct in your `.env` file
+- Check if your IP is whitelisted in Supabase dashboard: Project Settings → Database → Connection Pooling
+- Ensure your Supabase cloud project is healthy via the dashboard or https://status.supabase.com
+- Verify your database password is correct
 
 ### Migration Issues
 
