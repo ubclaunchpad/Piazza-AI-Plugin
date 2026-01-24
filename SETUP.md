@@ -17,7 +17,7 @@ API_PREFIX=/api/v1
 ALLOWED_ORIGINS=["http://localhost:3000", "chrome-extension://*", "https://piazza.com"]
 
 # Database Configuration (Supabase)
-# Get these values from: supabase status
+# Get these values from: Supabase Dashboard → Project Settings → Database/API
 DATABASE_URL=postgresql://postgres:YOUR_PASSWORD@db.YOUR_PROJECT_REF.supabase.co:5432/postgres
 
 SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
@@ -104,13 +104,22 @@ https://supabase.com/dashboard
 
 After completing the above steps, verify your setup:
 
-```bash
-# Check Supabase status
-supabase status
+**Check Cloud Project Status:**
+- Visit your Supabase dashboard at https://supabase.com/dashboard
+- Get the `SUPABASE_URL` from this page and add to the `backend/.env` file
+- Navigate to your project and check the "Project Status" section
+- Ensure all services (Database, Auth, Storage, Realtime) show as healthy
+- Go to the settings page, then navigate to API keys, then click on `Legacy anon, service role key` to get the `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY`.
 
-# Verify database connection
-# The output should show your linked project details
+**Verify Database Connection:**
+- Ensure you have set your `DATABASE_URL` variable in the .env. To do so, navigate to your Supabase dashboard → Project Settings → Database → Connection String. Select the "URI" tab and copy the connection string. Replace `[YOUR-PASSWORD]` with your database password (the password you set when creating the project). Add this to your `backend/.env` file as `DATABASE_URL`.
+
+```bash
+# Test the connection from your backend
+python backend/test_supabase_connection.py
 ```
+
+**Note:** The `supabase status` CLI command only works for local development stacks. For cloud projects, use the dashboard or status page above.
 
 ---
 
@@ -129,9 +138,10 @@ supabase status
 
 ### Database Connection Issues
 
-- Verify your `DATABASE_URL` is correct
-- Check if your IP is whitelisted in Supabase dashboard (for cloud connections)
-- Ensure Supabase project is running (`supabase status`)
+- Verify your `DATABASE_URL` is correct in your `.env` file
+- Check if your IP is whitelisted in Supabase dashboard: Project Settings → Database → Connection Pooling
+- Ensure your Supabase cloud project is healthy via the dashboard or https://status.supabase.com
+- Verify your database password is correct
 
 ### Migration Issues
 
