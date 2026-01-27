@@ -12,9 +12,13 @@ import unicodedata
 import uuid
 from datetime import datetime, timezone
 
+import easyocr
 import fitz
+import numpy as np
 
 TOOL_VERSION = "0.1.0"
+
+EASYOCR_READER = easyocr.Reader(["en"], gpu=False)
 
 
 def sha256_file(path: str) -> str:
@@ -46,6 +50,27 @@ def fix_hyphens(a: str, b: str) -> str:
     if a.endswith("-") and b[:1].islower():
         return a[:-1] + b
     return a + " " + b
+
+
+def page_to_image(page, dpi=300):
+    """Convert page -> image"""
+    zoom = dpi / 72
+    mat = fitz.Matrix(zoom, zoom)
+    pix = page.get_pixmap(matrix=mat)
+
+    img = np.frombuffer(pix.samples, dtype=np.uint8)
+    img = img.reshape(pix.h, pix.w, pix.n)
+
+    if pix.n == 4:
+        img = img[:, :, :3]
+
+    return img
+
+
+def ocr_with_easyocr(page):
+    img = page_to_image(page)
+    lines = EASYOCR_READER.readtext(img, detail=0, paragraph=True)
+    return "\n".join(lines)
 
 
 def extract_pdf_pymupdf(path: str, ocr_threshold=40, page_range=None):
@@ -89,19 +114,14 @@ def extract_pdf_pymupdf(path: str, ocr_threshold=40, page_range=None):
 
         # 2. OCR fallback
         if len(text.strip()) < ocr_threshold:
-            print(f"[PyMuPDF OCR] Page {page_num}: low text → using OCR…")
+            print(f"[EasyOCR] Page {page_num}: low text → OCR")
             used_ocr = True
+
             try:
-                text = page.get_text("ocr")
-            except Exception:
-                print(
-                    f"[PyMuPDF OCR] Page {page_num}: OCR Failed - retrying with language…"
-                )
-                try:
-                    text = page.get_text("ocr", ocr_language="eng")
-                except Exception:
-                    print(f"[PyMuPDF OCR] Page {page_num}: OCR Failed - Skipped")
-                    text = ""
+                text = ocr_with_easyocr(page)
+            except Exception as e:
+                print(f"[EasyOCR] Page {page_num}: failed ({e})")
+                text = ""
 
         # 2.5 Skip page if final text is empty
         if len(text.strip()) == 0:

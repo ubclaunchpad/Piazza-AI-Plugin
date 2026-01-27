@@ -13,3 +13,6 @@ langchain-openai
 langchain-groq
 langchain-postgres==0.0.16
 pgvector
+
+
+easyocr
