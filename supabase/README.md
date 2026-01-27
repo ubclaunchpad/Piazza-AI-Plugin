@@ -1,86 +1,73 @@
-# Supabase Local Development Guide
+# Supabase Cloud Development Guide
 
 This folder contains Supabase configuration and database migrations for the Piazza AI Plugin project.
 
+> **Note**: This project uses a **cloud-hosted Supabase instance**. The instructions below are for managing migrations and connecting to your cloud project. If you're looking for local development with Docker, that's not the current setup.
+
 ## ⚠️ Prerequisites
 
-**Docker Desktop must be running** before using any Supabase commands. Supabase runs all its services (PostgreSQL, Studio, etc.) in Docker containers.
-
-1. Install [Docker Desktop](https://www.docker.com/products/docker-desktop/) if you haven't already
-2. Start Docker Desktop application
-3. Verify Docker is running: `docker --version`
+1. **Supabase Cloud Project**: Create a project at https://supabase.com/dashboard
+2. **Supabase CLI**: Install the CLI for managing migrations
+   ```bash
+   npm install -g supabase
+   # or
+   brew install supabase/tap/supabase
+   ```
+3. **Link Your Project**: Link this local folder to your cloud project (see setup below)
 
 ## 🚀 Quick Reference
 
 ### Getting Your Connection Details
 
-First, make sure Supabase is running and check the status (your first time running the start command may take a while because supabase is downloading the docker images):
+Get your connection details from the Supabase Dashboard:
+
+1. **Navigate to your project** at https://supabase.com/dashboard
+2. **Go to Project Settings** (gear icon in sidebar)
+3. **Database section** → Connection String → Copy the URI format
+4. **API section** → Copy Project URL, anon key, and service_role key
+
+### Using the Values in Your .env File
+
+Add these to your `backend/.env` file:
 
 ```bash
-supabase start
-supabase status
+# From Project Settings → Database → Connection String (URI)
+DATABASE_URL=postgresql://postgres:[YOUR-PASSWORD]@db.[YOUR-PROJECT-REF].supabase.co:5432/postgres
+
+# From Project Settings → API → Project URL
+SUPABASE_URL=https://[YOUR-PROJECT-REF].supabase.co
+
+# From Project Settings → API → Project API keys → anon public
+SUPABASE_ANON_KEY=your_anon_key_from_dashboard
+
+# From Project Settings → API → Project API keys → service_role secret
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_from_dashboard
 ```
 
-Example output from `supabase status`:
+### Supabase Studio (Database Management)
 
-```
-supabase local development setup is running.
-
-         API URL: http://127.0.0.1:54321
-     GraphQL URL: http://127.0.0.1:54321/graphql/v1
-  S3 Storage URL: http://127.0.0.1:54321/storage/v1/s3
-         MCP URL: http://127.0.0.1:54321/mcp
-    Database URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
-      Studio URL: http://127.0.0.1:54323
-     Mailpit URL: http://127.0.0.1:54324
- Publishable key: eyJ[...truncated...]
-      Secret key: eyJ[...truncated...]
-   S3 Access Key: 625729a08b95bf1b7ff351a663f3a23c
-   S3 Secret Key: 850181e4652dd023b7a98c58ae0d2d34bd487ee0cc3254aed6eda37307425907
-       S3 Region: local
-```
-
-### Using the Output in Your .env File
-
-Copy the values from your `supabase status` output:
-
-```bash
-# From "Database URL" line
-DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres
-
-# From "API URL" line
-SUPABASE_URL=http://127.0.0.1:54321
-
-# From "Publishable key" line (copy the full key)
-SUPABASE_ANON_KEY=your_publishable_key_from_status_output
-
-# From "Secret key" line (copy the full key)
-SUPABASE_SERVICE_ROLE_KEY=your_secret_key_from_status_output
-```
-
-### Studio URL (Database Management)
-
-Use the **Studio URL** from your `supabase status` output (typically `http://127.0.0.1:54323`) to access the Supabase Studio for visual database management, running queries, and inspecting data.
+Access the Supabase Studio for visual database management:
+- **URL**: https://supabase.com/dashboard/project/[YOUR-PROJECT-REF]
+- Navigate to "Table Editor", "SQL Editor", or "Database" sections
+- Run queries, inspect data, and manage your schema visually
 
 ## 📋 Essential Supabase CLI Commands
 
 ### Project Management
 
 ```bash
-# Start Supabase local development
-supabase start
+# Link to your cloud Supabase project (run once)
+supabase link
 
-# Stop Supabase local development
-supabase stop
+# Check project status
+# Note: For cloud projects, use the dashboard at https://supabase.com/dashboard
+# Or check platform status at https://status.supabase.com
 
-# Check status of local services
-supabase status
+# Pull remote schema changes
+supabase db pull
 
-# Reset local database (⚠️ destroys all data)
-supabase db reset
-
-# Stop and remove all containers
-supabase stop --no-backup
+# Reset remote database (⚠️ destroys all data - use with extreme caution)
+supabase db reset --linked
 ```
 
 ### Database Migrations
@@ -100,47 +87,44 @@ supabase migration new "update_user_permissions"
 #### Running Migrations
 
 ```bash
-# Apply all pending migrations to local database
-supabase migration up --local
-
-# Apply migrations to remote database (production)
-supabase migration up
-
-# Rollback last migration (local)
-supabase migration down --local
+# Apply all pending migrations to linked cloud database
+supabase migration up --linked
 
 # Check migration status
 supabase migration list
+
+# Note: Always test migrations carefully before applying to production
+# Consider creating a staging project for testing migrations first
 ```
 
 #### Database Schema Management
 
 ```bash
-# Generate migration from current database state
-supabase db diff --local
+# Generate migration from remote database changes
+supabase db diff --linked
 
-# Generate TypeScript types from database
-supabase gen types typescript --local > types/database.types.ts
+# Generate TypeScript types from linked cloud database
+supabase gen types typescript --linked > types/database.types.ts
 
-# Reset database to latest migration state
-supabase db reset --local
+# Pull remote schema to local migration files
+supabase db pull
 ```
 
 ### Development Workflow
 
 ```bash
-# Full development setup (run once)
-supabase start
-supabase migration up --local
+# Initial setup (run once)
+cd supabase
+supabase link
+supabase migration up --linked
 
-# Daily development (if containers stopped)
-supabase start
+# After pulling new migrations from git
+supabase migration up --linked
 
-# After pulling new migrations
-supabase migration up --local
-
-# Before pushing schema changes
-supabase db diff --local > migrations/new_migration.sql
+# Before committing schema changes
+supabase db diff --linked > migrations/$(date +%Y%m%d%H%M%S)_description.sql
+# Review the generated migration file, then apply it
+supabase migration up --linked
 ```
 
 ## 🗂️ Folder Structure
@@ -178,17 +162,19 @@ Initial data inserted after migrations run. Use for:
 
 ### Using Studio (Recommended)
 
-1. Open http://127.0.0.1:54323
+1. Go to https://supabase.com/dashboard/project/[YOUR-PROJECT-REF]
 2. Navigate through tables, run queries, manage data
 3. Visual interface for schema management
+4. Access Table Editor, SQL Editor, Database sections
 
 ### Using SQL Editor
 
 ```bash
-# Connect with psql
-psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+# Connect with psql using your cloud connection string
+psql "postgresql://postgres:[YOUR-PASSWORD]@db.[YOUR-PROJECT-REF].supabase.co:5432/postgres"
 
-# Or use any PostgreSQL client with the connection string above
+# Or use any PostgreSQL client with your DATABASE_URL from .env
+# Or use the SQL Editor in the Supabase Dashboard (recommended)
 ```
 
 ## 🔄 Common Migration Patterns
@@ -242,26 +228,26 @@ CREATE INDEX idx_users_created_at ON users(created_at);
 
 ### Environment Variables
 
-Make sure your `.env` file includes:
+Make sure your `backend/.env` file includes your cloud project credentials:
 
 ```bash
-# Database
-DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres
+# Database (from Supabase Dashboard → Project Settings → Database)
+DATABASE_URL=postgresql://postgres:[YOUR-PASSWORD]@db.[YOUR-PROJECT-REF].supabase.co:5432/postgres
 
-# Supabase
-SUPABASE_URL=http://127.0.0.1:54321
-SUPABASE_ANON_KEY=your_anon_key_here
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
+# Supabase (from Supabase Dashboard → Project Settings → API)
+SUPABASE_URL=https://[YOUR-PROJECT-REF].supabase.co
+SUPABASE_ANON_KEY=your_anon_key_from_dashboard
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_from_dashboard
 ```
 
-### Port Configuration
+### Checking Project Status
 
-Default ports (configurable in config.toml):
+Since you're using a cloud Supabase instance, the `supabase status` CLI command won't work (it's only for local Docker setups).
 
-- **API**: 54321
-- **Database**: 54322
-- **Studio**: 54323
-- **Mailpit**: 54324
+**To check your cloud project status:**
+- **Dashboard**: Visit https://supabase.com/dashboard → Select your project → Check "Project Status" section
+- **Platform Status**: Visit https://status.supabase.com for overall Supabase platform health
+- **Programmatically**: Make a test API call to your project endpoints
 
 ## 🔗 Useful Links
 
@@ -274,15 +260,17 @@ Default ports (configurable in config.toml):
 
 ### Common Issues
 
-**Services won't start:**
+**Connection issues:**
 
 ```bash
-# Check if ports are in use
-lsof -i :54321 -i :54322 -i :54323 -i :54324
+# Verify your project is linked
+supabase link --project-ref [YOUR-PROJECT-REF]
 
-# Force stop and restart
-supabase stop --no-backup
-supabase start
+# Check migration status
+supabase migration list
+
+# Test connection from backend
+python ../backend/test_supabase_connection.py
 ```
 
 **Migration errors:**
@@ -291,20 +279,19 @@ supabase start
 # Check migration status
 supabase migration list
 
-# Reset and reapply
-supabase db reset --local
-supabase migration up --local
+# Pull current remote state
+supabase db pull
+
+# If needed, reset remote database (⚠️ DESTROYS ALL DATA)
+supabase db reset --linked
 ```
 
-**Connection issues:**
+**Project health issues:**
 
-```bash
-# Verify services are running
-supabase status
-
-# Test connection
-python ../backend/test_supabase_connection.py
-```
+- Check your project status in the Supabase dashboard
+- Visit https://status.supabase.com for platform-wide issues
+- Verify your IP is whitelisted (if connection pooling is restricted)
+- Check database resources aren't exhausted (CPU, memory, connections)
 
 ---
 

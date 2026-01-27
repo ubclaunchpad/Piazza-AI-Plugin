@@ -3,6 +3,40 @@ import ReactMarkdown from "react-markdown";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
+import rehypeRaw from "rehype-raw";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
+
+function SourcesDropdown({ sources, threadId }) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="mt-1 ml-1">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="text-xs text-purple-600 hover:text-purple-800 bg-transparent border-none cursor-pointer flex items-center gap-1 p-0 font-medium transition-colors"
+      >
+        {isOpen ? "▼" : "▶"} Sources ({sources.length})
+      </button>
+
+      {isOpen && (
+        <div className="mt-1 ml-2 flex flex-col gap-1 animate-fadeIn">
+          {sources.map((source, idx) => (
+            <a
+              key={idx}
+              href={`https://piazza.com/class/${threadId}/post/${source}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-blue-600 hover:text-purple-600 hover:underline transition-colors block"
+            >
+              Post {source}
+            </a>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function ChatbotApp() {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -13,44 +47,62 @@ function ChatbotApp() {
   const chatRef = useRef(null);
   const messagesEndRef = useRef(null);
 
-  // Handle clicking outside (works with Shadow DOM)
+  const [sessionId, setSessionId] = useState(null);
+  const [sessionTitle, setSessionTitle] = useState(null);
+  const [user, setUser] = useState(null);
+
+  // Fetch user info on mount
   useEffect(() => {
-    function handleClickOutside(event) {
-      if (chatRef.current && !chatRef.current.contains(event.target)) {
-        setIsExpanded(false);
+    /* global chrome */
+    chrome.storage.local.get(["user", "authToken", "tokenExpiry"], (result) => {
+      if (result.user && result.authToken) {
+        // Check if token is expired
+        if (result.tokenExpiry && Date.now() > result.tokenExpiry) {
+          console.warn("Token expired");
+          setMessages([
+            {
+              role: "assistant",
+              content:
+                "Session expired. Please open the extension icon to log in again.",
+            },
+          ]);
+          return;
+        }
+        setUser({ ...result.user, access_token: result.authToken });
       }
-    }
+    });
 
-    if (isExpanded) {
-      // Add listener to the shadow root where the component lives
-      const shadowRoot = chatRef.current?.getRootNode();
-
-      // Small delay to prevent the click that opens the chat from immediately triggering the close
-      const timer = setTimeout(() => {
-        if (shadowRoot) {
-          shadowRoot.addEventListener("mousedown", handleClickOutside);
+    // Listen for messages from popup
+    const messageListener = (request, sender, sendResponse) => {
+      if (request.type === "OPEN_CHAT_SESSION") {
+        setSessionId(request.sessionId);
+        if (request.title) {
+          setSessionTitle(request.title);
         }
-      }, 100);
+        setIsExpanded(true);
+      }
+    };
+    chrome.runtime.onMessage.addListener(messageListener);
+    return () => chrome.runtime.onMessage.removeListener(messageListener);
+  }, []);
 
-      return () => {
-        clearTimeout(timer);
-        if (shadowRoot) {
-          shadowRoot.removeEventListener("mousedown", handleClickOutside);
-        }
-      };
-    }
-  }, [isExpanded]);
-
-  // Auto-scroll to bottom
+  // Fetch most recent session or messages when needed
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    if (isExpanded && user && !sessionId) {
+      fetchMostRecentSession();
+    } else if (isExpanded && user && sessionId) {
+      fetchMessages(sessionId);
+    }
+  }, [isExpanded, user, sessionId]);
 
   const handleToggle = () => {
     setIsExpanded(!isExpanded);
   };
 
-  // Convert LaTeX notation to markdown math format
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
   const convertLatexToMarkdown = (text) => {
     // Replace display math: \[ ... \] -> $$...$$
     let converted = text.replace(
@@ -70,6 +122,146 @@ function ChatbotApp() {
 
     return converted;
   };
+  const handleAuthError = () => {
+    setMessages((prev) => [
+      ...prev,
+      {
+        role: "assistant",
+        content:
+          "Authentication failed. Please open the extension icon to log in again.",
+      },
+    ]);
+    // Optionally clear user state
+    // setUser(null);
+  };
+
+  const fetchMostRecentSession = async () => {
+    try {
+      const threadIdMatch = window.location.pathname.match(/\/class\/([^/?]+)/);
+      const threadId = threadIdMatch ? threadIdMatch[1] : null;
+      if (!threadId) return;
+
+      const API_ENDPOINT =
+        process.env.API_ENDPOINT || "http://localhost:8000/api/v1";
+      const response = await fetch(
+        `${API_ENDPOINT}/chat-sessions?piazza_course_id=${threadId}`,
+        {
+          headers: { Authorization: `Bearer ${user.access_token}` },
+        }
+      );
+
+      if (response.status === 401) {
+        handleAuthError();
+        return;
+      }
+
+      if (response.ok) {
+        const sessions = await response.json();
+        if (sessions.length > 0) {
+          setSessionId(sessions[0].id);
+          setSessionTitle(sessions[0].title);
+        } else {
+          // Create a new session automatically if none exist?
+          // Or just let the first message create it?
+          // For now, let's create one.
+          createNewSession(threadId);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching sessions:", error);
+    }
+  };
+
+  const createNewSession = async (courseId) => {
+    try {
+      const API_ENDPOINT =
+        process.env.API_ENDPOINT || "http://localhost:8000/api/v1";
+      const response = await fetch(`${API_ENDPOINT}/chat-sessions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${user.access_token}`,
+        },
+        body: JSON.stringify({
+          piazza_course_id: courseId,
+          title: "New Chat",
+        }),
+      });
+
+      if (response.status === 401) {
+        handleAuthError();
+        return;
+      }
+
+      if (response.ok) {
+        const newChat = await response.json();
+        setSessionId(newChat.id);
+        setSessionTitle(newChat.title);
+      }
+    } catch (error) {
+      console.error("Error creating session:", error);
+    }
+  };
+
+  const fetchMessages = async (sid) => {
+    setIsLoading(true);
+    try {
+      const API_ENDPOINT =
+        process.env.API_ENDPOINT || "http://localhost:8000/api/v1";
+      const response = await fetch(
+        `${API_ENDPOINT}/chat-sessions/${sid}/messages`,
+        {
+          headers: { Authorization: `Bearer ${user.access_token}` },
+        }
+      );
+
+      if (response.status === 401) {
+        handleAuthError();
+        return;
+      }
+
+      if (response.ok) {
+        const data = await response.json();
+        // Transform messages to UI format
+        const formattedMessages = data.map((msg) => {
+          const content = msg.message.data
+            ? msg.message.data.content
+            : msg.message.content;
+          const type = msg.message.type;
+
+          // Extract sources from metadata
+          let sources = [];
+          if (type === "ai") {
+            const metadata = msg.message.data
+              ? msg.message.data.response_metadata
+              : msg.message.response_metadata;
+            if (metadata && metadata.sources) {
+              sources = metadata.sources;
+            }
+          }
+
+          // Get current threadId from URL for links
+          const threadIdMatch =
+            window.location.pathname.match(/\/class\/([^/?]+)/);
+          const currentThreadId = threadIdMatch ? threadIdMatch[1] : null;
+
+          return {
+            role: type === "human" ? "user" : "assistant",
+            content: content,
+            sources: sources,
+            threadId: currentThreadId,
+          };
+        });
+        setMessages(formattedMessages);
+        // Scroll to bottom after loading messages
+        setTimeout(scrollToBottom, 100);
+      }
+    } catch (error) {
+      console.error("Error fetching messages:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -83,35 +275,110 @@ function ChatbotApp() {
     setIsLoading(true);
 
     try {
+      // Extract thread_id (network_id) from URL
+      const threadIdMatch = window.location.pathname.match(/\/class\/([^/?]+)/);
+      const threadId = threadIdMatch ? threadIdMatch[1] : null;
+
+      if (!threadId) {
+        throw new Error("Could not determine course ID from URL");
+      }
+
+      // Ensure we have a session
+      let currentSessionId = sessionId;
+      if (!currentSessionId) {
+        // Should have been created by fetchMostRecentSession, but just in case
+        await createNewSession(threadId);
+        // We can't easily wait for state update here, so we might fail this first request's history
+        // But fetchMostRecentSession is called on expand, so it should be fine.
+      }
+
       // Call the backend API
       const API_ENDPOINT =
         process.env.API_ENDPOINT || "http://localhost:8000/api/v1";
+
       const response = await fetch(`${API_ENDPOINT}/llm/query`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${user?.access_token}`,
         },
-        body: JSON.stringify({ query: userMessage }),
+        body: JSON.stringify({
+          query: userMessage,
+          thread_id: threadId,
+          session_id: sessionId, // Pass the session ID
+        }),
       });
+
+      if (response.status === 401) {
+        handleAuthError();
+        return;
+      }
 
       if (!response.ok) {
         throw new Error(`API error: ${response.status}`);
       }
 
-      const data = await response.json();
-
-      // Convert LaTeX notation and add AI response
-      const convertedContent = convertLatexToMarkdown(data.response);
-      console.log("Original:", data.response);
-      console.log("Converted:", convertedContent);
-
+      // Initialize empty AI message
       setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
-          content: convertedContent,
+          content: "",
+          sources: [],
+          threadId: threadId,
         },
       ]);
+
+      // Read the stream
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let aiResponseContent = "";
+      let aiSources = [];
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split("\n").filter((line) => line.trim() !== "");
+
+        for (const line of lines) {
+          try {
+            const data = JSON.parse(line);
+
+            if (data.type === "content") {
+              aiResponseContent += data.content;
+
+              // Update the last message with new content
+              setMessages((prev) => {
+                const newMessages = [...prev];
+                const lastMsg = newMessages[newMessages.length - 1];
+                if (lastMsg.role === "assistant") {
+                  lastMsg.content = convertLatexToMarkdown(aiResponseContent);
+                }
+                return newMessages;
+              });
+
+              // Scroll to bottom periodically or on every chunk
+              scrollToBottom();
+            } else if (data.type === "sources") {
+              aiSources = data.sources;
+
+              // Update sources
+              setMessages((prev) => {
+                const newMessages = [...prev];
+                const lastMsg = newMessages[newMessages.length - 1];
+                if (lastMsg.role === "assistant") {
+                  lastMsg.sources = aiSources;
+                }
+                return newMessages;
+              });
+            }
+          } catch (e) {
+            console.error("Error parsing JSON chunk", e);
+          }
+        }
+      }
     } catch (error) {
       console.error("Failed to get AI response:", error);
 
@@ -140,7 +407,7 @@ function ChatbotApp() {
           onMouseLeave={() => setIsHovered(false)}
         >
           <div className="flex items-center p-3 gap-2">
-            <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-purple-700 rounded-full flex-shrink-0"></div>
+            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-700 rounded-full flex-shrink-0"></div>
             {isHovered && (
               <span className="text-white font-semibold text-sm whitespace-nowrap transition-all duration-300">
                 Ask AI!
@@ -153,8 +420,15 @@ function ChatbotApp() {
           className="bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-slideUp"
           style={{ width: "50vw", height: "70vh" }}
         >
-          <div className="bg-gradient-to-r from-purple-500 to-purple-700 text-white px-5 py-4 flex justify-between items-center">
-            <h3 className="m-0 text-base font-semibold">AI Assistant</h3>
+          <div className="bg-gradient-to-r from-blue-600 to-blue-800 text-white px-5 py-4 flex justify-between items-center">
+            <div className="flex flex-col">
+              <h3 className="m-0 text-base font-semibold">AI Assistant</h3>
+              {sessionTitle && sessionTitle !== "New Chat" && (
+                <span className="text-xs opacity-80 font-medium truncate max-w-[200px]">
+                  {sessionTitle}
+                </span>
+              )}
+            </div>
             <button
               className="bg-white/20 border-none text-white w-7 h-7 rounded-full cursor-pointer text-base flex items-center justify-center transition-colors hover:bg-white/30"
               onClick={() => setIsExpanded(false)}
@@ -172,14 +446,14 @@ function ChatbotApp() {
               messages.map((msg, idx) => (
                 <div
                   key={idx}
-                  className={`flex mb-2 ${
-                    msg.role === "user" ? "justify-end" : "justify-start"
+                  className={`flex mb-2 flex-col ${
+                    msg.role === "user" ? "items-end" : "items-start"
                   }`}
                 >
                   <div
                     className={`max-w-[80%] px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed break-words ${
                       msg.role === "user"
-                        ? "bg-gradient-to-br from-purple-500 to-purple-700 text-white rounded-br-sm"
+                        ? "bg-gradient-to-br from-blue-500 to-blue-700 text-white rounded-br-sm"
                         : "bg-white text-gray-800 rounded-bl-sm shadow-sm"
                     }`}
                   >
@@ -187,7 +461,7 @@ function ChatbotApp() {
                       <div className="prose prose-sm max-w-none">
                         <ReactMarkdown
                           remarkPlugins={[remarkMath, remarkGfm]}
-                          rehypePlugins={[rehypeKatex]}
+                          rehypePlugins={[rehypeKatex, rehypeRaw]}
                           components={{
                             // Customize code blocks
                             code: ({
@@ -197,20 +471,43 @@ function ChatbotApp() {
                               children,
                               ...props
                             }) => {
-                              return inline ? (
+                              const isInline =
+                                inline ||
+                                (node &&
+                                  node.position &&
+                                  node.position.start.line ===
+                                    node.position.end.line);
+                              const match = /language-(\w+)/.exec(
+                                className || ""
+                              );
+
+                              return !isInline && match ? (
+                                <SyntaxHighlighter
+                                  style={vscDarkPlus}
+                                  language={match[1]}
+                                  PreTag="div"
+                                  className="rounded-md text-xs"
+                                  {...props}
+                                >
+                                  {String(children).replace(/\n$/, "")}
+                                </SyntaxHighlighter>
+                              ) : isInline ? (
                                 <code
-                                  className="bg-purple-50 text-purple-600 px-1 py-0.5 rounded text-xs inline"
+                                  className="bg-blue-50 text-blue-600 px-1 py-0.5 rounded text-xs inline-block"
                                   {...props}
                                 >
                                   {children}
                                 </code>
                               ) : (
-                                <code
-                                  className="block bg-gray-100 text-gray-800 p-2 rounded text-xs overflow-x-auto"
+                                <SyntaxHighlighter
+                                  style={vscDarkPlus}
+                                  language="text"
+                                  PreTag="div"
+                                  className="rounded-md text-xs"
                                   {...props}
                                 >
-                                  {children}
-                                </code>
+                                  {String(children).replace(/\n$/, "")}
+                                </SyntaxHighlighter>
                               );
                             },
                             // Customize paragraphs
@@ -285,15 +582,32 @@ function ChatbotApp() {
                       msg.content
                     )}
                   </div>
+                  {msg.role === "assistant" &&
+                    msg.sources &&
+                    msg.sources.length > 0 && (
+                      <SourcesDropdown
+                        sources={msg.sources}
+                        threadId={msg.threadId}
+                      />
+                    )}
                 </div>
               ))
             )}
             {isLoading && (
               <div className="flex justify-start mb-2">
                 <div className="bg-white px-3.5 py-3 rounded-2xl rounded-bl-sm shadow-sm flex gap-1">
-                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounceDot [animation-delay:-0.32s]"></span>
-                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounceDot [animation-delay:-0.16s]"></span>
-                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounceDot"></span>
+                  <span
+                    className="w-2 h-2 bg-gray-400 rounded-full animate-bounceDot"
+                    style={{ animationDelay: "0s" }}
+                  ></span>
+                  <span
+                    className="w-2 h-2 bg-gray-400 rounded-full animate-bounceDot"
+                    style={{ animationDelay: "0.15s" }}
+                  ></span>
+                  <span
+                    className="w-2 h-2 bg-gray-400 rounded-full animate-bounceDot"
+                    style={{ animationDelay: "0.3s" }}
+                  ></span>
                 </div>
               </div>
             )}
@@ -309,12 +623,12 @@ function ChatbotApp() {
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               placeholder="Type your message..."
-              className="flex-1 border border-gray-200 rounded-full px-4 py-2.5 text-sm outline-none transition-colors focus:border-purple-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+              className="flex-1 border border-gray-200 rounded-full px-4 py-2.5 text-sm outline-none transition-colors focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
               disabled={isLoading}
             />
             <button
               type="submit"
-              className="w-10 h-10 rounded-full border-none bg-gradient-to-br from-purple-500 to-purple-700 text-white text-lg cursor-pointer flex items-center justify-center flex-shrink-0 transition-transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-10 h-10 rounded-full border-none bg-gradient-to-br from-blue-500 to-blue-700 text-white text-lg cursor-pointer flex items-center justify-center flex-shrink-0 transition-transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={!inputValue.trim() || isLoading}
             >
               &rarr;

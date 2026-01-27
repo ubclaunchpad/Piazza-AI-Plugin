@@ -1,7 +1,7 @@
 CREATE TYPE validation_label_enum AS ENUM ('SUPPORTED', 'MIXED', 'CONTRADICTED');
 
 CREATE TABLE summary_cache (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     post_id UUID,
     thread_id UUID NOT NULL,
     summary_text TEXT NOT NULL,

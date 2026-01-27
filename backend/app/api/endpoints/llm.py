@@ -3,25 +3,28 @@ LLM API endpoint for text generation.
 """
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
 
-from app.models import QueryRequest, QueryResponse
-from app.textGeneration import get_llm_response
+from app.models import QueryRequest
+from app.textGeneration import stream_llm_response
 
 router = APIRouter()
 
 
-@router.post("/query", response_model=QueryResponse)
+@router.post("/query")
 async def generate_llm_response(request: QueryRequest):
-    """Generate an LLM response to a user query."""
+    """Generate an LLM response to a user query (Streaming)."""
     try:
-        response = get_llm_response(request.query)
-
-        return QueryResponse(
-            query=request.query,
-            response=response.content,
-            model=response.model,
+        return StreamingResponse(
+            stream_llm_response(
+                query=request.query,
+                thread_id=request.thread_id,
+                session_id=request.session_id,
+            ),
+            media_type="application/x-ndjson",
         )
     except Exception as e:
+        print(e)
         raise HTTPException(
             status_code=500,
             detail=f"Failed to generate response: {str(e)}",

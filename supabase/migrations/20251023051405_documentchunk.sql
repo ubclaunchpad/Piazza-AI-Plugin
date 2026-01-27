@@ -1,5 +1,5 @@
 CREATE TABLE document_chunks (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     document_id UUID NOT NULL,
     thread_id UUID NOT NULL,
     chunk_index INTEGER NOT NULL DEFAULT 0,
