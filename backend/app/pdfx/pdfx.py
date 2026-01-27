@@ -73,7 +73,7 @@ def ocr_with_easyocr(page):
     return "\n".join(lines)
 
 
-def extract_pdf_pymupdf(path: str, ocr_threshold=40, page_range=None):
+def extract_pdf_pymupdf(path: str, ocr_threshold=40, page_range=None, use_ocr=True):
     """
     Extract and process text using PyMuPDF.
     Only pages in `page_range` (1-indexed inclusive) are processed.
@@ -113,7 +113,7 @@ def extract_pdf_pymupdf(path: str, ocr_threshold=40, page_range=None):
         total_word_count += page_wc
 
         # 2. OCR fallback
-        if len(text.strip()) < ocr_threshold:
+        if len(text.strip()) < ocr_threshold and use_ocr:
             print(f"[EasyOCR] Page {page_num}: low text → OCR")
             used_ocr = True
 
@@ -184,10 +184,10 @@ def extract_pdf_pymupdf(path: str, ocr_threshold=40, page_range=None):
     }
 
 
-def run_extraction(input_path, out_dir, page_range=None):
+def run_extraction(input_path, out_dir, page_range=None, use_ocr=True, ocr_threshold=40):
     """Extraction wrapper for CLI"""
 
-    result = extract_pdf_pymupdf(path=input_path, page_range=page_range)
+    result = extract_pdf_pymupdf(path=input_path, page_range=page_range, use_ocr=use_ocr, ocr_threshold=ocr_threshold)
 
     # Output filename = doc_uuid.json
     out_path = f"{out_dir}/{result['doc_uuid']}.json"
@@ -208,6 +208,20 @@ def parse_page_range(r):
         raise argparse.ArgumentTypeError("Page range must be like 5-12")
 
 
+def str2bool(v):
+    """Parse common truthy/falsy strings into bool for argparse."""
+    if isinstance(v, bool):
+        return v
+    if v is None:
+        return True
+    s = str(v).strip().lower()
+    if s in ("yes", "y", "true", "t", "1"):
+        return True
+    if s in ("no", "n", "false", "f", "0"):
+        return False
+    raise argparse.ArgumentTypeError("Boolean value expected (true/false)")
+
+
 def main():
     """Script Input"""
     parser = argparse.ArgumentParser(
@@ -222,6 +236,16 @@ def main():
     p_extract.add_argument("--out", required=True, help="Output directory")
     p_extract.add_argument("--page-range", type=parse_page_range, help="e.g. 3-10")
 
+    # single --ocr argument that accepts optional true/false value
+    p_extract.add_argument(
+        "--ocr",
+        nargs="?",
+        const=True,
+        default=True,
+        type=str2bool,
+        help="Enable/disable OCR. Use '--ocr false' to disable; default is enabled.",
+    )
+
     args = parser.parse_args()
 
     if args.command == "extract":
@@ -233,7 +257,10 @@ def main():
 
         try:
             result = run_extraction(
-                input_path=args.input, out_dir=args.out, page_range=args.page_range
+                input_path=args.input,
+                out_dir=args.out,
+                page_range=args.page_range,
+                use_ocr=bool(args.ocr),
             )
 
             # Decide return code

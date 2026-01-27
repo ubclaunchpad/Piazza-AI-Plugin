@@ -1,8 +1,7 @@
-from pathlib import Path
 import json
+from pathlib import Path
 
 from app.pdfx.pdfx import extract_pdf_pymupdf, run_extraction
-
 
 OCR_PATH = "tests/pdfx_docs/ocr.pdf"
 
