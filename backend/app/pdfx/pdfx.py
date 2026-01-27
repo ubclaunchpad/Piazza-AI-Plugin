@@ -184,10 +184,17 @@ def extract_pdf_pymupdf(path: str, ocr_threshold=40, page_range=None, use_ocr=Tr
     }
 
 
-def run_extraction(input_path, out_dir, page_range=None, use_ocr=True, ocr_threshold=40):
+def run_extraction(
+    input_path, out_dir, page_range=None, use_ocr=True, ocr_threshold=40
+):
     """Extraction wrapper for CLI"""
 
-    result = extract_pdf_pymupdf(path=input_path, page_range=page_range, use_ocr=use_ocr, ocr_threshold=ocr_threshold)
+    result = extract_pdf_pymupdf(
+        path=input_path,
+        page_range=page_range,
+        use_ocr=use_ocr,
+        ocr_threshold=ocr_threshold,
+    )
 
     # Output filename = doc_uuid.json
     out_path = f"{out_dir}/{result['doc_uuid']}.json"
