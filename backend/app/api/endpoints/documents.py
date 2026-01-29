@@ -80,7 +80,14 @@ async def upload_document(
             )
 
         # Read file content
-        file_content = await file.read()
+        try:
+            file_content = await file.read()
+        except Exception as e:
+            logger.error(f"Failed to read uploaded file: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Failed to read uploaded file. The file may be corrupted or the upload was interrupted.",
+            )
         file_size = len(file_content)
         file_type = file.content_type or "application/octet-stream"
         file_name = file.filename or "unnamed_file"
@@ -278,6 +285,13 @@ async def get_document_download_url(document_id: str, expires_in: int = 3600):
                 status_code=status.HTTP_404_NOT_FOUND, detail="Document not found"
             )
 
+        # Validate expires_in
+        if expires_in <= 0 or expires_in > 86400:  # Max 24 hours
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="expires_in must be between 1 and 86400 seconds (24 hours)",
+            )
+
         # Generate signed URL
         signed_url = await get_signed_url(
             storage_ref=document["storage_ref"], expires_in=expires_in
@@ -342,8 +356,10 @@ async def delete_document(document_id: str):
         try:
             await delete_file(document["storage_ref"])
         except StorageError as e:
-            logger.warning(
-                f"Failed to delete from storage (continuing with DB delete): {e}"
+            logger.error(f"Failed to delete from storage, aborting DB delete: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to delete file from storage: {e}",
             )
 
         # Delete from database
