@@ -64,6 +64,7 @@ def get_supabase_client() -> Client:
 
     return _supabase_client
 
+
 def create_bucket(bucket_name: str) -> bool:
     """
     Create a new storage bucket in Supabase.
@@ -81,6 +82,7 @@ def create_bucket(bucket_name: str) -> bool:
     except Exception as e:
         logger.error(f"Failed to create bucket '{bucket_name}': {e}")
         raise StorageError(f"Failed to create bucket '{bucket_name}': {e}")
+
 
 def generate_storage_path(uploader_id: str, file_name: str) -> str:
     """

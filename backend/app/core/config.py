@@ -47,7 +47,6 @@ class Settings(BaseSettings):
     # Note: serve the static confirmation page at /confirm-email.html (file lives in frontend/public)
     EMAIL_CONFIRM_REDIRECT_URL: str = "http://127.0.0.1:3000/confirm-email.html"
 
-
     # File Upload Configuration
     MAX_FILE_SIZE: int = 10 * 1024 * 1024  # 10MB default
     ALLOWED_FILE_TYPES: List[str] = [
