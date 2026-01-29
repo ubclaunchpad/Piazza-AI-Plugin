@@ -1,7 +1,7 @@
 CREATE TYPE permission_enum as ENUM ('private', 'thread', 'instructor');
 
 CREATE TABLE documents(
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     thread_id UUID NOT NULL,
     uploader_id UUID NOT NULL,
     file_name VARCHAR(255),

@@ -1,6 +1,38 @@
 import { useEffect, useState } from "react";
 
 /* global chrome */
+function IngestionStatus({ status }) {
+  if (!status) return null;
+
+  const percentage =
+    status.total_posts_count > 0
+      ? Math.round(
+          (status.ingested_posts_count / status.total_posts_count) * 100
+        )
+      : 0;
+
+  return (
+    <div className="flex flex-col gap-1 mt-2 p-2 bg-gray-50 rounded-md border border-gray-200">
+      <div className="flex justify-between items-center text-xs">
+        <span className="font-medium text-gray-700">Ingestion Status</span>
+        <span className="font-bold text-blue-600">{percentage}%</span>
+      </div>
+      <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+        <div
+          className="bg-blue-500 h-full rounded-full transition-all duration-500"
+          style={{ width: `${percentage}%` }}
+        />
+      </div>
+      <div className="flex justify-between text-[10px] text-gray-500">
+        <span>
+          {status.ingested_posts_count} / {status.total_posts_count} posts
+        </span>
+        <span>Last ID: {status.last_ingested_post_id}</span>
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardPage({
   user,
   onLogout,
@@ -9,10 +41,83 @@ export default function DashboardPage({
   const [currentTab, setCurrentTab] = useState(null);
   const [piazzaInfo, setPiazzaInfo] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isIngesting, setIsIngesting] = useState(false);
+  const [ingestionStatus, setIngestionStatus] = useState(null);
+  const [dailyQueries, setDailyQueries] = useState(0);
 
   useEffect(() => {
     getCurrentTabInfo();
+    fetchDailyQueries();
   }, []);
+
+  // Poll for ingestion status if we have a class ID
+  useEffect(() => {
+    let interval;
+    if (piazzaInfo?.classId) {
+      fetchIngestionStatus(piazzaInfo.classId);
+      interval = setInterval(
+        () => fetchIngestionStatus(piazzaInfo.classId),
+        10000
+      );
+    }
+    return () => clearInterval(interval);
+  }, [piazzaInfo?.classId]);
+
+  const fetchIngestionStatus = async (classId) => {
+    try {
+      // Get cookie first
+      const [tab] = await chrome.tabs.query({
+        active: true,
+        currentWindow: true,
+      });
+      if (!tab) return;
+
+      const response = await chrome.tabs.sendMessage(tab.id, {
+        type: "GET_PIAZZA_COOKIE",
+      });
+
+      if (response && response.cookie) {
+        const API_ENDPOINT =
+          process.env.API_ENDPOINT || "http://localhost:8000/api/v1";
+        const statusResponse = await fetch(
+          `${API_ENDPOINT}/ingestion/ingest/status`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              thread_id: classId,
+              piazza_cookie: response.cookie,
+            }),
+          }
+        );
+
+        if (statusResponse.ok) {
+          const data = await statusResponse.json();
+          setIngestionStatus(data);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to fetch status:", error);
+    }
+  };
+
+  const fetchDailyQueries = async () => {
+    try {
+      const API_ENDPOINT =
+        process.env.API_ENDPOINT || "http://localhost:8000/api/v1";
+      const response = await fetch(`${API_ENDPOINT}/stats/daily-queries`, {
+        headers: {
+          Authorization: `Bearer ${user.access_token}`,
+        },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setDailyQueries(data.count);
+      }
+    } catch (error) {
+      console.error("Error fetching daily queries:", error);
+    }
+  };
 
   const getCurrentTabInfo = async () => {
     try {
@@ -72,10 +177,73 @@ export default function DashboardPage({
     }
   };
 
+  const handleIngestThread = async () => {
+    if (!piazzaInfo?.classId) {
+      alert("Cannot ingest thread: Missing class ID.");
+      return;
+    }
+
+    setIsIngesting(true); // Start loading state immediately
+
+    try {
+      // Get Piazza cookie from content script
+      const response = await chrome.tabs.sendMessage(currentTab.id, {
+        type: "GET_PIAZZA_COOKIE",
+      });
+
+      if (!response || !response.success || !response.cookie) {
+        throw new Error("Could not retrieve Piazza cookie");
+      }
+
+      console.log(`${process.env.API_ENDPOINT}/ingestion/ingest`);
+      // Call the backend API
+      const apiResponse = await fetch(
+        `${process.env.API_ENDPOINT}/ingestion/ingest`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            thread_id: piazzaInfo.classId,
+            piazza_cookie: response.cookie,
+          }),
+        }
+      );
+
+      if (!apiResponse.ok) {
+        const errorData = await apiResponse.json();
+        throw new Error(errorData.detail || "Failed to start ingestion");
+      }
+
+      const data = await apiResponse.json();
+
+      // Refresh status immediately
+      fetchIngestionStatus(piazzaInfo.classId);
+
+      if (data.status === "started") {
+        alert(
+          "Ingestion started in background. You can continue using the extension."
+        );
+      } else if (data.chunks_processed === 0) {
+        alert("Thread is already up to date! No new posts to ingest.");
+      } else {
+        alert(
+          `Ingestion complete! Processed ${data.chunks_processed} new chunks.`
+        );
+      }
+    } catch (error) {
+      console.error("Error ingesting thread:", error);
+      alert(`Ingestion failed: ${error.message}`);
+    } finally {
+      setIsIngesting(false);
+    }
+  };
+
   return (
     <div className="flex flex-col min-h-[500px]">
       {/* Header */}
-      <div className="bg-gradient-to-r from-purple-500 to-purple-700 p-5 flex items-center justify-between text-white">
+      <div className="bg-gradient-to-r from-blue-500 to-blue-700 p-5 flex items-center justify-between text-white">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center font-bold text-base border-2 border-white/30">
             {user.name?.charAt(0).toUpperCase() || "U"}
@@ -86,11 +254,24 @@ export default function DashboardPage({
           </div>
         </div>
         <button
-          className="bg-white/20 border-none text-white w-8 h-8 rounded-md cursor-pointer text-lg flex items-center justify-center transition-colors hover:bg-white/30"
+          className="bg-white/20 border-none text-white w-8 h-8 rounded-md cursor-pointer flex items-center justify-center transition-colors hover:bg-white/30"
           onClick={handleLogout}
           title="Log out"
         >
-          <span>↗</span>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth={1.5}
+            stroke="currentColor"
+            className="w-5 h-5"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9"
+            />
+          </svg>
         </button>
       </div>
 
@@ -113,7 +294,7 @@ export default function DashboardPage({
 
           {isLoading ? (
             <div className="flex items-center gap-2 p-3 text-gray-600 text-sm">
-              <span className="w-4 h-4 border-2 border-gray-300 border-t-purple-500 rounded-full animate-spin inline-block"></span>
+              <span className="w-4 h-4 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin inline-block"></span>
               <span>Loading...</span>
             </div>
           ) : piazzaInfo?.isPiazza ? (
@@ -142,7 +323,7 @@ export default function DashboardPage({
                     <span className="text-gray-600 font-medium min-w-[70px]">
                       Thread:
                     </span>
-                    <span className="text-gray-900 font-semibold bg-purple-50 px-1.5 py-0.5 rounded">
+                    <span className="text-gray-900 font-semibold bg-blue-50 px-1.5 py-0.5 rounded">
                       {piazzaInfo.threadName}
                     </span>
                   </div>
@@ -159,17 +340,10 @@ export default function DashboardPage({
                   </div>
                 )}
 
-                <div className="flex flex-col gap-1 text-sm">
-                  <span className="text-gray-600 font-medium">URL:</span>
-                  <a
-                    href={piazzaInfo.fullUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-purple-600 no-underline break-all text-xs hover:underline"
-                  >
-                    {piazzaInfo.pathname}
-                  </a>
-                </div>
+                {/* Ingestion Status */}
+                {ingestionStatus && (
+                  <IngestionStatus status={ingestionStatus} />
+                )}
               </div>
 
               {/* Quick Actions */}
@@ -181,9 +355,22 @@ export default function DashboardPage({
                   <span>📊</span>
                   Assistant
                 </button>
-                <button className="flex-1 px-3 py-2 bg-gray-100 border border-gray-200 rounded-md text-xs font-medium cursor-pointer flex items-center justify-center gap-1.5 transition-all hover:bg-gray-200 hover:border-gray-300">
-                  <span>📥</span>
-                  Ingest Thread
+                <button
+                  onClick={handleIngestThread}
+                  disabled={isIngesting}
+                  className="flex-1 px-3 py-2 bg-gray-100 border border-gray-200 rounded-md text-xs font-medium cursor-pointer flex items-center justify-center gap-1.5 transition-all hover:bg-gray-200 hover:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isIngesting ? (
+                    <>
+                      <span className="w-3 h-3 border-2 border-gray-400 border-t-blue-500 rounded-full animate-spin inline-block"></span>
+                      Ingesting...
+                    </>
+                  ) : (
+                    <>
+                      <span>📥</span>
+                      Ingest Thread
+                    </>
+                  )}
                 </button>
               </div>
             </div>
@@ -218,7 +405,9 @@ export default function DashboardPage({
           </h3>
           <div className="grid grid-cols-2 gap-3">
             <div className="text-center p-4 bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg">
-              <div className="text-2xl font-bold text-gray-900 mb-1">0</div>
+              <div className="text-2xl font-bold text-gray-900 mb-1">
+                {dailyQueries}
+              </div>
               <div className="text-[11px] text-gray-600 font-medium uppercase tracking-wider">
                 Queries Today
               </div>
