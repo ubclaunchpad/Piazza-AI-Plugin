@@ -54,6 +54,9 @@ def get_supabase_client() -> Client:
             _supabase_client = create_client(
                 settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY
             )
+            # create bucket if it doesn't exist
+            create_bucket(settings.SUPABASE_STORAGE_BUCKET)
+
             logger.info("Supabase client initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize Supabase client: {e}")
@@ -61,6 +64,23 @@ def get_supabase_client() -> Client:
 
     return _supabase_client
 
+def create_bucket(bucket_name: str) -> bool:
+    """
+    Create a new storage bucket in Supabase.
+
+    Args:
+        bucket_name: Name of the bucket to create
+    Returns:
+        bool: True if bucket was created successfully
+    """
+    try:
+        client = get_supabase_client()
+        client.storage.create_bucket(bucket_name)
+        logger.info(f"Bucket '{bucket_name}' created successfully")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to create bucket '{bucket_name}': {e}")
+        raise StorageError(f"Failed to create bucket '{bucket_name}': {e}")
 
 def generate_storage_path(uploader_id: str, file_name: str) -> str:
     """

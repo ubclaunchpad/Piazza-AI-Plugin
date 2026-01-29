@@ -52,6 +52,8 @@ class Settings(BaseSettings):
     MAX_FILE_SIZE: int = 10 * 1024 * 1024  # 10MB default
     ALLOWED_FILE_TYPES: List[str] = [
         "application/pdf",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",  # .docx
+        "text/plain",  # .txt
     ]
 
     class Config:

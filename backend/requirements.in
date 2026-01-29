@@ -3,6 +3,7 @@ uvicorn[standard]
 pydantic[email]
 pydantic-settings
 python-dotenv
+python-multipart
 psycopg2-binary
 sqlalchemy
 websockets

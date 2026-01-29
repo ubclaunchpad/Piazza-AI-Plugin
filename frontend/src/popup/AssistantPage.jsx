@@ -10,7 +10,7 @@ export default function AssistantPage({ user, onBack, onLogout }) {
   const [isUploading, setIsUploading] = useState(false);
   const perPage = 5;
 
-  // Mocked UUIDs - TODO: Replace with real context values
+  // @TODO: Replace with real context values - this is just for demo purposes
   const mockedUserUUID = "00000000-0000-0000-0000-000000000000";
   const mockedThreadUUID = "11111111-1111-1111-1111-111111111111";
 
