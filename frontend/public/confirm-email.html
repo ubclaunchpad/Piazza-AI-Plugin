@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -28,7 +28,8 @@
         background: #fff;
         padding: 2.5rem 2rem;
         border-radius: 18px;
-        box-shadow: 0 8px 28px -6px rgba(80, 30, 150, 0.18),
+        box-shadow:
+          0 8px 28px -6px rgba(80, 30, 150, 0.18),
           0 2px 6px -1px rgba(0, 0, 0, 0.08);
       }
       h1 {
@@ -246,7 +247,7 @@
         // Heuristic: If an error flag present -> failure
         if (error || errorDescription) {
           el("error-msg").textContent = decodeURIComponent(
-            errorDescription || error || "Unknown error"
+            errorDescription || error || "Unknown error",
           );
           finish(false);
           return;
@@ -271,7 +272,7 @@
         function notifyExtension() {
           if (!EXTENSION_ID || EXTENSION_ID.startsWith("REPLACE_")) {
             console.warn(
-              "[Confirm Email] EXTENSION_ID not set; skipping message"
+              "[Confirm Email] EXTENSION_ID not set; skipping message",
             );
             return;
           }
@@ -291,7 +292,7 @@
                 if (chrome.runtime.lastError) {
                   console.warn(
                     "[Confirm Email] Extension message error:",
-                    chrome.runtime.lastError.message
+                    chrome.runtime.lastError.message,
                   );
                   return;
                 }
@@ -300,12 +301,12 @@
                   details.textContent =
                     "Email confirmed. Extension updated – you may close this tab and log in.";
                 }
-              }
+              },
             );
           } catch (e) {
             console.warn(
               "[Confirm Email] Failed sending message to extension",
-              e
+              e,
             );
           }
         }
