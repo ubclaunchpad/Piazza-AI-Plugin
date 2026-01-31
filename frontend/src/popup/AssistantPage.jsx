@@ -46,7 +46,7 @@ export default function AssistantPage({ user, onBack, onLogout }) {
           headers: {
             Authorization: `Bearer ${user.access_token}`,
           },
-        }
+        },
       );
       if (response.status === 401) {
         onLogout();
@@ -154,7 +154,7 @@ export default function AssistantPage({ user, onBack, onLogout }) {
     if (files && files.length > 0) {
       console.log(
         "Files selected:",
-        Array.from(files).map((f) => f.name)
+        Array.from(files).map((f) => f.name),
       );
       // TODO: Handle file upload
     }

@@ -109,7 +109,7 @@ function ChatbotApp() {
       /\\\[\s*([^\]]+?)\s*\\\]/g,
       (match, content) => {
         return `\n$$\n${content.trim()}\n$$\n`;
-      }
+      },
     );
 
     // Replace inline math: \( ... \) -> $...$
@@ -117,7 +117,7 @@ function ChatbotApp() {
       /\\\(\s*([^)]+?)\s*\\\)/g,
       (match, content) => {
         return `$${content.trim()}$`;
-      }
+      },
     );
 
     return converted;
@@ -147,7 +147,7 @@ function ChatbotApp() {
         `${API_ENDPOINT}/chat-sessions?piazza_course_id=${threadId}`,
         {
           headers: { Authorization: `Bearer ${user.access_token}` },
-        }
+        },
       );
 
       if (response.status === 401) {
@@ -212,7 +212,7 @@ function ChatbotApp() {
         `${API_ENDPOINT}/chat-sessions/${sid}/messages`,
         {
           headers: { Authorization: `Bearer ${user.access_token}` },
-        }
+        },
       );
 
       if (response.status === 401) {
@@ -478,7 +478,7 @@ function ChatbotApp() {
                                   node.position.start.line ===
                                     node.position.end.line);
                               const match = /language-(\w+)/.exec(
-                                className || ""
+                                className || "",
                               );
 
                               return !isInline && match ? (

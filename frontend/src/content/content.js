@@ -130,7 +130,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "GET_PIAZZA_INFO") {
     // Get the thread name from the Piazza page
     const threadNameElement = document.querySelector(
-      "#topbar_current_class_number"
+      "#topbar_current_class_number",
     );
     const threadName = threadNameElement
       ? threadNameElement.textContent.trim()
