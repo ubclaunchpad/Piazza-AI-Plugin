@@ -7,7 +7,7 @@ psycopg2-binary
 sqlalchemy
 websockets
 supabase
-langchain==1.1.2
+langchain==1.2.7
 langchain-community==0.4.1
 langchain-openai
 langchain-groq

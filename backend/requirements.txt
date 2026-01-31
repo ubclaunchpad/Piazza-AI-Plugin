@@ -102,13 +102,13 @@ jsonpatch==1.33
     # via langchain-core
 jsonpointer==3.0.0
     # via jsonpatch
-langchain==1.1.2
+langchain==1.2.7
     # via -r requirements.in
 langchain-classic==1.0.0
     # via langchain-community
 langchain-community==0.4.1
     # via -r requirements.in
-langchain-core==1.1.1
+langchain-core==1.2.7
     # via
     #   langchain
     #   langchain-classic
@@ -128,15 +128,15 @@ langchain-postgres==0.0.16
     # via -r requirements.in
 langchain-text-splitters==1.0.0
     # via langchain-classic
-langgraph==1.0.4
+langgraph==1.0.7
     # via langchain
 langgraph-checkpoint==3.0.1
     # via
     #   langgraph
     #   langgraph-prebuilt
-langgraph-prebuilt==1.0.5
+langgraph-prebuilt==1.0.7
     # via langgraph
-langgraph-sdk==0.2.12
+langgraph-sdk==0.3.3
     # via langgraph
 langsmith==0.4.55
     # via
@@ -299,7 +299,7 @@ uuid-utils==0.12.0
     #   langsmith
 uvicorn[standard]==0.38.0
     # via -r requirements.in
-uvloop==0.22.1 ; sys_platform != 'win32'
+uvloop==0.22.1
     # via uvicorn
 watchfiles==1.1.1
     # via uvicorn
