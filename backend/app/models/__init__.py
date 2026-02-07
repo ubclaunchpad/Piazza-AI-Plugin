@@ -10,6 +10,19 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
+# Import Document models
+from app.models.document import (
+    DocumentBase,
+    DocumentCreate,
+    DocumentDeleteResponse,
+    DocumentListResponse,
+    DocumentResponse,
+    DocumentUpdate,
+    DocumentUploadRequest,
+    DocumentUploadResponse,
+    PermissionEnum,
+)
+
 # Import LLM models
 from app.models.llm import QueryRequest, QueryResponse
 
@@ -63,13 +76,25 @@ class UserUpdate(BaseModel):
 
 # Export all models
 __all__ = [
+    # User models
     "UserStatus",
     "UserBase",
     "UserCreate",
     "UserResponse",
     "UserUpdate",
+    # LLM models
     "QueryRequest",
     "QueryResponse",
+    # Document models
+    "PermissionEnum",
+    "DocumentBase",
+    "DocumentCreate",
+    "DocumentUpdate",
+    "DocumentResponse",
+    "DocumentUploadRequest",
+    "DocumentUploadResponse",
+    "DocumentListResponse",
+    "DocumentDeleteResponse",
 ]
 
 # TODO: Add SQLAlchemy database models when needed

@@ -1,4 +1,4 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -25,8 +25,7 @@
         background: #fff;
         padding: 2.5rem 2rem;
         border-radius: 18px;
-        box-shadow:
-          0 8px 28px -6px rgba(80, 30, 150, 0.18),
+        box-shadow: 0 8px 28px -6px rgba(80, 30, 150, 0.18),
           0 2px 6px -1px rgba(0, 0, 0, 0.08);
       }
       h1 {
@@ -135,7 +134,7 @@
 
         if (error || errorDescription) {
           el("error-msg").textContent = decodeURIComponent(
-            errorDescription || error || "Unknown error",
+            errorDescription || error || "Unknown error"
           );
           finish(false);
           return;

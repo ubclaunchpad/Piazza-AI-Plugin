@@ -7,7 +7,7 @@ function IngestionStatus({ status }) {
   const percentage =
     status.total_posts_count > 0
       ? Math.round(
-          (status.ingested_posts_count / status.total_posts_count) * 100,
+          (status.ingested_posts_count / status.total_posts_count) * 100
         )
       : 0;
 
@@ -57,7 +57,7 @@ export default function DashboardPage({
       fetchIngestionStatus(piazzaInfo.classId);
       interval = setInterval(
         () => fetchIngestionStatus(piazzaInfo.classId),
-        10000,
+        10000
       );
     }
     return () => clearInterval(interval);
@@ -88,7 +88,7 @@ export default function DashboardPage({
               thread_id: classId,
               piazza_cookie: response.cookie,
             }),
-          },
+          }
         );
 
         if (statusResponse.ok) {
@@ -208,7 +208,7 @@ export default function DashboardPage({
             thread_id: piazzaInfo.classId,
             piazza_cookie: response.cookie,
           }),
-        },
+        }
       );
 
       if (!apiResponse.ok) {
@@ -223,13 +223,13 @@ export default function DashboardPage({
 
       if (data.status === "started") {
         alert(
-          "Ingestion started in background. You can continue using the extension.",
+          "Ingestion started in background. You can continue using the extension."
         );
       } else if (data.chunks_processed === 0) {
         alert("Thread is already up to date! No new posts to ingest.");
       } else {
         alert(
-          `Ingestion complete! Processed ${data.chunks_processed} new chunks.`,
+          `Ingestion complete! Processed ${data.chunks_processed} new chunks.`
         );
       }
     } catch (error) {
