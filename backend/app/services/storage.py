@@ -82,7 +82,11 @@ def create_bucket(bucket_name: str) -> bool:
     except Exception as e:
         error_str = str(e)
         # Handle case where bucket already exists (409 Duplicate)
-        if "409" in error_str or "already exists" in error_str.lower() or "Duplicate" in error_str:
+        if (
+            "409" in error_str
+            or "already exists" in error_str.lower()
+            or "Duplicate" in error_str
+        ):
             logger.debug(f"Bucket '{bucket_name}' already exists, continuing")
             return True
         logger.error(f"Failed to create bucket '{bucket_name}': {e}")

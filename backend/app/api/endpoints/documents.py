@@ -459,14 +459,18 @@ async def list_documents(
         if piazza_course_id:
             # Resolve piazza_course_id to thread UUID
             thread_query = "SELECT id FROM threads WHERE piazza_course_id = %s"
-            thread_result = execute_query(thread_query, (piazza_course_id,), fetch_one=True)
+            thread_result = execute_query(
+                thread_query, (piazza_course_id,), fetch_one=True
+            )
             if thread_result:
                 query += " AND thread_id = %s"
                 count_query += " AND thread_id = %s"
                 params.append(str(thread_result["id"]))
             else:
                 # No thread found for this course - return empty result
-                return DocumentListResponse(documents=[], total=0, page=page, per_page=per_page)
+                return DocumentListResponse(
+                    documents=[], total=0, page=page, per_page=per_page
+                )
 
         if uploader_id:
             try:
