@@ -26,7 +26,7 @@ export function useDocument(documentId, options = {}) {
 /**
  * Hook to fetch paginated documents with optional filtering
  * @param {Object} params - Query parameters
- * @param {string} params.threadId - Filter by thread ID (optional)
+ * @param {string} params.piazzaCourseId - Filter by Piazza course ID (optional)
  * @param {string} params.uploaderId - Filter by uploader ID (optional)
  * @param {number} params.page - Page number (default: 1)
  * @param {number} params.perPage - Items per page (default: 20)
@@ -34,15 +34,15 @@ export function useDocument(documentId, options = {}) {
  * @returns {QueryResult} Documents query result
  */
 export function useDocuments({
-  threadId,
+  piazzaCourseId,
   uploaderId,
   page = 1,
   perPage = 20,
   ...options
 } = {}) {
   return useQuery({
-    queryKey: ["documents", { threadId, uploaderId, page, perPage }],
-    queryFn: () => getDocuments({ threadId, uploaderId, page, perPage }),
+    queryKey: ["documents", { piazzaCourseId, uploaderId, page, perPage }],
+    queryFn: () => getDocuments({ piazzaCourseId, uploaderId, page, perPage }),
     enabled: options.enabled ?? true,
     ...options,
   });
@@ -86,7 +86,7 @@ export function useDocumentsByUploader(uploaderId, options = {}) {
 export function useDocumentDownloadUrl(
   documentId,
   expiresIn = 3600,
-  options = {}
+  options = {},
 ) {
   return useQuery({
     queryKey: ["documentDownload", documentId, expiresIn],

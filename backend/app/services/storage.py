@@ -72,7 +72,7 @@ def create_bucket(bucket_name: str) -> bool:
     Args:
         bucket_name: Name of the bucket to create
     Returns:
-        bool: True if bucket was created successfully
+        bool: True if bucket was created or already exists
     """
     try:
         client = get_supabase_client()
@@ -80,33 +80,42 @@ def create_bucket(bucket_name: str) -> bool:
         logger.info(f"Bucket '{bucket_name}' created successfully")
         return True
     except Exception as e:
+        error_str = str(e)
+        # Handle case where bucket already exists (409 Duplicate)
+        if "409" in error_str or "already exists" in error_str.lower() or "Duplicate" in error_str:
+            logger.debug(f"Bucket '{bucket_name}' already exists, continuing")
+            return True
         logger.error(f"Failed to create bucket '{bucket_name}': {e}")
         raise StorageError(f"Failed to create bucket '{bucket_name}': {e}")
 
 
-def generate_storage_path(uploader_id: str, file_name: str) -> str:
+def generate_storage_path(thread_id: str, uploader_id: str, file_name: str) -> str:
     """
     Generate a unique storage path for a file.
 
     Args:
+        thread_id: Piazza thread/class ID (from URL path)
         uploader_id: UUID of the user uploading the file
         file_name: Original filename
 
     Returns:
-        str: Unique storage path in format: uploader_id/timestamp_uuid_filename
+        str: Unique storage path in format: thread_id/uploader_id/timestamp_uuid_filename
     """
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     unique_id = str(uuid.uuid4())[:8]
     # Sanitize filename - remove special characters
     safe_filename = "".join(c for c in file_name if c.isalnum() or c in ".-_")
+    # Sanitize thread_id as well (it comes from Piazza URL)
+    safe_thread_id = "".join(c for c in thread_id if c.isalnum() or c in "-_")
 
-    return f"{uploader_id}/{timestamp}_{unique_id}_{safe_filename}"
+    return f"{safe_thread_id}/{uploader_id}/{timestamp}_{unique_id}_{safe_filename}"
 
 
 async def upload_to_supabase(
     file_content: bytes,
     file_name: str,
     file_type: str,
+    thread_id: str,
     uploader_id: str,
     bucket: Optional[str] = None,
 ) -> Tuple[str, int]:
@@ -117,6 +126,7 @@ async def upload_to_supabase(
         file_content: File content as bytes
         file_name: Original filename
         file_type: MIME type of the file
+        thread_id: Piazza thread/class ID (from URL path)
         uploader_id: UUID of the user uploading the file
         bucket: Storage bucket name (defaults to config value)
 
@@ -127,7 +137,7 @@ async def upload_to_supabase(
         StorageError: If upload fails
     """
     bucket = bucket or settings.SUPABASE_STORAGE_BUCKET
-    storage_path = generate_storage_path(uploader_id, file_name)
+    storage_path = generate_storage_path(thread_id, uploader_id, file_name)
     file_size = len(file_content)
 
     try:

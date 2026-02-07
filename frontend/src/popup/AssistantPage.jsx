@@ -9,22 +9,23 @@ export default function AssistantPage({ user, onBack, onLogout }) {
   const [selectedDocumentId, setSelectedDocumentId] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const perPage = 5;
+  const [chats, setChats] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [piazzaClassId, setPiazzaClassId] = useState(null);
+  const [isCreating, setIsCreating] = useState(false);
 
-  // @TODO: Replace with real context values - this is just for demo purposes
-  const mockedUserUUID = "00000000-0000-0000-0000-000000000000";
-  const mockedThreadUUID = "11111111-1111-1111-1111-111111111111";
-
-  // Fetch documents for this user/thread
+  // Fetch documents for this user/thread (using Piazza class ID as thread ID)
   const {
     data: documentsData,
     isLoading: isLoadingDocuments,
     isError: isDocumentsError,
     refetch: refetchDocuments,
   } = useDocuments({
-    uploaderId: mockedUserUUID,
-    threadId: mockedThreadUUID,
+    uploaderId: user?.id,
+    piazzaCourseId: piazzaClassId,
     page,
     perPage,
+    enabled: !!piazzaClassId && !!user?.id,
   });
 
   // Get download URL for selected document
@@ -35,10 +36,6 @@ export default function AssistantPage({ user, onBack, onLogout }) {
       enabled: !!selectedDocumentId,
     },
   );
-  const [chats, setChats] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [piazzaClassId, setPiazzaClassId] = useState(null);
-  const [isCreating, setIsCreating] = useState(false);
 
   useEffect(() => {
     fetchPiazzaInfo();
@@ -183,14 +180,20 @@ export default function AssistantPage({ user, onBack, onLogout }) {
 
   const handleFileUpload = async (event) => {
     const files = event.target.files;
+    if (!piazzaClassId || !user?.id) {
+      alert(
+        "Unable to upload: Please ensure you are on a Piazza page and logged in.",
+      );
+      return;
+    }
     if (files && files.length > 0) {
       setIsUploading(true);
       try {
         // Upload each file
         for (const file of Array.from(files)) {
           await uploadDocument({
-            uploaderId: mockedUserUUID,
-            threadId: mockedThreadUUID,
+            uploaderId: user.id,
+            piazzaCourseId: piazzaClassId,
             permission: "private",
             file,
           });

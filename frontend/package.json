@@ -12,6 +12,7 @@
   "type": "module",
   "dependencies": {
     "@tanstack/react-query": "^5.90.11",
+    "dotenv": "^17.2.4",
     "postcss-loader": "^8.2.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",

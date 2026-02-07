@@ -4,14 +4,14 @@ const API_ENDPOINT = process.env.API_ENDPOINT || "http://localhost:8000/api/v1";
  * Upload a document
  * @param {Object} params - Upload parameters
  * @param {string} params.uploaderId - Uploader UUID (required)
- * @param {string} params.threadId - Thread UUID (optional)
+ * @param {string} params.piazzaCourseId - Piazza course ID from URL (required)
  * @param {string} params.permission - Permission level (private, thread, instructor)
  * @param {File} params.file - File to upload
  * @returns {Promise<Object>} Upload response with document details
  */
 export const uploadDocument = async ({
   uploaderId,
-  threadId,
+  piazzaCourseId,
   permission,
   file,
 }) => {
@@ -20,10 +20,11 @@ export const uploadDocument = async ({
   formData.append("uploader_id", uploaderId);
   formData.append("permission", permission || "private");
 
-  // Only append thread_id if provided
-  if (threadId) {
-    formData.append("thread_id", threadId);
+  // Append piazza_course_id (required)
+  if (!piazzaCourseId) {
+    throw new Error("piazzaCourseId is required");
   }
+  formData.append("piazza_course_id", piazzaCourseId);
 
   const response = await fetch(`${API_ENDPOINT}/documents/upload`, {
     method: "POST",
@@ -62,7 +63,7 @@ export const getDocument = async (documentId) => {
  */
 export const getDocumentDownloadUrl = async (documentId, expiresIn = 3600) => {
   const response = await fetch(
-    `${API_ENDPOINT}/documents/${documentId}/download?expires_in=${expiresIn}`
+    `${API_ENDPOINT}/documents/${documentId}/download?expires_in=${expiresIn}`,
   );
 
   if (!response.ok) {
@@ -94,26 +95,26 @@ export const deleteDocument = async (documentId) => {
 /**
  * List documents with optional filtering
  * @param {Object} params - Query parameters
- * @param {string} params.threadId - Filter by thread ID (optional)
+ * @param {string} params.piazzaCourseId - Filter by Piazza course ID (optional)
  * @param {string} params.uploaderId - Filter by uploader ID (optional)
  * @param {number} params.page - Page number (default: 1)
  * @param {number} params.perPage - Items per page (default: 20)
  * @returns {Promise<Object>} Paginated document list
  */
 export const getDocuments = async ({
-  threadId,
+  piazzaCourseId,
   uploaderId,
   page = 1,
   perPage = 20,
 } = {}) => {
   const params = new URLSearchParams();
-  if (threadId) params.append("thread_id", threadId);
+  if (piazzaCourseId) params.append("piazza_course_id", piazzaCourseId);
   if (uploaderId) params.append("uploader_id", uploaderId);
   params.append("page", page.toString());
   params.append("per_page", perPage.toString());
 
   const response = await fetch(
-    `${API_ENDPOINT}/documents/?${params.toString()}`
+    `${API_ENDPOINT}/documents/?${params.toString()}`,
   );
 
   if (!response.ok) {

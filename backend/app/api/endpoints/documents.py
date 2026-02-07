@@ -40,7 +40,7 @@ router = APIRouter()
 @router.post("/upload", response_model=DocumentUploadResponse)
 async def upload_document(
     file: UploadFile = File(..., description="File to upload"),
-    thread_id: str = Form(..., description="Thread ID to attach document to"),
+    piazza_course_id: str = Form(..., description="Piazza course ID from URL path"),
     uploader_id: str = Form(..., description="User ID of uploader"),
     permission: str = Form(default="private", description="Access permission level"),
 ):
@@ -49,7 +49,7 @@ async def upload_document(
 
     Args:
         file: The file to upload
-        thread_id: UUID of the thread to attach document to
+        piazza_course_id: Piazza course ID (from URL path, e.g., 'abc123')
         uploader_id: UUID of the user uploading the document
         permission: Permission level (private, thread, instructor)
 
@@ -60,15 +60,48 @@ async def upload_document(
         HTTPException: 400 for invalid file, 413 for file too large, 500 for server errors
     """
     try:
-        # Validate thread_id and uploader_id are valid UUIDs
+        # Validate piazza_course_id
+        if not piazza_course_id or not piazza_course_id.strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="piazza_course_id is required and cannot be empty.",
+            )
+
+        # Validate uploader_id is a valid UUID
         try:
-            thread_uuid = UUID(thread_id)
             uploader_uuid = UUID(uploader_id)
         except ValueError:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid thread_id or uploader_id format. Must be valid UUIDs.",
+                detail="Invalid uploader_id format. Must be a valid UUID.",
             )
+
+        # Resolve piazza_course_id to thread UUID
+        # First, try to find existing thread
+        thread_query = "SELECT id FROM threads WHERE piazza_course_id = %s"
+        thread_result = execute_query(thread_query, (piazza_course_id,), fetch_one=True)
+
+        if thread_result:
+            thread_uuid = UUID(str(thread_result["id"]))
+        else:
+            # Create a new thread record if it doesn't exist
+            upsert_query = """
+                INSERT INTO threads (piazza_course_id, thread_title, is_indexable, updated_at)
+                VALUES (%s, %s, %s, NOW())
+                ON CONFLICT (piazza_course_id) DO UPDATE SET updated_at = NOW()
+                RETURNING id
+            """
+            new_thread = execute_query(
+                upsert_query,
+                (piazza_course_id, f"Course {piazza_course_id}", True),
+                fetch_one=True,
+            )
+            if not new_thread:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Failed to create or find thread for this course.",
+                )
+            thread_uuid = UUID(str(new_thread["id"]))
 
         # Validate permission
         try:
@@ -111,6 +144,7 @@ async def upload_document(
             file_content=file_content,
             file_name=file_name,
             file_type=file_type,
+            thread_id=str(thread_uuid),
             uploader_id=str(uploader_uuid),
         )
 
@@ -393,7 +427,7 @@ async def delete_document(document_id: str):
 
 @router.get("/", response_model=DocumentListResponse)
 async def list_documents(
-    thread_id: Optional[str] = None,
+    piazza_course_id: Optional[str] = None,
     uploader_id: Optional[str] = None,
     page: int = 1,
     per_page: int = 20,
@@ -402,7 +436,7 @@ async def list_documents(
     List documents with optional filtering.
 
     Args:
-        thread_id: Filter by thread ID (optional)
+        piazza_course_id: Filter by Piazza course ID (optional)
         uploader_id: Filter by uploader ID (optional)
         page: Page number (default: 1)
         per_page: Items per page (default: 20)
@@ -422,17 +456,17 @@ async def list_documents(
         count_query = "SELECT COUNT(*) as total FROM documents WHERE 1=1"
         params = []
 
-        if thread_id:
-            try:
-                UUID(thread_id)
-            except ValueError:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid thread_id format",
-                )
-            query += " AND thread_id = %s"
-            count_query += " AND thread_id = %s"
-            params.append(thread_id)
+        if piazza_course_id:
+            # Resolve piazza_course_id to thread UUID
+            thread_query = "SELECT id FROM threads WHERE piazza_course_id = %s"
+            thread_result = execute_query(thread_query, (piazza_course_id,), fetch_one=True)
+            if thread_result:
+                query += " AND thread_id = %s"
+                count_query += " AND thread_id = %s"
+                params.append(str(thread_result["id"]))
+            else:
+                # No thread found for this course - return empty result
+                return DocumentListResponse(documents=[], total=0, page=page, per_page=per_page)
 
         if uploader_id:
             try:
