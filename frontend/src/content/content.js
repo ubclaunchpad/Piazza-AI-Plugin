@@ -73,6 +73,22 @@ function injectChatbot() {
   }
 }
 
+function injectDivToPosts() {
+  // Find all divs with id='quanda-content'
+  const containers = document.querySelectorAll("div#qanda-content");
+  containers.forEach((container) => {
+    // Inside each container, find article with id='qaContentViewId'
+    const article = container.querySelector("article#qaContentViewId");
+    if (article && !article.querySelector(".my-injected-div")) {
+      const div = document.createElement("div");
+      div.className = "my-injected-div";
+      div.textContent = "Injected content here!";
+      // Insert at the top of the article
+      article.insertBefore(div, article.firstChild);
+    }
+  });
+}
+
 // Setup observer to watch for removal
 function setupObserver() {
   if (!document.body) {
@@ -95,6 +111,7 @@ function setupObserver() {
       shadowRoot = null;
       root = null;
       setTimeout(injectChatbot, 50);
+      setTimeout(injectDivToPosts, 50);
     }
   });
 
@@ -111,6 +128,7 @@ function setupObserver() {
 function init() {
   if (document.body) {
     injectChatbot();
+    injectDivToPosts();
     setupObserver();
   } else {
     // Retry until body is available
@@ -130,7 +148,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "GET_PIAZZA_INFO") {
     // Get the thread name from the Piazza page
     const threadNameElement = document.querySelector(
-      "#topbar_current_class_number"
+      "#topbar_current_class_number",
     );
     const threadName = threadNameElement
       ? threadNameElement.textContent.trim()
@@ -169,5 +187,6 @@ setInterval(() => {
     lastUrl = currentUrl;
     console.log("URL changed, checking chatbot...");
     setTimeout(injectChatbot, 200);
+    setTimeout(injectDivToPosts, 200);
   }
 }, 500);
