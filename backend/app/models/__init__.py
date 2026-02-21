@@ -26,6 +26,9 @@ from app.models.document import (
 # Import LLM models
 from app.models.llm import QueryRequest, QueryResponse
 
+# Import Post Assistant Models
+from app.models.post_assistant import PostRequest, SimplifyPostRequest
+
 
 class UserStatus(str, Enum):
     """User status enumeration."""
@@ -85,6 +88,9 @@ __all__ = [
     # LLM models
     "QueryRequest",
     "QueryResponse",
+    # Post assistant model
+    "PostRequest",
+    "SimplifyPostRequest",
     # Document models
     "PermissionEnum",
     "DocumentBase",
