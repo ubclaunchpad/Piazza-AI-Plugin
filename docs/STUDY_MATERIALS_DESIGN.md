@@ -5,7 +5,7 @@
 The Study Material Generator extends ThreadSense to automatically create educational content (quizzes, flashcards, and summaries) from Piazza course materials using LLM technology.
 
 ### Key Features
-- **Quiz Generation**: Multiple-choice and short-answer questions with auto-grading
+- **Quiz Generation**: Multiple-choice and multiple-select questions with auto-grading
 - **Flashcard Decks**: Spaced repetition system using SM-2 algorithm
 - **Summaries**: Condensed thread summaries and exam guides
 - **Progress Tracking**: Quiz scores and flashcard mastery metrics
@@ -248,7 +248,7 @@ FOR EACH ROW EXECUTE FUNCTION update_deck_card_count();
 
 4. **`grade_quiz_submission(questions, answers)`**
    - Multiple choice: exact match
-   - Short answer: keyword matching
+   - Multiple select: check all correct options selected
    - Return score + detailed feedback
 
 5. **`update_flashcard_sm2(ease_factor, interval_days, repetitions, quality)`**
