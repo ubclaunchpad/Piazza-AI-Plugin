@@ -279,6 +279,10 @@ Scope: build the user-facing “Resources” experience in the Chrome extension 
       - List of saved resources grouped by topic or course.
       - Filter by topic or `piazza_course_id`.
       - “Remove” button for each card (calls DELETE endpoint).
+  - Open questions for team discussion:
+    - Where should the Resources entry point live (Dashboard vs Assistant, or both)?
+    - Should the Resources page open pre-filtered to the current post/topic or just the course?
+    - How prominent should provider metadata and relevance scores be in the UI?
 
 - **3.2 Integrate Piazza context (class + post/topic)**
   - Reuse existing logic in `DashboardPage.jsx` and `AssistantPage.jsx`:
