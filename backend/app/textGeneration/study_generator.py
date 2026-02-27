@@ -8,12 +8,13 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_groq import ChatGroq
 
 from app.core.database import execute_query
-from app.models.study_materials import QuizQuestion
+from app.models.study_materials import FlashcardCard, QuizQuestion
 
 logger = logging.getLogger(__name__)
 
 QUIZ_MODEL = "openai/gpt-oss-120b"
 
+# ----------------------------- Quiz ------------------------------- #
 
 class QuizGenerationPayload(BaseModel):
     questions: list[QuizQuestion]
@@ -21,6 +22,16 @@ class QuizGenerationPayload(BaseModel):
 
 _quiz_payload_adapter = TypeAdapter(QuizGenerationPayload)
 _questions_schema_json = json.dumps(_quiz_payload_adapter.json_schema(), indent=2)
+
+
+# ----------------------------- Flashcards ------------------------------- #
+
+class FlashcardGenerationPayload(BaseModel):
+    cards: list[FlashcardCard]
+
+
+_flashcard_payload_adapter = TypeAdapter(FlashcardGenerationPayload)
+_flashcard_schema_json = json.dumps(_flashcard_payload_adapter.json_schema(), indent=2)
 
 
 def _extract_json_object(raw: str) -> dict[str, Any]:
@@ -130,7 +141,7 @@ def generate_quiz_questions(
     chunks = _get_answered_chunks(
         piazza_course_id=piazza_course_id,
         source_posts=source_posts,
-        limit=max(num_questions * 6, 20),
+        limit=min(num_questions * 3, 30),
     )
     if not chunks:
         raise ValueError(
@@ -164,6 +175,9 @@ Rules:
 - 4 options per question.
 - Difficulty level: {difficulty}.
 - Quiz title: {title}.
+- Focus exclusively on course concepts, definitions, algorithms, theories, and technical subject matter.
+- NEVER generate questions about: grade curves or curve amounts, score adjustments or extra credit, exam/assignment score averages or statistics, grading scales or cutoffs, rounding policies, late penalties or extensions, exam logistics (time, location, format, duration), regrade or grading dispute discussions, or any other administrative/logistical announcements.
+- If a piece of context only contains administrative or grade-related information and no educational content, skip it entirely and draw from other context.
 """,
             ),
             ("human", "Context:\n{context}"),
@@ -196,6 +210,185 @@ Rules:
 
     return {
         "questions": [q.model_dump() for q in questions],
+        "source_posts": resolved_source_posts,
+        "model": QUIZ_MODEL,
+    }
+
+
+
+def generate_summary(
+    *,
+    piazza_course_id: str,
+    title: str,
+    summary_type: str,
+    source_posts: Optional[list[str]] = None,
+) -> dict[str, Any]:
+    """
+    Generate a prose summary from ingested answered posts.
+
+    Returns:
+        {
+            "content": str,
+            "source_posts": list[str],
+            "model": str
+        }
+    """
+    chunks = _get_answered_chunks(
+        piazza_course_id=piazza_course_id,
+        source_posts=source_posts,
+        limit=30,
+    )
+    if not chunks:
+        raise ValueError(
+            "No answered ingested posts found for this course. Run ingestion first."
+        )
+
+    context, resolved_source_posts = _build_context(chunks)
+
+    type_instructions = {
+        "thread": (
+            "Summarize the specific thread(s) provided. "
+            "Use a concise Q&A format: state the question(s) raised and the key answer(s) given."
+        ),
+        "weekly": (
+            "Write a weekly digest of all activity. "
+            "Organize by topic/theme. Briefly describe the main questions and resolutions."
+        ),
+        "exam_guide": (
+            "Create an exam study guide. "
+            "List key concepts, important definitions, and common question patterns found in the posts."
+        ),
+        "custom": (
+            "Write a comprehensive summary of the provided content. "
+            "Cover all major topics and important points."
+        ),
+    }
+    type_instruction = type_instructions.get(summary_type, type_instructions["custom"])
+
+    llm = ChatGroq(
+        model=QUIZ_MODEL,
+        temperature=0.3,
+        max_tokens=4000,
+        max_retries=3,
+    )
+
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                """You are summarizing Piazza course discussion posts for students.
+Write a clear, well-structured prose summary. Do not return JSON.
+Summary type: {summary_type}
+Instructions: {type_instruction}
+Title: {title}
+Focus only on course content and educational material. Ignore posts about grades, exam logistics, grading disputes, assignment deadlines, or software/homework bugs unrelated to learning.
+""",
+            ),
+            ("human", "Context:\n{context}"),
+        ]
+    )
+
+    content = (prompt | llm | StrOutputParser()).invoke(
+        {
+            "summary_type": summary_type,
+            "type_instruction": type_instruction,
+            "title": title,
+            "context": context,
+        }
+    )
+
+    if not content or not content.strip():
+        raise ValueError("LLM returned an empty summary.")
+
+    return {
+        "content": content.strip(),
+        "source_posts": resolved_source_posts,
+        "model": QUIZ_MODEL,
+    }
+
+
+def generate_flashcard_stream(
+    piazza_course_id: str,
+    title: str,
+    tags: Optional[list[str]],
+    source_posts: Optional[list[str]] = None,
+) -> dict[str, Any]:
+    """
+    Generate flashcards from ingested answered posts.
+
+    Returns:
+        {
+            "cards": list[dict],
+            "source_posts": list[str],
+            "model": str
+        }
+    """
+    chunks = _get_answered_chunks(piazza_course_id, source_posts, 20)
+
+    if not chunks:
+        raise ValueError(
+            "No answered ingested posts found for this course. Run ingestion first."
+        )
+
+    context, resolved_source_posts = _build_context(chunks)
+
+    llm = ChatGroq(
+        model=QUIZ_MODEL,
+        temperature=0.2,
+        max_tokens=6000,
+        max_retries=3,
+    )
+
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                """You are generating course flashcards from Piazza context.
+Return strict JSON only. No markdown, no prose.
+Your output must conform to this Pydantic JSON schema (for `cards` only):
+{flashcard_schema}
+Output envelope must be:
+{{"cards": [...]}}
+Rules:
+- Generate between 10 and 20 flashcards depending on available context.
+- Each card must be grounded in the provided context.
+- card_type must be one of: "concept", "definition", "qa".
+- front: a concise question or term.
+- back: a clear, complete answer or explanation.
+- Deck title: {title}.
+- Focus exclusively on course concepts, definitions, algorithms, theories, and technical subject matter.
+- NEVER create flashcards about: grade curves or curve amounts, score adjustments or extra credit, exam/assignment score averages or statistics, grading scales or cutoffs, rounding policies, late penalties or extensions, exam logistics (time, location, format, duration), regrade or grading dispute discussions, or any other administrative/logistical announcements.
+- If a piece of context only contains administrative or grade-related information and no educational content, skip it entirely and draw from other context.
+{tags_instruction}""",
+            ),
+            ("human", "Context:\n{context}"),
+        ]
+    )
+
+    tags_instruction = (
+        f"- Focus on these topic tags: {', '.join(tags)}." if tags else ""
+    )
+
+    raw = (prompt | llm | StrOutputParser()).invoke(
+        {
+            "flashcard_schema": _flashcard_schema_json,
+            "title": title,
+            "tags_instruction": tags_instruction,
+            "context": context,
+        }
+    )
+
+    parsed = _extract_json_object(raw)
+
+    try:
+        payload = _flashcard_payload_adapter.validate_python(parsed)
+        cards = payload.cards
+    except ValidationError as e:
+        logger.error("Flashcard validation failed: %s", e)
+        raise ValueError("Generated flashcard format is invalid.")
+
+    return {
+        "cards": [c.model_dump() for c in cards],
         "source_posts": resolved_source_posts,
         "model": QUIZ_MODEL,
     }
