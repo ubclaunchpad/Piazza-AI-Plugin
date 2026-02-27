@@ -26,6 +26,17 @@ from app.models.document import (
 # Import LLM models
 from app.models.llm import QueryRequest, QueryResponse
 
+# Import Resource aggregator models
+from app.models.resource import (
+    ResourceSearchRequest,
+    ResourceSearchItem,
+    ResourceSearchResponse,
+    SavedResource,
+    SavedResourceListResponse,
+    SaveResourceRequest,
+    SaveResourceResponse,
+)
+
 
 class UserStatus(str, Enum):
     """User status enumeration."""
@@ -95,6 +106,14 @@ __all__ = [
     "DocumentUploadResponse",
     "DocumentListResponse",
     "DocumentDeleteResponse",
+    # Resource aggregator models
+    "ResourceSearchRequest",
+    "ResourceSearchItem",
+    "ResourceSearchResponse",
+    "SavedResource",
+    "SavedResourceListResponse",
+    "SaveResourceRequest",
+    "SaveResourceResponse",
 ]
 
 # TODO: Add SQLAlchemy database models when needed
