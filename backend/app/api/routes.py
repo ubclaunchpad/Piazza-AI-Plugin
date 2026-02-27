@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 # Import endpoint routers
 from app.api.endpoints import auth, chat_sessions, documents, example, ingestion, llm
+from backend.app.api.endpoints import calendar
 
 # Create main API router
 api_router = APIRouter()
@@ -37,6 +38,8 @@ api_router.include_router(chat_sessions.router, tags=["chat-sessions"])
 # Include document endpoints
 api_router.include_router(documents.router, prefix="/documents", tags=["documents"])
 
+# Include google calendar auth endpoints
+api_router.include_router(calendar.router, prefix="/calendar", tags=["calendar-auth"])
 
 @api_router.get("/health", response_model=MessageResponse)
 def health_check():

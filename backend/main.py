@@ -4,8 +4,11 @@ Piazza AI Plugin Backend
 Minimal FastAPI backend for the Piazza AI browser extension.
 """
 
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 
 from app.api.routes import api_router
 from app.core.config import settings
@@ -24,6 +27,12 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["*"],
+)
+
+# Add session middleware for OAuth state management
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=os.getenv("SESSION_SECRET", "super-secret-key")
 )
 
 # Include API routes
