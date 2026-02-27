@@ -34,7 +34,7 @@ CREATE TABLE flashcards (
     deck_id UUID REFERENCES flashcard_decks(id) ON DELETE CASCADE,
     front TEXT NOT NULL,
     back TEXT NOT NULL,
-    card_type TEXT DEFAULT 'basic', -- basic, cloze
+    card_type TEXT DEFAULT 'concept', -- concept, definition, qa
     -- Spaced repetition fields (SM-2 algorithm)
     ease_factor DECIMAL(3,2) DEFAULT 2.5,
     interval_days INT DEFAULT 0,
