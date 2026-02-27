@@ -174,3 +174,5 @@ logs/
 # uploads/
 # static/media/
 # node_modules/  # if adding any frontend build tools
+
+client_secret.json 
