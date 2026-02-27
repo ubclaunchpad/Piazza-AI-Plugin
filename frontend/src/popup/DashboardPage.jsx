@@ -37,7 +37,6 @@ export default function DashboardPage({
   user,
   onLogout,
   onNavigateToAssistant,
-  onNavigateToStudy,
 }) {
   const [currentTab, setCurrentTab] = useState(null);
   const [piazzaInfo, setPiazzaInfo] = useState(null);
@@ -357,7 +356,12 @@ export default function DashboardPage({
                   Assistant
                 </button>
                 <button
-                  onClick={onNavigateToStudy}
+                  onClick={() => {
+                    const url = new URL(chrome.runtime.getURL("studytab.html"));
+                    if (piazzaInfo?.classId)
+                      url.searchParams.set("course_id", piazzaInfo.classId);
+                    chrome.tabs.create({ url: url.toString() });
+                  }}
                   className="flex-1 px-3 py-2 bg-gray-100 border border-gray-200 rounded-md text-xs font-medium cursor-pointer flex items-center justify-center gap-1.5 transition-all hover:bg-gray-200 hover:border-gray-300"
                 >
                   <span>📚</span>

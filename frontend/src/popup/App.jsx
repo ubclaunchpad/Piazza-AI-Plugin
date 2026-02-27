@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import LoginPage from "./LoginPage";
 import DashboardPage from "./DashboardPage";
 import AssistantPage from "./AssistantPage";
-import StudyMaterialsPage from "./StudyMaterialsPage";
 
 /* global chrome */
 export default function App() {
@@ -176,16 +175,9 @@ export default function App() {
             user={user}
             onLogout={handleLogout}
             onNavigateToAssistant={() => setCurrentPage("assistant")}
-            onNavigateToStudy={() => setCurrentPage("study")}
-          />
-        ) : currentPage === "assistant" ? (
-          <AssistantPage
-            user={user}
-            onBack={() => setCurrentPage("dashboard")}
-            onLogout={handleLogout}
           />
         ) : (
-          <StudyMaterialsPage
+          <AssistantPage
             user={user}
             onBack={() => setCurrentPage("dashboard")}
             onLogout={handleLogout}

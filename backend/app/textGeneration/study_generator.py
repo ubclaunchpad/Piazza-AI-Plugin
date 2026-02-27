@@ -141,7 +141,7 @@ def generate_quiz_questions(
     chunks = _get_answered_chunks(
         piazza_course_id=piazza_course_id,
         source_posts=source_posts,
-        limit=max(num_questions * 6, 20),
+        limit=min(num_questions * 3, 30),
     )
     if not chunks:
         raise ValueError(
@@ -175,6 +175,9 @@ Rules:
 - 4 options per question.
 - Difficulty level: {difficulty}.
 - Quiz title: {title}.
+- Focus exclusively on course concepts, definitions, algorithms, theories, and technical subject matter.
+- NEVER generate questions about: grade curves or curve amounts, score adjustments or extra credit, exam/assignment score averages or statistics, grading scales or cutoffs, rounding policies, late penalties or extensions, exam logistics (time, location, format, duration), regrade or grading dispute discussions, or any other administrative/logistical announcements.
+- If a piece of context only contains administrative or grade-related information and no educational content, skip it entirely and draw from other context.
 """,
             ),
             ("human", "Context:\n{context}"),
@@ -210,6 +213,7 @@ Rules:
         "source_posts": resolved_source_posts,
         "model": QUIZ_MODEL,
     }
+
 
 
 def generate_summary(
@@ -277,6 +281,7 @@ Write a clear, well-structured prose summary. Do not return JSON.
 Summary type: {summary_type}
 Instructions: {type_instruction}
 Title: {title}
+Focus only on course content and educational material. Ignore posts about grades, exam logistics, grading disputes, assignment deadlines, or software/homework bugs unrelated to learning.
 """,
             ),
             ("human", "Context:\n{context}"),
@@ -351,6 +356,9 @@ Rules:
 - front: a concise question or term.
 - back: a clear, complete answer or explanation.
 - Deck title: {title}.
+- Focus exclusively on course concepts, definitions, algorithms, theories, and technical subject matter.
+- NEVER create flashcards about: grade curves or curve amounts, score adjustments or extra credit, exam/assignment score averages or statistics, grading scales or cutoffs, rounding policies, late penalties or extensions, exam logistics (time, location, format, duration), regrade or grading dispute discussions, or any other administrative/logistical announcements.
+- If a piece of context only contains administrative or grade-related information and no educational content, skip it entirely and draw from other context.
 {tags_instruction}""",
             ),
             ("human", "Context:\n{context}"),

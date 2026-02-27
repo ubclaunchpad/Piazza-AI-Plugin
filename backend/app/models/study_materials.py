@@ -15,7 +15,7 @@ class QuizGenerateRequest(BaseModel):
     title: str = Field(..., min_length=1, max_length=255)
     difficulty: Literal['easy', 'medium', 'hard']
     num_questions: int = Field(default=10, ge=1, le=50)
-    source_posts: Optional[list[str]]
+    source_posts: Optional[list[str]] = None
 
 
 class QuizSubmitRequest(BaseModel):
