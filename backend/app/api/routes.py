@@ -18,7 +18,6 @@ class MessageResponse(BaseModel):
     message: str
     status: str
 
-api_router.include_router(study_materials.router, prefix="/study", tags=["study"])
 # Include example endpoints
 api_router.include_router(example.router, prefix="/example", tags=["users"])
 
@@ -37,6 +36,8 @@ api_router.include_router(chat_sessions.router, tags=["chat-sessions"])
 # Include document endpoints
 api_router.include_router(documents.router, prefix="/documents", tags=["documents"])
 
+# Include study material generator endpoints
+api_router.include_router(study_materials.router, prefix="/study", tags=["study-materials"])
 
 @api_router.get("/health", response_model=MessageResponse)
 def health_check():

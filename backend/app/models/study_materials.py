@@ -47,6 +47,11 @@ class QuizDeleteResponse(BaseModel):
 
 # ------ Flashcards ------ #
 
+class FlashcardCard(BaseModel):
+    front: str
+    back: str
+    card_type: Literal["concept", "definition", "qa"]
+
 class FlashcardRequestGenerate(BaseModel):
     piazza_course_id: str
     title: str = Field(..., min_length=1, max_length=255)
