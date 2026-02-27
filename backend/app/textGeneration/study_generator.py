@@ -175,6 +175,7 @@ Rules:
 - 4 options per question.
 - Difficulty level: {difficulty}.
 - Quiz title: {title}.
+- Every question MUST include a non-empty explanation field (1-3 sentences) that explains why the correct answer is right, referencing the relevant concept from the context.
 - Focus exclusively on course concepts, definitions, algorithms, theories, and technical subject matter.
 - NEVER generate questions about: grade curves or curve amounts, score adjustments or extra credit, exam/assignment score averages or statistics, grading scales or cutoffs, rounding policies, late penalties or extensions, exam logistics (time, location, format, duration), regrade or grading dispute discussions, or any other administrative/logistical announcements.
 - If a piece of context only contains administrative or grade-related information and no educational content, skip it entirely and draw from other context.
