@@ -2,6 +2,7 @@ import { createRoot } from "react-dom/client";
 import ChatbotApp from "./ChatbotApp.jsx";
 // Import CSS as a raw string - we'll inject it into shadow DOM
 import cssText from "./content.css?raw";
+import { initPostInjector } from "./PostInjector.jsx";
 
 const CONTAINER_ID = "ai-chatbot-extension-root";
 let root = null;
@@ -112,6 +113,7 @@ function init() {
   if (document.body) {
     injectChatbot();
     setupObserver();
+    initPostInjector();
   } else {
     // Retry until body is available
     setTimeout(init, 10);
