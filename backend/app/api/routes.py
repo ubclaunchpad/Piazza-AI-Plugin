@@ -4,9 +4,11 @@ API routes for Piazza AI backend.
 
 from fastapi import APIRouter
 from pydantic import BaseModel
+from app.api.endpoints import calendar
 
 # Import endpoint routers
 from app.api.endpoints import auth, chat_sessions, documents, example, ingestion, llm
+
 
 # Create main API router
 api_router = APIRouter()
@@ -36,6 +38,9 @@ api_router.include_router(chat_sessions.router, tags=["chat-sessions"])
 
 # Include document endpoints
 api_router.include_router(documents.router, prefix="/documents", tags=["documents"])
+
+# Include calendar endpoints
+api_router.include_router(calendar.router, prefix="/calendar", tags=["calendar"])
 
 
 @api_router.get("/health", response_model=MessageResponse)
