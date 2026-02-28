@@ -12,17 +12,19 @@ Endpoints follow FastAPI best practices and include detailed docstrings for clar
 """
 
 import logging
-from app.core.database import execute_query
-from app.core.database import execute_statement
-from fastapi import APIRouter, Depends, HTTPException, status
-from app.models.calendar import CalendarEvent, CalendarToken
 from typing import List
+
+from fastapi import APIRouter, HTTPException
+
+from app.core.database import execute_query, execute_statement
+from app.models.calendar import CalendarEvent
 
 # Placeholder imports for future models and logic
 # from app.models.calendar import ...
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
 
 @router.get("/calendar/oauth")
 def calendar_auth():
@@ -35,6 +37,7 @@ def calendar_auth():
     # TODO: Implement Google OAuth initiation logic
     pass
 
+
 @router.get("/calendar/callback")
 def calendar_callback():
     """
@@ -45,6 +48,7 @@ def calendar_callback():
     """
     # TODO: Implement Google OAuth callback handling logic
     pass
+
 
 @router.post("/calendar/events", response_model=CalendarEvent)
 def create_calendar_event(event: CalendarEvent):
@@ -67,8 +71,8 @@ def create_calendar_event(event: CalendarEvent):
     """
 
     params = {
-        event.id, 
-        "user_id_placeholder", 
+        event.id,
+        "user_id_placeholder",
         "course_id_placeholder",
         event.google_event_id,
         event.title,
@@ -80,6 +84,7 @@ def create_calendar_event(event: CalendarEvent):
     execute_statement(query, params)
     return event
 
+
 @router.get("/calendar/events", response_model=List[CalendarEvent])
 def list_calendar_events():
     """
@@ -89,10 +94,11 @@ def list_calendar_events():
     Returns:
         A list of calendar events.
     """
-    
+
     query = "SELECT * FROM calendar_events"
     results = execute_query(query)
     return [CalendarEvent(**event) for event in results]
+
 
 @router.get("/calendar/events/{event_id}", response_model=CalendarEvent)
 def get_calendar_event(event_id: str):
@@ -110,6 +116,7 @@ def get_calendar_event(event_id: str):
     if not result:
         raise HTTPException(status_code=404, detail="Event not found")
     return CalendarEvent(**result)
+
 
 @router.put("/calendar/settings")
 def update_calendar_settings():

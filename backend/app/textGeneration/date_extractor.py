@@ -1,5 +1,3 @@
-
-
 def extract_dates_from_text(text: str):
     """
     Extract dates and event information from Piazza post text.
@@ -12,4 +10,3 @@ def extract_dates_from_text(text: str):
     """
     # TODO: Implement with ChatGroq, spaCY, or dateparser
     return []
-
