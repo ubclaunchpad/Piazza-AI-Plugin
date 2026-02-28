@@ -1,10 +1,10 @@
 from typing import List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
+from app.api.dependencies.auth import get_current_user
 from app.core.database import execute_insert, execute_query, execute_statement
-from app.core.supabase import supabase
 from app.models.chat_session import (
     ChatMessage,
     ChatSessionCreate,
@@ -13,23 +13,6 @@ from app.models.chat_session import (
 )
 
 router = APIRouter()
-
-
-async def get_current_user(authorization: Optional[str] = Header(None)):
-    if not authorization:
-        raise HTTPException(status_code=401, detail="Missing authorization header")
-
-    try:
-        token = authorization.replace("Bearer ", "")
-        user = supabase.auth.get_user(token)
-        if not user or not user.user:
-            raise HTTPException(status_code=401, detail="Invalid token")
-        return user.user
-    except Exception as e:
-        import logging
-
-        logging.error(f"Authentication failed: {str(e)}")
-        raise HTTPException(status_code=401, detail=f"Authentication failed: {str(e)}")
 
 
 @router.post("/chat-sessions", response_model=ChatSessionResponse)

@@ -165,6 +165,119 @@ async def upload_to_supabase(
         raise StorageError(f"Failed to upload file: {e}")
 
 
+async def create_signed_upload_url(
+    file_name: str,
+    file_type: str,
+    thread_id: str,
+    uploader_id: str,
+    bucket: Optional[str] = None,
+) -> dict:
+    """
+    Generate a signed URL for direct browser-to-Supabase upload.
+
+    The client can use the returned URL to PUT the file directly to
+    Supabase Storage, bypassing the backend entirely for the file bytes.
+
+    Args:
+        file_name: Original filename (used to build the storage path)
+        file_type: MIME type of the file (for reference, not enforced here)
+        thread_id: Piazza thread/class ID (from URL path)
+        uploader_id: UUID of the user uploading the file
+        bucket: Storage bucket name (defaults to config value)
+
+    Returns:
+        dict with keys: signed_url, token, storage_path
+
+    Raises:
+        StorageError: If signed URL generation fails
+    """
+    bucket = bucket or settings.SUPABASE_STORAGE_BUCKET
+    storage_path = generate_storage_path(thread_id, uploader_id, file_name)
+
+    try:
+        client = get_supabase_client()
+
+        result = client.storage.from_(bucket).create_signed_upload_url(
+            path=storage_path,
+        )
+
+        # The SDK returns {"path": ..., "token": ..., "signedURL": ...}
+        # or an object with similar attributes depending on the version.
+        if isinstance(result, dict):
+            signed_url = result.get("signedURL") or result.get("signed_url", "")
+            token = result.get("token", "")
+        else:
+            # Handle object-style response
+            signed_url = getattr(result, "signed_url", "") or getattr(result, "signedURL", "")
+            token = getattr(result, "token", "")
+
+        if not signed_url:
+            raise StorageError(
+                "Failed to generate signed upload URL: empty URL in response"
+            )
+
+        logger.info(f"Signed upload URL generated for: {storage_path}")
+        return {
+            "signed_url": signed_url,
+            "token": token,
+            "storage_path": storage_path,
+        }
+
+    except StorageError:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to generate signed upload URL: {e}")
+        raise StorageError(f"Failed to generate signed upload URL: {e}")
+
+
+async def verify_file_exists(
+    storage_path: str,
+    bucket: Optional[str] = None,
+) -> bool:
+    """
+    Verify that a file exists at the given storage path.
+
+    Used after a direct upload to confirm the file was actually uploaded
+    before creating the database record.
+
+    Args:
+        storage_path: Storage reference path
+        bucket: Storage bucket name (defaults to config value)
+
+    Returns:
+        bool: True if the file exists
+
+    Raises:
+        StorageError: If the check fails
+    """
+    bucket = bucket or settings.SUPABASE_STORAGE_BUCKET
+
+    try:
+        client = get_supabase_client()
+
+        # List files at the path's parent directory and check for the file
+        # Split path to get directory and filename
+        parts = storage_path.rsplit("/", 1)
+        if len(parts) == 2:
+            directory, filename = parts
+        else:
+            directory = ""
+            filename = parts[0]
+
+        result = client.storage.from_(bucket).list(
+            path=directory,
+            options={"search": filename},
+        )
+
+        if result and len(result) > 0:
+            return True
+        return False
+
+    except Exception as e:
+        logger.error(f"Failed to verify file existence at {storage_path}: {e}")
+        raise StorageError(f"Failed to verify file existence: {e}")
+
+
 async def get_signed_url(
     storage_ref: str, expires_in: int = 3600, bucket: Optional[str] = None
 ) -> str:

@@ -3,6 +3,14 @@ Document upload and management endpoints.
 
 This module handles file uploads, document retrieval, and deletion
 using Supabase Storage and PostgreSQL database.
+
+Provides two upload flows:
+  1. Presigned URL flow (recommended):
+       POST /request-upload  -> returns signed URL
+       Client PUTs file directly to Supabase Storage
+       POST /confirm-upload  -> creates DB record
+  2. Legacy proxy flow (deprecated):
+       POST /upload  -> backend proxies file to Supabase
 """
 
 import logging
@@ -10,24 +18,30 @@ from datetime import datetime, timezone
 from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 
+from app.api.dependencies.auth import get_current_user
 from app.core.config import settings
 from app.core.database import execute_query, execute_statement
 from app.models.document import (
+    ConfirmUploadRequest,
     DocumentDeleteResponse,
     DocumentListResponse,
     DocumentResponse,
     DocumentUploadResponse,
     PermissionEnum,
+    SignedUploadRequest,
+    SignedUploadResponse,
 )
 from app.services.storage import (
     StorageError,
+    create_signed_upload_url,
     delete_file,
     get_signed_url,
     upload_to_supabase,
     validate_file_size,
     validate_file_type,
+    verify_file_exists,
 )
 
 # Configure logging
@@ -37,27 +51,238 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.post("/upload", response_model=DocumentUploadResponse)
+# ---------------------------------------------------------------------------
+# Helper: resolve piazza_course_id -> thread UUID (upsert if needed)
+# ---------------------------------------------------------------------------
+
+def _resolve_thread_id(piazza_course_id: str) -> UUID:
+    """
+    Look up the thread UUID for a piazza_course_id, creating the thread
+    record if it does not yet exist.
+
+    Raises:
+        HTTPException 500 if the upsert fails.
+    """
+    thread_result = execute_query(
+        "SELECT id FROM threads WHERE piazza_course_id = %s",
+        (piazza_course_id,),
+        fetch_one=True,
+    )
+
+    if thread_result:
+        return UUID(str(thread_result["id"]))
+
+    upsert_query = """
+        INSERT INTO threads (piazza_course_id, thread_title, is_indexable, updated_at)
+        VALUES (%s, %s, %s, NOW())
+        ON CONFLICT (piazza_course_id) DO UPDATE SET updated_at = NOW()
+        RETURNING id
+    """
+    new_thread = execute_query(
+        upsert_query,
+        (piazza_course_id, f"Course {piazza_course_id}", True),
+        fetch_one=True,
+    )
+    if not new_thread:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create or find thread for this course.",
+        )
+    return UUID(str(new_thread["id"]))
+
+
+# ---------------------------------------------------------------------------
+# Presigned URL flow
+# ---------------------------------------------------------------------------
+
+@router.post("/request-upload", response_model=SignedUploadResponse)
+async def request_upload(
+    body: SignedUploadRequest,
+    user=Depends(get_current_user),
+):
+    """
+    Request a presigned upload URL for direct browser-to-Supabase upload.
+
+    The client should:
+      1. Call this endpoint with file metadata.
+      2. PUT the file bytes directly to the returned ``signed_url``.
+      3. Call ``POST /confirm-upload`` to finalise the metadata record.
+
+    Authentication required -- the uploader identity is derived from the
+    Bearer token, not from the request body.
+    """
+    try:
+        # Validate piazza_course_id
+        if not body.piazza_course_id or not body.piazza_course_id.strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="piazza_course_id is required and cannot be empty.",
+            )
+
+        # Validate file size
+        if not validate_file_size(body.file_size):
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=f"File too large. Maximum size is {settings.MAX_FILE_SIZE // (1024 * 1024)}MB",
+            )
+
+        # Validate file type
+        if not validate_file_type(body.file_type):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"File type '{body.file_type}' not allowed. Allowed types: {settings.ALLOWED_FILE_TYPES}",
+            )
+
+        # Resolve course -> thread
+        thread_uuid = _resolve_thread_id(body.piazza_course_id)
+
+        # Generate the signed upload URL
+        upload_data = await create_signed_upload_url(
+            file_name=body.file_name,
+            file_type=body.file_type,
+            thread_id=str(thread_uuid),
+            uploader_id=str(user.id),
+        )
+
+        return SignedUploadResponse(
+            signed_url=upload_data["signed_url"],
+            token=upload_data["token"],
+            storage_path=upload_data["storage_path"],
+            thread_id=thread_uuid,
+            file_name=body.file_name,
+            file_type=body.file_type,
+            file_size=body.file_size,
+        )
+
+    except HTTPException:
+        raise
+    except StorageError as e:
+        logger.error(f"Storage error generating signed upload URL: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error generating signed upload URL: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate upload URL: {str(e)}",
+        )
+
+
+@router.post("/confirm-upload", response_model=DocumentUploadResponse)
+async def confirm_upload(
+    body: ConfirmUploadRequest,
+    user=Depends(get_current_user),
+):
+    """
+    Confirm that a direct upload has completed and create the document
+    metadata record in the database.
+
+    Should be called *after* the client has successfully PUT the file
+    to the signed URL returned by ``POST /request-upload``.
+    """
+    try:
+        # Verify the file actually exists in storage
+        try:
+            exists = await verify_file_exists(body.storage_path)
+            if not exists:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="File not found at the specified storage path. "
+                           "Ensure the file was uploaded before confirming.",
+                )
+        except StorageError as e:
+            logger.warning(
+                f"Could not verify file existence (proceeding anyway): {e}"
+            )
+            # Non-fatal -- we still create the record. The file may simply
+            # not be listable yet due to eventual consistency.
+
+        # Insert document metadata into database
+        current_time = datetime.now(timezone.utc)
+
+        insert_query = """
+            INSERT INTO documents (
+                thread_id, uploader_id, file_name, file_type,
+                file_size, storage_ref, indexed, permission,
+                created_at, updated_at, metadata
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id, created_at
+        """
+
+        result = execute_query(
+            insert_query,
+            (
+                str(body.thread_id),
+                str(user.id),
+                body.file_name,
+                body.file_type,
+                body.file_size,
+                body.storage_path,
+                False,  # indexed = False initially
+                body.permission.value,
+                current_time,
+                current_time,
+                None,  # metadata
+            ),
+            fetch_one=True,
+        )
+
+        if not result:
+            # Rollback: delete the orphaned file from storage
+            try:
+                await delete_file(body.storage_path)
+            except StorageError:
+                logger.error(
+                    f"Failed to rollback storage upload: {body.storage_path}"
+                )
+
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to save document metadata",
+            )
+
+        logger.info(f"Document confirmed successfully: {result['id']}")
+
+        return DocumentUploadResponse(
+            id=result["id"],
+            file_name=body.file_name,
+            file_type=body.file_type,
+            file_size=body.file_size,
+            storage_ref=body.storage_path,
+            permission=body.permission,
+            indexed=False,
+            created_at=result["created_at"],
+            message="File uploaded and confirmed successfully",
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error confirming upload: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to confirm upload: {str(e)}",
+        )
+
+
+# ---------------------------------------------------------------------------
+# Legacy proxy upload (deprecated -- kept for backwards compatibility)
+# ---------------------------------------------------------------------------
+
+@router.post("/upload", response_model=DocumentUploadResponse, deprecated=True)
 async def upload_document(
     file: UploadFile = File(..., description="File to upload"),
     piazza_course_id: str = Form(..., description="Piazza course ID from URL path"),
-    uploader_id: str = Form(..., description="User ID of uploader"),
     permission: str = Form(default="private", description="Access permission level"),
+    user=Depends(get_current_user),
 ):
     """
-    Upload a document to Supabase Storage and save metadata to database.
+    **Deprecated** -- use ``POST /request-upload`` + ``POST /confirm-upload`` instead.
 
-    Args:
-        file: The file to upload
-        piazza_course_id: Piazza course ID (from URL path, e.g., 'abc123')
-        uploader_id: UUID of the user uploading the document
-        permission: Permission level (private, thread, instructor)
-
-    Returns:
-        DocumentUploadResponse with document details
-
-    Raises:
-        HTTPException: 400 for invalid file, 413 for file too large, 500 for server errors
+    Upload a document via the backend proxy. The file bytes are buffered in
+    server memory and then forwarded to Supabase Storage.
     """
     try:
         # Validate piazza_course_id
@@ -67,41 +292,8 @@ async def upload_document(
                 detail="piazza_course_id is required and cannot be empty.",
             )
 
-        # Validate uploader_id is a valid UUID
-        try:
-            uploader_uuid = UUID(uploader_id)
-        except ValueError:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid uploader_id format. Must be a valid UUID.",
-            )
-
-        # Resolve piazza_course_id to thread UUID
-        # First, try to find existing thread
-        thread_query = "SELECT id FROM threads WHERE piazza_course_id = %s"
-        thread_result = execute_query(thread_query, (piazza_course_id,), fetch_one=True)
-
-        if thread_result:
-            thread_uuid = UUID(str(thread_result["id"]))
-        else:
-            # Create a new thread record if it doesn't exist
-            upsert_query = """
-                INSERT INTO threads (piazza_course_id, thread_title, is_indexable, updated_at)
-                VALUES (%s, %s, %s, NOW())
-                ON CONFLICT (piazza_course_id) DO UPDATE SET updated_at = NOW()
-                RETURNING id
-            """
-            new_thread = execute_query(
-                upsert_query,
-                (piazza_course_id, f"Course {piazza_course_id}", True),
-                fetch_one=True,
-            )
-            if not new_thread:
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Failed to create or find thread for this course.",
-                )
-            thread_uuid = UUID(str(new_thread["id"]))
+        # Resolve course -> thread
+        thread_uuid = _resolve_thread_id(piazza_course_id)
 
         # Validate permission
         try:
@@ -139,13 +331,13 @@ async def upload_document(
                 detail=f"File type '{file_type}' not allowed. Allowed types: {settings.ALLOWED_FILE_TYPES}",
             )
 
-        # Upload to Supabase Storage
+        # Upload to Supabase Storage (uploader_id from auth token)
         storage_ref, actual_size = await upload_to_supabase(
             file_content=file_content,
             file_name=file_name,
             file_type=file_type,
             thread_id=str(thread_uuid),
-            uploader_id=str(uploader_uuid),
+            uploader_id=str(user.id),
         )
 
         # Insert document metadata into database
@@ -165,7 +357,7 @@ async def upload_document(
             insert_query,
             (
                 str(thread_uuid),
-                str(uploader_uuid),
+                str(user.id),
                 file_name,
                 file_type,
                 file_size,
@@ -220,19 +412,17 @@ async def upload_document(
         )
 
 
+# ---------------------------------------------------------------------------
+# Read / download / delete / list
+# ---------------------------------------------------------------------------
+
 @router.get("/{document_id}", response_model=DocumentResponse)
-async def get_document(document_id: str):
+async def get_document(document_id: str, user=Depends(get_current_user)):
     """
-    Get document metadata and signed URL for download.
+    Get document metadata by ID.
 
-    Args:
-        document_id: UUID of the document
-
-    Returns:
-        DocumentResponse with document details and download URL
-
-    Raises:
-        HTTPException: 404 if document not found
+    Only the uploader or users in the same thread (depending on
+    permission level) should be able to access the document.
     """
     try:
         # Validate document_id
@@ -258,6 +448,16 @@ async def get_document(document_id: str):
         if not document:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Document not found"
+            )
+
+        # Access check: private docs are only visible to the uploader
+        if (
+            document["permission"] == PermissionEnum.PRIVATE.value
+            and str(document["uploader_id"]) != str(user.id)
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not have permission to access this document.",
             )
 
         return DocumentResponse(
@@ -286,19 +486,13 @@ async def get_document(document_id: str):
 
 
 @router.get("/{document_id}/download")
-async def get_document_download_url(document_id: str, expires_in: int = 3600):
+async def get_document_download_url(
+    document_id: str,
+    expires_in: int = 3600,
+    user=Depends(get_current_user),
+):
     """
     Get a signed URL for downloading a document.
-
-    Args:
-        document_id: UUID of the document
-        expires_in: URL expiration time in seconds (default: 1 hour)
-
-    Returns:
-        Object with signed download URL
-
-    Raises:
-        HTTPException: 404 if document not found
     """
     try:
         # Validate document_id
@@ -311,12 +505,22 @@ async def get_document_download_url(document_id: str, expires_in: int = 3600):
             )
 
         # Fetch document storage_ref from database
-        query = "SELECT storage_ref, file_name FROM documents WHERE id = %s"
+        query = "SELECT storage_ref, file_name, uploader_id, permission FROM documents WHERE id = %s"
         document = execute_query(query, (str(doc_uuid),), fetch_one=True)
 
         if not document:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Document not found"
+            )
+
+        # Access check
+        if (
+            document["permission"] == PermissionEnum.PRIVATE.value
+            and str(document["uploader_id"]) != str(user.id)
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not have permission to download this document.",
             )
 
         # Validate expires_in
@@ -354,18 +558,11 @@ async def get_document_download_url(document_id: str, expires_in: int = 3600):
 
 
 @router.delete("/{document_id}", response_model=DocumentDeleteResponse)
-async def delete_document(document_id: str):
+async def delete_document(document_id: str, user=Depends(get_current_user)):
     """
     Delete a document from storage and database.
 
-    Args:
-        document_id: UUID of the document to delete
-
-    Returns:
-        DocumentDeleteResponse with deletion confirmation
-
-    Raises:
-        HTTPException: 404 if document not found
+    Only the uploader can delete their own documents.
     """
     try:
         # Validate document_id
@@ -377,13 +574,20 @@ async def delete_document(document_id: str):
                 detail="Invalid document_id format. Must be a valid UUID.",
             )
 
-        # Fetch document to get storage_ref
-        query = "SELECT storage_ref, file_name FROM documents WHERE id = %s"
+        # Fetch document to get storage_ref and verify ownership
+        query = "SELECT storage_ref, file_name, uploader_id FROM documents WHERE id = %s"
         document = execute_query(query, (str(doc_uuid),), fetch_one=True)
 
         if not document:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Document not found"
+            )
+
+        # Ownership check
+        if str(document["uploader_id"]) != str(user.id):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You can only delete your own documents.",
             )
 
         # Delete from Supabase Storage
@@ -431,18 +635,12 @@ async def list_documents(
     uploader_id: Optional[str] = None,
     page: int = 1,
     per_page: int = 20,
+    user=Depends(get_current_user),
 ):
     """
     List documents with optional filtering.
 
-    Args:
-        piazza_course_id: Filter by Piazza course ID (optional)
-        uploader_id: Filter by uploader ID (optional)
-        page: Page number (default: 1)
-        per_page: Items per page (default: 20)
-
-    Returns:
-        DocumentListResponse with paginated documents
+    Results are scoped: private documents are only visible to their uploader.
     """
     try:
         # Build query with optional filters
@@ -483,6 +681,15 @@ async def list_documents(
             query += " AND uploader_id = %s"
             count_query += " AND uploader_id = %s"
             params.append(uploader_id)
+
+        # Scope private documents to the authenticated user
+        query += (
+            " AND (permission != 'private' OR uploader_id = %s)"
+        )
+        count_query += (
+            " AND (permission != 'private' OR uploader_id = %s)"
+        )
+        params.append(str(user.id))
 
         # Add pagination
         offset = (page - 1) * per_page
@@ -533,7 +740,7 @@ async def list_documents(
 
 @router.get("/health")
 async def documents_health_check():
-    """Health check for document service."""
+    """Health check for document service (no auth required)."""
     return {
         "status": "healthy",
         "service": "documents",

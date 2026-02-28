@@ -1,18 +1,36 @@
 import { useState, useEffect } from "react";
-import { useDocuments, useDocumentDownloadUrl } from "../queries/useDocument";
-import { uploadDocument } from "../api/documentApi";
+import {
+  useDocuments,
+  useDocumentDownloadUrl,
+  useUploadDocument,
+} from "../queries/useDocument";
 
 /* global chrome */
 export default function AssistantPage({ user, onBack, onLogout }) {
   const [activeTab, setActiveTab] = useState("chats"); // 'chats' or 'files'
   const [page, setPage] = useState(1);
   const [selectedDocumentId, setSelectedDocumentId] = useState(null);
-  const [isUploading, setIsUploading] = useState(false);
   const perPage = 5;
   const [chats, setChats] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [piazzaClassId, setPiazzaClassId] = useState(null);
   const [isCreating, setIsCreating] = useState(false);
+
+  // ---------- Upload via presigned URL ----------
+  const {
+    mutateAsync: uploadFile,
+    isLoading: isUploadingFile,
+    progress: uploadProgress,
+    error: uploadError,
+    reset: resetUpload,
+  } = useUploadDocument({
+    accessToken: user?.access_token,
+    piazzaCourseId: piazzaClassId,
+    permission: "private",
+  });
+
+  const [uploadQueue, setUploadQueue] = useState([]); // files being uploaded
+  const [isUploading, setIsUploading] = useState(false);
 
   // Fetch documents for this user/thread (using Piazza class ID as thread ID)
   const {
@@ -25,15 +43,17 @@ export default function AssistantPage({ user, onBack, onLogout }) {
     piazzaCourseId: piazzaClassId,
     page,
     perPage,
-    enabled: !!piazzaClassId && !!user?.id,
+    accessToken: user?.access_token,
+    enabled: !!piazzaClassId && !!user?.id && !!user?.access_token,
   });
 
   // Get download URL for selected document
   const { data: downloadData } = useDocumentDownloadUrl(
     selectedDocumentId,
     3600,
+    user?.access_token,
     {
-      enabled: !!selectedDocumentId,
+      enabled: !!selectedDocumentId && !!user?.access_token,
     },
   );
 
@@ -180,7 +200,7 @@ export default function AssistantPage({ user, onBack, onLogout }) {
 
   const handleFileUpload = async (event) => {
     const files = event.target.files;
-    if (!piazzaClassId || !user?.id) {
+    if (!piazzaClassId || !user?.id || !user?.access_token) {
       alert(
         "Unable to upload: Please ensure you are on a Piazza page and logged in.",
       );
@@ -188,23 +208,50 @@ export default function AssistantPage({ user, onBack, onLogout }) {
     }
     if (files && files.length > 0) {
       setIsUploading(true);
+      resetUpload();
+
+      const fileArray = Array.from(files);
+      setUploadQueue(fileArray.map((f) => ({ name: f.name, status: "pending" })));
+
       try {
-        // Upload each file
-        for (const file of Array.from(files)) {
-          await uploadDocument({
-            uploaderId: user.id,
-            piazzaCourseId: piazzaClassId,
-            permission: "private",
-            file,
-          });
-        }
-        alert("Files uploaded successfully!");
+        // Upload all files concurrently via presigned URLs
+        const results = await Promise.all(
+          fileArray.map(async (file, index) => {
+            setUploadQueue((prev) =>
+              prev.map((item, i) =>
+                i === index ? { ...item, status: "uploading" } : item,
+              ),
+            );
+
+            try {
+              const result = await uploadFile(file);
+              setUploadQueue((prev) =>
+                prev.map((item, i) =>
+                  i === index ? { ...item, status: "done" } : item,
+                ),
+              );
+              return result;
+            } catch (err) {
+              setUploadQueue((prev) =>
+                prev.map((item, i) =>
+                  i === index ? { ...item, status: "error" } : item,
+                ),
+              );
+              throw err;
+            }
+          }),
+        );
+
+        alert(`${results.length} file(s) uploaded successfully!`);
         refetchDocuments();
       } catch (error) {
         console.error("Error uploading files:", error);
-        alert("Error uploading files. Please try again.");
+        alert(`Error uploading files: ${error.message}`);
       } finally {
         setIsUploading(false);
+        setUploadQueue([]);
+        // Reset file input so the same file(s) can be re-selected
+        event.target.value = "";
       }
     }
   };
@@ -369,7 +416,28 @@ export default function AssistantPage({ user, onBack, onLogout }) {
                   {isUploading ? (
                     <>
                       <span className="w-8 h-8 border-3 border-gray-300 border-t-purple-500 rounded-full animate-spin mb-2"></span>
-                      <p className="text-sm text-gray-600">Uploading...</p>
+                      <p className="text-sm text-gray-600">
+                        Uploading... {uploadProgress > 0 ? `${uploadProgress}%` : ""}
+                      </p>
+                      {/* Per-file status */}
+                      {uploadQueue.length > 0 && (
+                        <div className="mt-2 text-xs text-gray-500 max-w-[200px]">
+                          {uploadQueue.map((item, i) => (
+                            <div key={i} className="flex items-center gap-1 truncate">
+                              <span>
+                                {item.status === "done"
+                                  ? "✓"
+                                  : item.status === "error"
+                                    ? "✗"
+                                    : item.status === "uploading"
+                                      ? "↑"
+                                      : "…"}
+                              </span>
+                              <span className="truncate">{item.name}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </>
                   ) : (
                     <>
@@ -394,6 +462,11 @@ export default function AssistantPage({ user, onBack, onLogout }) {
                   disabled={isUploading}
                 />
               </label>
+              {uploadError && (
+                <p className="mt-2 text-xs text-red-500">
+                  Upload error: {uploadError.message}
+                </p>
+              )}
             </div>
 
             {/* Uploaded Files List */}
