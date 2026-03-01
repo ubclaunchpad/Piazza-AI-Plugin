@@ -2,9 +2,10 @@
 LLM API endpoint for text generation.
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
+from app.api.dependencies.auth import get_current_user
 from app.models import QueryRequest
 from app.textGeneration import stream_llm_response
 
@@ -12,7 +13,7 @@ router = APIRouter()
 
 
 @router.post("/query")
-async def generate_llm_response(request: QueryRequest):
+async def generate_llm_response(request: QueryRequest, user=Depends(get_current_user)):
     """Generate an LLM response to a user query (Streaming)."""
     try:
         return StreamingResponse(

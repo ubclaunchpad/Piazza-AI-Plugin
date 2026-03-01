@@ -83,7 +83,10 @@ export default function DashboardPage({
           `${API_ENDPOINT}/ingestion/ingest/status`,
           {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${user?.access_token}`,
+            },
             body: JSON.stringify({
               thread_id: classId,
               piazza_cookie: response.cookie,
@@ -195,14 +198,15 @@ export default function DashboardPage({
         throw new Error("Could not retrieve Piazza cookie");
       }
 
-      console.log(`${process.env.API_ENDPOINT}/ingestion/ingest`);
-      // Call the backend API
+      const API_ENDPOINT =
+        process.env.API_ENDPOINT || "http://localhost:8000/api/v1";
       const apiResponse = await fetch(
-        `${process.env.API_ENDPOINT}/ingestion/ingest`,
+        `${API_ENDPOINT}/ingestion/ingest`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            Authorization: `Bearer ${user?.access_token}`,
           },
           body: JSON.stringify({
             thread_id: piazzaInfo.classId,

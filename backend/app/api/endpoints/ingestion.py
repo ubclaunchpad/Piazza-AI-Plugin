@@ -4,8 +4,10 @@ Data ingestion API endpoint for Piazza threads.
 
 from typing import Any, Dict, List
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel, Field
+
+from app.api.dependencies.auth import get_current_user
 
 from app.threadIngestion import ThreadIngestionOrchestrator
 
@@ -53,7 +55,7 @@ def run_ingestion_task(thread_id: str, piazza_cookie: str):
 
 
 @router.post("/ingest", response_model=IngestResponse)
-async def ingest_thread(request: IngestRequest, background_tasks: BackgroundTasks):
+async def ingest_thread(request: IngestRequest, background_tasks: BackgroundTasks, user=Depends(get_current_user)):
     """
     Start data ingestion for a Piazza thread in the background.
 
@@ -83,7 +85,7 @@ async def ingest_thread(request: IngestRequest, background_tasks: BackgroundTask
 
 
 @router.post("/ingest/preview", response_model=List[ChunkData])
-async def preview_ingestion(request: IngestRequest):
+async def preview_ingestion(request: IngestRequest, user=Depends(get_current_user)):
     """
     Preview what chunks would be generated without storing them.
 
@@ -143,7 +145,7 @@ class IngestionStatusResponse(BaseModel):
 
 
 @router.post("/ingest/status", response_model=IngestionStatusResponse)
-async def get_ingestion_status(request: IngestRequest):
+async def get_ingestion_status(request: IngestRequest, user=Depends(get_current_user)):
     """
     Get the ingestion status for a thread/course.
 
