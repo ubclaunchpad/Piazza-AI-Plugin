@@ -18,9 +18,7 @@ router = APIRouter()
 
 
 @router.post("/simplify/{proficiency}")
-async def generate_llm_simplify_response(
-    request: PostRequest, proficiency: int
-):
+async def generate_llm_simplify_response(request: PostRequest, proficiency: int):
     try:
         return StreamingResponse(
             stream_llm_simplify_response(
