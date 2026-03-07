@@ -14,7 +14,7 @@ All paths below are relative to the repo root.
 
 These are ideal setup tasks to complete up front so developers can work independently with minimal merge conflicts. They are mostly **scaffolding, contracts, and wiring**, not full logic.
 
-- **1.1 Define backend API surface & shared contracts**
+- **1.1 Define backend API surface & shared contracts** *(completed)*
   - **1.1.1 Add resources router file**
     - Create `backend/app/api/endpoints/resources.py` with:
       - `router = APIRouter()` and placeholder endpoints:
@@ -30,7 +30,7 @@ These are ideal setup tasks to complete up front so developers can work independ
       - `api_router.include_router(resources.router, prefix="/resources", tags=["resources"])`.
     - Confirm the FastAPI docs (`/docs`) show the new endpoints.
 
-- **1.2 Define resource models (Pydantic)**
+- **1.2 Define resource models (Pydantic)** *(completed)*
   - **1.2.1 Create resource models module**
     - Add `backend/app/models/resource.py` with Pydantic models mirroring the spec:
       - `ResourceSearchRequest`:
@@ -73,7 +73,7 @@ These are ideal setup tasks to complete up front so developers can work independ
   - **1.2.2 Export models through the main models module**
     - Update `backend/app/models/__init__.py` to import and expose resource models (like `Document*` is currently done), so endpoints can `from app.models import ResourceSearchRequest, ...`.
 
-- **1.3 Database migration for `resource_library` table**
+- **1.3 Database migration for `resource_library` table** *(completed)*
   - **1.3.1 Create migration file**
     - Under `supabase/migrations/`, add a new migration, e.g. `20260226000000_resource_library.sql` (timestamp prefix can follow the pattern of existing files).
   - **1.3.2 Implement schema using the spec**
@@ -92,7 +92,7 @@ These are ideal setup tasks to complete up front so developers can work independ
       - Index on `(user_id, piazza_course_id)`.
       - Maybe index on `topic` if you expect topic-based filtering.
 
-- **1.4 Backend scaffolding for external aggregators and LLM ranking**
+- **1.4 Backend scaffolding for external aggregators and LLM ranking** *(completed)*
   - **1.4.1 Create a module for resource providers**
     - Add `backend/app/services/resource_providers.py` (or a small package `backend/app/services/resource_providers/` if you want one file per provider).
     - Define **interfaces only**, with stub implementations:
@@ -107,7 +107,7 @@ These are ideal setup tasks to complete up front so developers can work independ
         - `def rank_resources(resources: list[dict], query: str, piazza_course_id: str | None = None) -> list[dict]:`
       - For setup, implement a trivial ranking (e.g., keep order, or sort by a `source_weight` key) so the endpoint works end-to-end while LLM logic is built later by Backend dev.
 
-- **1.5 Frontend scaffolding for Resources UI**
+- **1.5 Frontend scaffolding for Resources UI** *(ongoing: awaiting ui design)*
   - **1.5.1 Create a Resources page component**
     - Add `frontend/src/popup/ResourcesPage.jsx`:
       - Basic layout only:
@@ -122,7 +122,7 @@ These are ideal setup tasks to complete up front so developers can work independ
       - Add a stub navigation path to `ResourcesPage` (e.g., a button from `DashboardPage` that sets `currentPage` to `"resources"`).
       - Keep this change small so future Frontend work can expand it without touching `App.jsx` again.
 
-- **1.6 API client stubs for resources**
+- **1.6 API client stubs for resources** *(completed)*
   - **1.6.1 Add API helper functions**
     - Create `frontend/src/api/resourcesApi.js` with functions:
       - `searchResources({ query, piazzaCourseId, filters, limit })`
@@ -131,7 +131,7 @@ These are ideal setup tasks to complete up front so developers can work independ
       - `deleteResource(id)`
     - For setup, have them hit the **real backend endpoints** but expect dummy data (from stubbed backend), or even temporarily return mocked data structures while backend is being implemented.
 
-- **1.7 Dependencies & configuration**
+- **1.7 Dependencies & configuration** *(completed)*
   - **1.7.1 Backend dependencies**
     - Update `backend/requirements.in` (and regenerate `requirements.txt` if you use a lock step) to include:
       - `google-api-python-client` (YouTube Data API v3)
@@ -153,13 +153,13 @@ Once all of the above are done, the **backend** and **frontend** workstreams can
 
 Scope: implement resource fetching, ranking, and library persistence in the backend, plus DB migration and provider integrations. Primary directories: `backend/app/api/endpoints`, `backend/app/models`, `backend/app/services`, `backend/app/textGeneration`, `supabase/migrations`.
 
-- **2.1 Implement `resource_library` migration & verify schema**
+- **2.1 Implement `resource_library` migration & verify schema** *(completed)*
   - Complete and run the new migration file created in **1.3**:
     - Ensure table `resource_library` is created correctly with foreign keys and indexes.
     - Confirm it appears in Supabase / Postgres.
   - Add any necessary down-migration logic if your tooling requires reversible migrations.
 
-- **2.2 Finalize Pydantic models and types**
+- **2.2 Finalize Pydantic models and types** *(completed)*
   - Revisit `backend/app/models/resource.py`:
     - Ensure all fields match the final DB schema (`resource_library`) and API contract.
     - Add any additional optional fields you decide to support (e.g., `thumbnail_url`, `source_id`, `raw_metadata`).

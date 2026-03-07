@@ -55,6 +55,16 @@ class Settings(BaseSettings):
         "text/plain",  # .txt
     ]
 
+    # External resource provider configuration
+    # API keys are optional here and should be provided via environment variables in deployments.
+    YOUTUBE_API_KEY: str | None = None
+    STACKEXCHANGE_API_KEY: str | None = None
+    STACKEXCHANGE_SITE: str = "stackoverflow"
+
+    # Resource search defaults
+    RESOURCE_SEARCH_DEFAULT_LIMIT: int = 10
+    RESOURCE_SEARCH_TIMEOUT_SECONDS: int = 10
+
     class Config:
         case_sensitive = True
 
