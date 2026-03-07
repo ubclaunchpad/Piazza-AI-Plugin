@@ -70,7 +70,7 @@ def create_calendar_event(event: CalendarEvent):
     )
     """
 
-    params = {
+    params = (
         event.id,
         "user_id_placeholder",
         "course_id_placeholder",
@@ -79,7 +79,7 @@ def create_calendar_event(event: CalendarEvent):
         event.event_date,
         "post_number_placeholder",
         event.reminder_settings,
-    }
+    )
 
     execute_statement(query, params)
     return event
