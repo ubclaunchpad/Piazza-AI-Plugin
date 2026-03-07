@@ -18,6 +18,7 @@ from fastapi import APIRouter, HTTPException, Depends
 
 from app.core.database import execute_query, execute_statement
 from app.models.calendar import CalendarEvent
+from app.core.encryption import fernet
 from app.core.auth import get_current_user
 
 # Placeholder imports for future models and logic
@@ -30,16 +31,17 @@ router = APIRouter()
 @router.get("/oauth")
 def calendar_auth():
     """
-    Initiate Google OAuth flow for calendar integration.
+    Handle OAuth callback and store tokens for the authenticated user.
 
-    Returns:
-        Redirect URL for Google OAuth consent screen.
+    TODO: When implementing, encrypt access_token and refresh_token using Fernet before storing in the database.
+    See app/core/encryption.py for encryption setup.
     """
-    # TODO: Implement Google OAuth initiation logic
-    raise HTTPException(
-        status_code=501,
-        detail="Google Calendar OAuth initiation is not implemented yet.",
-    )
+    # TODO: Implement OAuth callback logic
+    # Example:
+    # encrypted_access_token = fernet.encrypt(access_token.encode())
+    # encrypted_refresh_token = fernet.encrypt(refresh_token.encode())
+    # Store these in calendar_tokens table
+    pass
 
 
 @router.get("/callback")
