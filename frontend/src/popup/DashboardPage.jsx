@@ -7,7 +7,7 @@ function IngestionStatus({ status }) {
   const percentage =
     status.total_posts_count > 0
       ? Math.round(
-          (status.ingested_posts_count / status.total_posts_count) * 100
+          (status.ingested_posts_count / status.total_posts_count) * 100,
         )
       : 0;
 
@@ -44,6 +44,7 @@ export default function DashboardPage({
   const [isIngesting, setIsIngesting] = useState(false);
   const [ingestionStatus, setIngestionStatus] = useState(null);
   const [dailyQueries, setDailyQueries] = useState(0);
+  const [linkedToCalendar, setLinkedToCalendar] = useState(false);
 
   useEffect(() => {
     getCurrentTabInfo();
@@ -57,7 +58,7 @@ export default function DashboardPage({
       fetchIngestionStatus(piazzaInfo.classId);
       interval = setInterval(
         () => fetchIngestionStatus(piazzaInfo.classId),
-        10000
+        10000,
       );
     }
     return () => clearInterval(interval);
@@ -88,7 +89,7 @@ export default function DashboardPage({
               thread_id: classId,
               piazza_cookie: response.cookie,
             }),
-          }
+          },
         );
 
         if (statusResponse.ok) {
@@ -208,7 +209,7 @@ export default function DashboardPage({
             thread_id: piazzaInfo.classId,
             piazza_cookie: response.cookie,
           }),
-        }
+        },
       );
 
       if (!apiResponse.ok) {
@@ -223,13 +224,13 @@ export default function DashboardPage({
 
       if (data.status === "started") {
         alert(
-          "Ingestion started in background. You can continue using the extension."
+          "Ingestion started in background. You can continue using the extension.",
         );
       } else if (data.chunks_processed === 0) {
         alert("Thread is already up to date! No new posts to ingest.");
       } else {
         alert(
-          `Ingestion complete! Processed ${data.chunks_processed} new chunks.`
+          `Ingestion complete! Processed ${data.chunks_processed} new chunks.`,
         );
       }
     } catch (error) {
@@ -237,6 +238,39 @@ export default function DashboardPage({
       alert(`Ingestion failed: ${error.message}`);
     } finally {
       setIsIngesting(false);
+    }
+  };
+
+  useEffect(() => {
+    // Check if calendar is already linked
+    chrome.storage.local.get(["calendarLinked"], (result) => {
+      if (result.calendarLinked) {
+        setLinkedToCalendar(true);
+      } else {
+        setLinkedToCalendar(false);
+      }
+    });
+  }, []);
+
+  const handleCalendarLink = async () => {
+    try {
+      chrome.storage.local.get(["authToken"], (result) => {
+        const token = result.authToken;
+
+        if (!token) {
+          alert("You must be logged in first.");
+          return;
+        }
+
+        const authUrl = `${process.env.API_ENDPOINT}/calendar/auth?token=${token}`;
+
+        chrome.tabs.create({
+          url: authUrl,
+        });
+      });
+    } catch (error) {
+      console.error("Error opening calendar auth:", error);
+      alert(`Error: ${error.message}`);
     }
   };
 
@@ -371,6 +405,19 @@ export default function DashboardPage({
                       Ingest Thread
                     </>
                   )}
+                </button>
+                <button
+                  onClick={() => {
+                    if (!linkedToCalendar) {
+                      handleCalendarLink();
+                    }
+                  }}
+                  className="flex-1 px-3 py-2 bg-gray-100 border border-gray-200 rounded-md text-xs font-medium cursor-pointer flex items-center justify-center gap-1.5 transition-all hover:bg-gray-200 hover:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <span>📅</span>
+                  {linkedToCalendar
+                    ? "Already linked to Calendar"
+                    : "Link Calendar"}
                 </button>
               </div>
             </div>

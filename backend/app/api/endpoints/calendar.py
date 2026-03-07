@@ -1,15 +1,19 @@
-from fastapi import APIRouter, Request, Depends, Header, HTTPException
-from fastapi.responses import RedirectResponse
 from typing import Optional
+from fastapi import APIRouter, HTTPException, Header, Query
+from fastapi.responses import RedirectResponse
+from pydantic import BaseModel
+
 import google_auth_oauthlib.flow
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
+from google.auth.transport.requests import Request  # IMPORTANT
+
 import os
 import json
 import base64
 from datetime import datetime, timezone
 
-from app.core.database import execute_statement, fetch_one
+from app.core.database import execute_statement, execute_query
 from app.core.supabase import supabase
 
 router = APIRouter()
@@ -20,83 +24,90 @@ SCOPES = ["https://www.googleapis.com/auth/calendar"]
 
 REDIRECT_URI = "http://localhost:8000/api/v1/calendar/callback"
 
-PROVIDER = "google"
-
-
-# =========================
-# Supabase Auth
-# =========================
+PROVIDER_ACCOUNT_ID = "demo-account-id"
 
 async def get_current_user(authorization: Optional[str] = Header(None)):
     if not authorization:
         raise HTTPException(status_code=401, detail="Missing authorization header")
 
-    token = authorization.replace("Bearer ", "")
-    user = supabase.auth.get_user(token)
+    try:
+        token = authorization.replace("Bearer ", "")
+        user = supabase.auth.get_user(token)
+        if not user or not user.user:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        return user.user
+    except Exception as e:
+        import logging
 
-    if not user or not user.user:
-        raise HTTPException(status_code=401, detail="Invalid token")
+        logging.error(f"Authentication failed: {str(e)}")
+        raise HTTPException(status_code=401, detail=f"Authentication failed: {str(e)}")
 
-    return user.user
-
-
-# =========================
-# Step 1 - Start Google Linking
-# =========================
+# =====================================
+# Step 1 - Start Google OAuth
+# =====================================
 
 @router.get("/auth")
-async def calendar_auth(user=Depends(get_current_user)):
+async def calendar_auth(token: Optional[str] = Query(None)):
+    user = await get_current_user(token)
 
     flow = google_auth_oauthlib.flow.Flow.from_client_secrets_file(
         CLIENT_SECRETS_FILE,
         scopes=SCOPES,
-        redirect_uri=REDIRECT_URI
+        redirect_uri=REDIRECT_URI,
     )
 
-    # Encode user_id inside state
     state_data = base64.urlsafe_b64encode(
-        json.dumps({"user_id": user.id}).encode()
+        json.dumps({"user_id": str(user.id)}).encode()
     ).decode()
 
     authorization_url, _ = flow.authorization_url(
         access_type="offline",
         include_granted_scopes="true",
         prompt="consent",
-        state=state_data
+        state=state_data,
     )
 
-    return {"auth_url": authorization_url}
+    return RedirectResponse(authorization_url)
 
 
-# =========================
+# =====================================
 # Step 2 - Google Callback
-# =========================
+# =====================================
 
 @router.get("/callback")
 async def calendar_callback(state: str, code: str):
+    try:
+        # Decode OAuth state
+        decoded = json.loads(base64.urlsafe_b64decode(state.encode()).decode())
+        user_id = decoded["user_id"]
 
-    # Decode state
-    decoded = json.loads(base64.urlsafe_b64decode(state.encode()).decode())
-    user_id = decoded["user_id"]
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid OAuth state")
 
+    # Recreate OAuth flow
     flow = google_auth_oauthlib.flow.Flow.from_client_secrets_file(
         CLIENT_SECRETS_FILE,
         scopes=SCOPES,
         state=state,
-        redirect_uri=REDIRECT_URI
+        redirect_uri=REDIRECT_URI,
     )
 
+    # Exchange code for tokens
     flow.fetch_token(code=code)
+
     credentials = flow.credentials
 
-    # Save or update in DB
+    # Store tokens for this user
     execute_statement(
         """
-        INSERT INTO oauth_accounts (
-            user_id, provider, access_token, refresh_token, expires_at
+        INSERT INTO calendar_tokens (
+            user_id,
+            access_token,
+            refresh_token,
+            expires_at
         )
-        VALUES (%s, %s, %s, %s, %s)
-        ON CONFLICT (user_id, provider) DO UPDATE SET
+        VALUES (%s, %s, %s, %s)
+        ON CONFLICT (user_id) DO UPDATE SET
             access_token = EXCLUDED.access_token,
             refresh_token = EXCLUDED.refresh_token,
             expires_at = EXCLUDED.expires_at,
@@ -104,91 +115,115 @@ async def calendar_callback(state: str, code: str):
         """,
         (
             user_id,
-            PROVIDER,
             credentials.token,
             credentials.refresh_token,
             credentials.expiry,
         ),
     )
 
-    # Redirect back to frontend
-    return RedirectResponse("http://localhost:3000/calendar-linked")
+    # Redirect user back to Piazza
+    return RedirectResponse("https://piazza.com")
 
 
-# =========================
+# =====================================
 # Helper - Get Valid Credentials
-# =========================
+# =====================================
 
 def get_valid_google_credentials(user_id: str):
 
-    record = fetch_one(
-        "SELECT access_token, refresh_token, expires_at FROM oauth_accounts WHERE user_id = %s AND provider = %s",
-        (user_id, PROVIDER),
+    record = execute_query(
+        """
+        SELECT access_token, refresh_token, expires_at
+        FROM calendar_tokens
+        WHERE user_id = %s
+        """,
+        (user_id,),
+        fetch_one=True,
     )
 
     if not record:
         return None
 
-    access_token, refresh_token, expires_at = record
+    access_token = record["access_token"]
+    refresh_token = record["refresh_token"]
+    expires_at = record["expires_at"]
 
     creds = Credentials(
         token=access_token,
         refresh_token=refresh_token,
         token_uri="https://oauth2.googleapis.com/token",
-        client_id=None,
-        client_secret=None,
+        client_id=json.load(open(CLIENT_SECRETS_FILE))["web"]["client_id"],
+        client_secret=json.load(open(CLIENT_SECRETS_FILE))["web"]["client_secret"],
         scopes=SCOPES,
     )
 
-    # If expired -> refresh
-    if expires_at <= datetime.now(timezone.utc):
-        creds.refresh(Request())
+    # Ensure timezone-aware expiry
+    if isinstance(expires_at, datetime):
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
 
-        execute_statement(
-            """
-            UPDATE oauth_accounts
-            SET access_token = %s,
-                expires_at = %s,
-                updated_at = NOW()
-            WHERE user_id = %s AND provider = %s
-            """,
-            (creds.token, creds.expiry, user_id, PROVIDER),
-        )
+        if expires_at <= datetime.now(timezone.utc):
+
+            creds.refresh(Request())
+
+            execute_statement(
+                """
+                UPDATE calendar_tokens
+                SET access_token = %s,
+                    expires_at = %s,
+                    updated_at = NOW()
+                WHERE user_id = %s
+                """,
+                (creds.token, creds.expiry, user_id),
+            )
 
     return creds
 
 
-# =========================
+# =====================================
 # Add Event Endpoint
-# =========================
+# =====================================
 
-@router.post("/add-event")
+class AddEventRequest(BaseModel):
+    title: str
+    start_time: str
+    end_time: str
+
+
+@router.post("/events")
 async def add_calendar_event(
-    title: str,
-    start_time: str,
-    end_time: str,
-    user=Depends(get_current_user)
+    event: AddEventRequest,
+    authorization: Optional[str] = Header(None),
 ):
+
+    user = await get_current_user(authorization)
 
     creds = get_valid_google_credentials(user.id)
 
     if not creds:
-        return {"action": "link_required"}
+        raise HTTPException(status_code=401, detail="Google account not connected")
 
     service = build("calendar", "v3", credentials=creds)
 
-    event = {
-        "summary": title,
-        "start": {"dateTime": start_time, "timeZone": "UTC"},
-        "end": {"dateTime": end_time, "timeZone": "UTC"},
+    event_body = {
+        "summary": event.title,
+        "start": {
+            "dateTime": event.start_time,
+            "timeZone": "UTC",
+        },
+        "end": {
+            "dateTime": event.end_time,
+            "timeZone": "UTC",
+        },
     }
 
     created_event = service.events().insert(
         calendarId="primary",
-        body=event
+        body=event_body,
     ).execute()
 
     return {
         "status": "event_created",
-        "event_id": created_event["id"]
+        "event_id": created_event["id"],
+        "html_link": created_event.get("htmlLink"),
     }

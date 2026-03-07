@@ -1,5 +1,6 @@
 import { createRoot } from "react-dom/client";
 import ChatbotApp from "./ChatbotApp.jsx";
+import injectEventButtonToPosts from "./injectEventButtonToPosts.js";
 // Import CSS as a raw string - we'll inject it into shadow DOM
 import cssText from "./content.css?raw";
 
@@ -73,53 +74,6 @@ function injectChatbot() {
   }
 }
 
-// Detects possible dates in a string (simple regex for common formats)
-function detectDates(text) {
-  const datePatterns = [
-    /\b\d{4}-\d{1,2}-\d{1,2}\b/g, // YYYY-MM-DD
-    /\b\d{1,2}\/\d{1,2}\/\d{4}\b/g, // MM/DD/YYYY or DD/MM/YYYY
-    /\b\d{1,2}-\d{1,2}-\d{4}\b/g, // MM-DD-YYYY or DD-MM-YYYY
-    /\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{4}\b/gi, // Month DD, YYYY
-    /\b\d{4}\/\d{1,2}\/\d{1,2}\b/g, // YYYY/MM/DD
-    /\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2}\b/gi, // Month DD (no year)
-  ];
-  let matches = [];
-  datePatterns.forEach((pattern) => {
-    const found = text.match(pattern);
-    if (found) matches = matches.concat(found);
-  });
-  return matches;
-}
-
-function injectDivToPosts() {
-  // Find all divs with id='quanda-content'
-  const containers = document.querySelectorAll("div#qanda-content");
-  containers.forEach((container) => {
-    // Inside each container, find article with id='qaContentViewId'
-    const article = container.querySelector("article#qaContentViewId");
-    // add the div only if the article exists, the div hasn't been injected yet, and the detect date function returns true
-    console.log("Checking article for date detection:", article.textContent);
-    console.log("Detected dates:", detectDates(article.textContent));
-    if (
-      article &&
-      !article.querySelector(".my-injected-div") &&
-      detectDates(article.textContent).length > 0
-    ) {
-      // add each div corresponding to each date found in the article
-      const dates = detectDates(article.textContent);
-      dates.forEach((date) => {
-        const div = document.createElement("div");
-        div.className = "my-injected-div";
-        div.textContent = `Detected date: ${date}`;
-        div.style.backgroundColor = "#ffeb3b";
-        div.style.padding = "5px";
-        div.style.marginTop = "5px";
-        article.appendChild(div);
-      });
-    }
-  });
-}
-
 // Setup observer to watch for removal
 function setupObserver() {
   if (!document.body) {
@@ -142,7 +96,7 @@ function setupObserver() {
       shadowRoot = null;
       root = null;
       setTimeout(injectChatbot, 50);
-      setTimeout(injectDivToPosts, 50);
+      setTimeout(injectEventButtonToPosts, 50);
     }
   });
 
@@ -159,7 +113,7 @@ function setupObserver() {
 function init() {
   if (document.body) {
     injectChatbot();
-    injectDivToPosts();
+    injectEventButtonToPosts();
     setupObserver();
   } else {
     // Retry until body is available
@@ -218,6 +172,6 @@ setInterval(() => {
     lastUrl = currentUrl;
     console.log("URL changed, checking chatbot...");
     setTimeout(injectChatbot, 200);
-    setTimeout(injectDivToPosts, 200);
+    setTimeout(injectEventButtonToPosts, 200);
   }
 }, 500);

@@ -16,3 +16,4 @@ langchain-postgres==0.0.16
 pgvector
 google_auth_oauthlib
 itsdangerous
+google-api-python-client
