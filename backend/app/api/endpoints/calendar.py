@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.get("/calendar/oauth")
+@router.get("/oauth")
 def calendar_auth():
     """
     Initiate Google OAuth flow for calendar integration.
@@ -38,7 +38,7 @@ def calendar_auth():
     pass
 
 
-@router.get("/calendar/callback")
+@router.get("/callback")
 def calendar_callback():
     """
     Handle Google OAuth callback and store access tokens.
@@ -50,7 +50,7 @@ def calendar_callback():
     pass
 
 
-@router.post("/calendar/events", response_model=CalendarEvent)
+@router.post("/events", response_model=CalendarEvent)
 def create_calendar_event(event: CalendarEvent):
     """
     Create a new Google Calendar event based on Piazza post data and save it to the database.
@@ -85,7 +85,7 @@ def create_calendar_event(event: CalendarEvent):
     return event
 
 
-@router.get("/calendar/events", response_model=List[CalendarEvent])
+@router.get("/events", response_model=List[CalendarEvent])
 def list_calendar_events():
     """
     List all calendar events synced with the user's Google Calendar.
@@ -100,7 +100,7 @@ def list_calendar_events():
     return [CalendarEvent(**event) for event in results]
 
 
-@router.get("/calendar/events/{event_id}", response_model=CalendarEvent)
+@router.get("/events/{event_id}", response_model=CalendarEvent)
 def get_calendar_event(event_id: str):
     """
     Get a single calendar event by its ID.
@@ -118,7 +118,7 @@ def get_calendar_event(event_id: str):
     return CalendarEvent(**result)
 
 
-@router.put("/calendar/settings")
+@router.put("/settings")
 def update_calendar_settings():
     """
     Update user's calendar integration settings, such as reminder preferences.
