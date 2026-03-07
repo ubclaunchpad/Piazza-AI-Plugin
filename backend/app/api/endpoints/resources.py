@@ -7,10 +7,13 @@ This module defines the API surface for the Smart Resource Aggregator feature.
 import asyncio
 import logging
 from datetime import datetime, timezone
+from typing import Optional
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 
+from app.core.database import execute_query, execute_statement
+from app.core.supabase import supabase
 from app.models import (
     ResourceSearchItem,
     ResourceSearchRequest,
@@ -39,6 +42,32 @@ PROVIDER_MAP = {
     "khan_academy": fetch_khan_academy_resources,
     "wikipedia": fetch_wikipedia_resources,
 }
+
+
+async def get_current_user(authorization: Optional[str] = Header(None)):
+    """Validate Bearer token and return the current user (for library endpoints)."""
+    if not authorization:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing authorization header",
+        )
+    try:
+        token = authorization.replace("Bearer ", "").strip()
+        user = supabase.auth.get_user(token)
+        if not user or not user.user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token",
+            )
+        return user.user
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Resource library auth failed: %s", e)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication failed",
+        )
 
 
 @router.post(
@@ -114,25 +143,62 @@ async def search_resources(payload: ResourceSearchRequest) -> ResourceSearchResp
     response_model=SavedResourceListResponse,
     summary="Get saved resources for a user",
 )
-async def get_resource_library() -> SavedResourceListResponse:
+async def get_resource_library(
+    user=Depends(get_current_user),
+    piazza_course_id: Optional[str] = Query(None, description="Filter by Piazza course ID"),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(20, ge=1, le=100),
+) -> SavedResourceListResponse:
     """
     Retrieve resources previously saved to the user's library.
-
-    Stub implementation: returns a small, fixed example list.
     """
-    now = datetime.now(timezone.utc)
-    example_resource = SavedResource(
-        id=uuid4(),
-        topic="Example Topic",
-        title="Example saved resource",
-        url="https://example.com/resource",
-        resource_type="wikipedia",
-        description="Example saved resource from the library.",
-        relevance_score=0.9,
-        piazza_course_id="CPSC_###",
-        created_at=now,
-    )
-    return SavedResourceListResponse(saved_resources=[example_resource])
+    try:
+        base_sql = """
+            SELECT id, user_id, piazza_course_id, topic, resource_type, title, url,
+                   description, relevance_score, created_at
+            FROM resource_library
+            WHERE user_id = %s
+        """
+        count_sql = "SELECT COUNT(*) AS total FROM resource_library WHERE user_id = %s"
+        params = [str(user.id)]
+        if piazza_course_id and piazza_course_id.strip():
+            base_sql += " AND piazza_course_id = %s"
+            count_sql += " AND piazza_course_id = %s"
+            params.append(piazza_course_id.strip())
+        base_sql += " ORDER BY created_at DESC LIMIT %s OFFSET %s"
+        offset = (page - 1) * per_page
+        params.extend([per_page, offset])
+
+        total_row = execute_query(count_sql, tuple(params[: len(params) - 2]), fetch_one=True)
+        total = int(total_row["total"]) if total_row else 0
+
+        rows = execute_query(base_sql, tuple(params))
+        if not rows:
+            return SavedResourceListResponse(saved_resources=[])
+
+        saved = [
+            SavedResource(
+                id=row["id"],
+                topic=row["topic"],
+                title=row["title"],
+                url=row["url"],
+                resource_type=row["resource_type"] or "other",
+                description=row["description"],
+                relevance_score=float(row["relevance_score"]) if row["relevance_score"] is not None else None,
+                piazza_course_id=row["piazza_course_id"] or "",
+                created_at=row["created_at"],
+            )
+            for row in rows
+        ]
+        return SavedResourceListResponse(saved_resources=saved)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Failed to fetch resource library: %s", e)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to fetch resource library",
+        )
 
 
 @router.post(
@@ -141,15 +207,68 @@ async def get_resource_library() -> SavedResourceListResponse:
     status_code=status.HTTP_200_OK,
     summary="Save a resource to the library",
 )
-async def save_resource_to_library(payload: SaveResourceRequest) -> SaveResourceResponse:
+async def save_resource_to_library(
+    payload: SaveResourceRequest,
+    user=Depends(get_current_user),
+) -> SaveResourceResponse:
     """
     Save a specific resource item to the resource library.
-
-    Stub implementation: returns a generated ID without persisting data.
     """
-    # In the full implementation, this will insert into the resource_library table.
-    new_id = uuid4()
-    return SaveResourceResponse(id=new_id)
+    try:
+        url = (payload.url or "").strip()
+        if not url:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="url is required and cannot be empty",
+            )
+        topic = (payload.topic or "").strip()
+        if not topic:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="topic is required and cannot be empty",
+            )
+        title = (payload.title or "").strip()
+        if not title:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="title is required and cannot be empty",
+            )
+
+        insert_sql = """
+            INSERT INTO resource_library
+            (user_id, piazza_course_id, topic, resource_type, title, url, description, relevance_score)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id
+        """
+        row = execute_query(
+            insert_sql,
+            (
+                str(user.id),
+                payload.piazza_course_id or None,
+                topic,
+                payload.resource_type or None,
+                title,
+                url,
+                payload.description or None,
+                payload.relevance_score,
+            ),
+            fetch_one=True,
+        )
+        if not row:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to save resource",
+            )
+        new_id = row["id"]
+        return SaveResourceResponse(id=new_id)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Failed to save resource: %s", e)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to save resource",
+        )
 
 
 @router.delete(
@@ -157,12 +276,28 @@ async def save_resource_to_library(payload: SaveResourceRequest) -> SaveResource
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete a resource from the library",
 )
-async def delete_resource_from_library(id: UUID) -> None:
+async def delete_resource_from_library(
+    id: UUID,
+    user=Depends(get_current_user),
+) -> None:
     """
     Delete a specific resource from the library by its ID.
-
-    Stub implementation: assumes deletion succeeds and returns 204.
     """
-    # Full implementation will validate ownership and delete from resource_library.
-    return None
+    try:
+        delete_sql = "DELETE FROM resource_library WHERE id = %s AND user_id = %s"
+        affected = execute_statement(delete_sql, (str(id), str(user.id)))
+        if affected == 0:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Resource not found or not authorized to delete",
+            )
+        return None
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Failed to delete resource: %s", e)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to delete resource",
+        )
 

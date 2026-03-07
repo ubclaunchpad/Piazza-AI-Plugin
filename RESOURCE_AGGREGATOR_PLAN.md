@@ -165,7 +165,7 @@ Scope: implement resource fetching, ranking, and library persistence in the back
     - Add any additional optional fields you decide to support (e.g., `thumbnail_url`, `source_id`, `raw_metadata`).
     - Make sure models are exported from `backend/app/models/__init__.py`.
 
-- **2.3 Implement `POST /resources/search` endpoint**
+- **2.3 Implement `POST /resources/search` endpoint** *(completed)*
   - File: `backend/app/api/endpoints/resources.py`.
   - Responsibilities:
     - Accept `ResourceSearchRequest` in the body.
@@ -182,7 +182,7 @@ Scope: implement resource fetching, ranking, and library persistence in the back
     - Gracefully handle provider failures (e.g., log and continue with other providers).
     - Return 500 only if all providers fail or ranking fails in a non-recoverable way.
 
-- **2.4 Implement `GET /resources/library` endpoint**
+- **2.4 Implement `GET /resources/library` endpoint** *(completed)*
   - Responsibilities:
     - Identify user (for now, options include:
       - Use a `user_id` passed explicitly as a query parameter, or
@@ -193,7 +193,7 @@ Scope: implement resource fetching, ranking, and library persistence in the back
   - Performance:
     - Use pagination if you expect many rows (page / per_page query params).
 
-- **2.5 Implement `POST /resources/library` endpoint**
+- **2.5 Implement `POST /resources/library` endpoint** *(completed)*
   - Responsibilities:
     - Accept `SaveResourceRequest` (plus user or session context).
     - Validate URL and required fields.
@@ -204,7 +204,7 @@ Scope: implement resource fetching, ranking, and library persistence in the back
   - Consider deduplication:
     - Optionally avoid duplicates for the same user/topic/url (e.g., unique constraint on `(user_id, url)` or application-level check).
 
-- **2.6 Implement `DELETE /resources/library/{id}` endpoint**
+- **2.6 Implement `DELETE /resources/library/{id}` endpoint** *(completed)*
   - Responsibilities:
     - Validate that the resource belongs to the requesting user (if you have auth context).
     - Delete row by `id` from `resource_library`.
