@@ -35,7 +35,10 @@ def calendar_auth():
         Redirect URL for Google OAuth consent screen.
     """
     # TODO: Implement Google OAuth initiation logic
-    pass
+    raise HTTPException(
+        status_code=501,
+        detail="Google Calendar OAuth initiation is not implemented yet.",
+    )
 
 
 @router.get("/callback")
