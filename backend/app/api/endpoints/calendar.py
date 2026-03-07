@@ -67,7 +67,7 @@ def create_calendar_event(event: CalendarEvent):
 
     query = """
         INSERT INTO calendar_events (
-            id, user_id, course_id, google_event_id, title, event_date, post_number, reminder_settings
+            id, user_id, piazza_course_id, google_event_id, title, event_date, source_post_number, reminder_settings
         ) VALUES (
         %s, %s, %s, %s, %s, %s, %s, %s
     )
@@ -76,11 +76,11 @@ def create_calendar_event(event: CalendarEvent):
     params = (
         event.id,
         "user_id_placeholder",
-        "course_id_placeholder",
+        "piazza_course_id_placeholder",
         event.google_event_id,
         event.title,
         event.event_date,
-        "post_number_placeholder",
+        "source_post_number_placeholder",
         event.reminder_settings,
     )
 
