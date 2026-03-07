@@ -14,10 +14,11 @@ Endpoints follow FastAPI best practices and include detailed docstrings for clar
 import logging
 from typing import List
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 
 from app.core.database import execute_query, execute_statement
 from app.models.calendar import CalendarEvent
+from app.core.auth import get_current_user
 
 # Placeholder imports for future models and logic
 # from app.models.calendar import ...
@@ -54,7 +55,7 @@ def calendar_callback():
 
 
 @router.post("/events", response_model=CalendarEvent)
-def create_calendar_event(event: CalendarEvent):
+def create_calendar_event(event: CalendarEvent, current_user=Depends(get_current_user)):
     """
     Create a new Google Calendar event based on Piazza post data and save it to the database.
 
@@ -75,12 +76,12 @@ def create_calendar_event(event: CalendarEvent):
 
     params = (
         event.id,
-        "user_id_placeholder",
-        "piazza_course_id_placeholder",
+        current_user.id,
+        event.piazza_course_id,
         event.google_event_id,
         event.title,
         event.event_date,
-        "source_post_number_placeholder",
+        event.source_post_number,
         event.reminder_settings,
     )
 
@@ -89,7 +90,7 @@ def create_calendar_event(event: CalendarEvent):
 
 
 @router.get("/events", response_model=List[CalendarEvent])
-def list_calendar_events():
+def list_calendar_events(current_user=Depends(get_current_user)):
     """
     List all calendar events synced with the user's Google Calendar.
 
@@ -98,13 +99,13 @@ def list_calendar_events():
         A list of calendar events.
     """
 
-    query = "SELECT * FROM calendar_events"
-    results = execute_query(query)
+    query = "SELECT * FROM calendar_events WHERE user_id = %s"
+    results = execute_query(query, (current_user.id,))
     return [CalendarEvent(**event) for event in results]
 
 
 @router.get("/events/{event_id}", response_model=CalendarEvent)
-def get_calendar_event(event_id: str):
+def get_calendar_event(event_id: str, current_user=Depends(get_current_user)):
     """
     Get a single calendar event by its ID.
 
@@ -114,20 +115,26 @@ def get_calendar_event(event_id: str):
     Returns:
         CalendarEvent: The event data, or raises 404 if not found.
     """
-    query = "SELECT * FROM calendar_events WHERE id = %s"
-    result = execute_query(query, (event_id,), fetch_one=True)
+    query = "SELECT * FROM calendar_events WHERE id = %s AND user_id = %s"
+    result = execute_query(query, (event_id, current_user.id), fetch_one=True)
     if not result:
         raise HTTPException(status_code=404, detail="Event not found")
     return CalendarEvent(**result)
 
 
 @router.put("/settings")
-def update_calendar_settings():
+def update_calendar_settings(reminder_settings: str, current_user=Depends(get_current_user)):
     """
     Update user's calendar integration settings, such as reminder preferences.
+
+     Args:
+        reminder_settings: The new reminder settings.
 
     Returns:
         Updated settings or confirmation message.
     """
-    # TODO: Implement calendar settings update logic
-    pass
+    query = "UPDATE calendar_events SET reminder_settings = %s WHERE user_id = %s"
+    result = execute_statement(query, (reminder_settings, current_user.id))
+    if result.rowcount == 0:
+        raise HTTPException(status_code=404, detail="Event not found or not owned by user")
+    return {"status": "success", "reminder_settings": reminder_settings}
