@@ -13,6 +13,7 @@ from app.api.endpoints import (
     example,
     ingestion,
     llm,
+    per_post_llm,
     study_materials,
 )
 
@@ -44,6 +45,11 @@ api_router.include_router(chat_sessions.router, tags=["chat-sessions"])
 
 # Include document endpoints
 api_router.include_router(documents.router, prefix="/documents", tags=["documents"])
+
+# Include post assistant endpoints
+api_router.include_router(
+    per_post_llm.router, prefix="/per-post", tags=["post-assistant"]
+)
 
 # Include study material generator endpoints
 api_router.include_router(
