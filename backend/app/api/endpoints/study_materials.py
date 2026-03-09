@@ -27,7 +27,11 @@ from app.models.study_materials import (
     SummaryResponse,
     AllStudyMaterialsResponse,
 )
-from app.textGeneration import generate_quiz_questions, generate_flashcard_stream, generate_summary
+from app.textGeneration import (
+    generate_quiz_questions,
+    generate_flashcard_stream,
+    generate_summary,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -453,7 +457,7 @@ async def get_all_flashcards() -> list[FlashcardAllResponse]:
         )
 
         result = []
-        for deck in (decks or []):
+        for deck in decks or []:
             cards_rows = execute_query(
                 """
                 SELECT id, front, back, card_type,
@@ -462,13 +466,17 @@ async def get_all_flashcards() -> list[FlashcardAllResponse]:
                 """,
                 (str(deck["id"]),),
             )
-            result.append(FlashcardAllResponse(
-                id=deck["id"],
-                title=deck["title"],
-                tags=deck["tags"],
-                created_at=deck["created_at"],
-                cards=[FlashcardResponse.model_validate(r) for r in (cards_rows or [])],
-            ))
+            result.append(
+                FlashcardAllResponse(
+                    id=deck["id"],
+                    title=deck["title"],
+                    tags=deck["tags"],
+                    created_at=deck["created_at"],
+                    cards=[
+                        FlashcardResponse.model_validate(r) for r in (cards_rows or [])
+                    ],
+                )
+            )
 
         return result
 
@@ -579,7 +587,7 @@ async def list_all_study_materials(piazza_course_id: str) -> AllStudyMaterialsRe
         )
 
         flashcard_decks = []
-        for deck in (deck_rows or []):
+        for deck in deck_rows or []:
             cards_rows = execute_query(
                 """
                 SELECT id, front, back, card_type,
@@ -588,13 +596,17 @@ async def list_all_study_materials(piazza_course_id: str) -> AllStudyMaterialsRe
                 """,
                 (str(deck["id"]),),
             )
-            flashcard_decks.append(FlashcardAllResponse(
-                id=deck["id"],
-                title=deck["title"],
-                tags=deck["tags"],
-                created_at=deck["created_at"],
-                cards=[FlashcardResponse.model_validate(r) for r in (cards_rows or [])],
-            ))
+            flashcard_decks.append(
+                FlashcardAllResponse(
+                    id=deck["id"],
+                    title=deck["title"],
+                    tags=deck["tags"],
+                    created_at=deck["created_at"],
+                    cards=[
+                        FlashcardResponse.model_validate(r) for r in (cards_rows or [])
+                    ],
+                )
+            )
 
         summary_rows = execute_query(
             """

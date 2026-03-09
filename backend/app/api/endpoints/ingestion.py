@@ -171,7 +171,9 @@ async def get_ingestion_status(request: IngestRequest):
                 WHERE c.name = %s
             """
             result = execute_query(count_query, (request.thread_id,))
-            ingested_count = result[0].get("count", 0) if result and len(result) > 0 else 0
+            ingested_count = (
+                result[0].get("count", 0) if result and len(result) > 0 else 0
+            )
         except Exception as e:
             logger.warning(f"Failed to get ingested count: {e}")
             ingested_count = 0

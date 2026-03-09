@@ -168,7 +168,9 @@ def test_connection() -> bool:
             cursor = db.cursor()
             cursor.execute("SELECT 1 as test")
             result = cursor.fetchone()
-            success = bool(result and dict(result).get("test") == 1) if result else False
+            success = (
+                bool(result and dict(result).get("test") == 1) if result else False
+            )
 
         if success:
             logger.info("Database connection test successful")

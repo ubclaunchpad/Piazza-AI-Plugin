@@ -16,6 +16,7 @@ QUIZ_MODEL = "openai/gpt-oss-120b"
 
 # ----------------------------- Quiz ------------------------------- #
 
+
 class QuizGenerationPayload(BaseModel):
     questions: list[QuizQuestion]
 
@@ -25,6 +26,7 @@ _questions_schema_json = json.dumps(_quiz_payload_adapter.json_schema(), indent=
 
 
 # ----------------------------- Flashcards ------------------------------- #
+
 
 class FlashcardGenerationPayload(BaseModel):
     cards: list[FlashcardCard]
@@ -214,7 +216,6 @@ Rules:
         "source_posts": resolved_source_posts,
         "model": QUIZ_MODEL,
     }
-
 
 
 def generate_summary(
