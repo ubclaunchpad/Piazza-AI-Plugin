@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { SimplifyIcon, SummarizeIcon, SolveIcon, TranslateIcon, ConceptIcon, ActionButton, ResultDisplay, LoadingSpinner, ProficiencySelector } from "./PostAssistantUI.jsx";
 
 const API_BASE_URL = process.env.API_ENDPOINT || "http://localhost:8000/api/v1";
+const TOOLBAR_SESSION_EVENT = "piazza-ai-open-session";
 
 export default function PostAssistant({ threadId, postNum, content }) {
   const [activeAction, setActiveAction] = useState(null);
@@ -9,7 +10,7 @@ export default function PostAssistant({ threadId, postNum, content }) {
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
   const [user, setUser] = useState(null);
-  const [proficiency, setProficiency] = useState(0); // 0: Beginner, 1: Advanced
+  const [proficiency, setProficiency] = useState(1);
 
   useEffect(() => {
     if (typeof chrome !== "undefined" && chrome.storage) {
@@ -20,6 +21,49 @@ export default function PostAssistant({ threadId, postNum, content }) {
       });
     }
   }, []);
+
+  const createToolbarSession = async () => {
+    const response = await fetch(`${API_BASE_URL}/chat-sessions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: user ? `Bearer ${user.access_token}` : "",
+      },
+      body: JSON.stringify({
+        piazza_course_id: threadId,
+        title: "New Chat",
+      }),
+    });
+
+    if (response.status === 401) {
+      throw new Error("Authentication failed. Please log in via the extension.");
+    }
+
+    if (!response.ok) {
+      throw new Error("Failed to create chat session.");
+    }
+
+    return response.json();
+  };
+
+  const openChatSession = (sessionId, title) => {
+    window.dispatchEvent(
+      new CustomEvent(TOOLBAR_SESSION_EVENT, {
+        detail: {
+          sessionId,
+          title,
+          source: "post-assistant",
+        },
+      })
+    );
+  };
+
+  const mapSimplifyProficiency = (value) => {
+    // Keep the UI at 3 tiers and map directly to backend path param.
+    if (value <= 1) return 1;
+    if (value >= 3) return 3;
+    return 2;
+  };
 
   const handleAction = async (action) => {
     // Toggle off if clicking the active button (allow closing even if error occurred)
@@ -34,12 +78,24 @@ export default function PostAssistant({ threadId, postNum, content }) {
     setError(null);
 
     try {
+      if (!user?.access_token) {
+        throw new Error("Please log in via the extension.");
+      }
+
+      if (!threadId || !postNum || !content?.trim()) {
+        throw new Error("Could not resolve current post context.");
+      }
+
+      const newSession = await createToolbarSession();
+      const sessionId = newSession.id;
+
       // Construct endpoint based on action
-      let endpoint = `${API_BASE_URL}`;
+      let endpoint = `${API_BASE_URL}/per-post`;
+      const simplifyLevel = mapSimplifyProficiency(proficiency);
       
       switch (action) {
         case 'simplify':
-          endpoint += `/simplify/${proficiency}`;
+          endpoint += `/simplify/${simplifyLevel}`;
           break;
         case 'summarize':
           endpoint += '/summarize';
@@ -64,10 +120,9 @@ export default function PostAssistant({ threadId, postNum, content }) {
           "Authorization": user ? `Bearer ${user.access_token}` : ""
         },
         body: JSON.stringify({
-          post_num: postNum,
+          post_num: Number(postNum),
           thread_id: threadId,
-          session_id: null, // Optional for one-off tasks
-          content: content  // Send content just in case backend needs it
+          session_id: sessionId,
         })
       });
 
@@ -102,6 +157,8 @@ export default function PostAssistant({ threadId, postNum, content }) {
           }
         }
       }
+
+      openChatSession(sessionId, newSession.title);
 
     } catch (err) {
       setError(err.message);

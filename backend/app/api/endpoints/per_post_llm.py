@@ -5,7 +5,7 @@ LLM API endpoints for per-post AI assistant
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
-from app.models import PostRequest, SimplifyPostRequest
+from app.models import PostRequest
 from app.textGeneration.post_assistant.concept_linking import (
     stream_llm_concept_response,
 )
@@ -18,9 +18,7 @@ router = APIRouter()
 
 
 @router.post("/simplify/{proficiency}")
-async def generate_llm_simplify_response(
-    request: SimplifyPostRequest, proficiency: int
-):
+async def generate_llm_simplify_response(request: PostRequest, proficiency: int):
     try:
         return StreamingResponse(
             stream_llm_simplify_response(
