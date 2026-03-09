@@ -1,4 +1,5 @@
-from typing import List, Optional
+import logging
+from typing import Any, List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
@@ -12,10 +13,12 @@ from app.models.chat_session import (
     ChatSessionUpdate,
 )
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-async def get_current_user(authorization: Optional[str] = Header(None)):
+async def get_current_user(authorization: Optional[str] = Header(None)) -> Any:
+    """Validate authorization token and return current user."""
     if not authorization:
         raise HTTPException(status_code=401, detail="Missing authorization header")
 
@@ -26,9 +29,7 @@ async def get_current_user(authorization: Optional[str] = Header(None)):
             raise HTTPException(status_code=401, detail="Invalid token")
         return user.user
     except Exception as e:
-        import logging
-
-        logging.error(f"Authentication failed: {str(e)}")
+        logger.error(f"Authentication failed: {str(e)}")
         raise HTTPException(status_code=401, detail=f"Authentication failed: {str(e)}")
 
 
@@ -229,7 +230,7 @@ async def get_daily_query_count(user=Depends(get_current_user)):
               AND cm.created_at >= CURRENT_DATE
         """
         result = execute_query(query, (user.id,), fetch_one=True)
-        count = result["count"] if result else 0
+        count = result.get("count", 0) if result else 0
         return {"count": count}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch stats: {str(e)}")

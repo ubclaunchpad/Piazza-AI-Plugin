@@ -14,6 +14,7 @@ from app.api.endpoints import (
     ingestion,
     llm,
     per_post_llm,
+    study_materials,
 )
 
 # Create main API router
@@ -48,6 +49,11 @@ api_router.include_router(documents.router, prefix="/documents", tags=["document
 # Include post assistant endpoints
 api_router.include_router(
     per_post_llm.router, prefix="/per-post", tags=["post-assistant"]
+)
+
+# Include study material generator endpoints
+api_router.include_router(
+    study_materials.router, prefix="/study", tags=["study-materials"]
 )
 
 
