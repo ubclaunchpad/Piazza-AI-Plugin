@@ -51,7 +51,7 @@ def run_ingestion_task(thread_id: str, piazza_cookie: str):
         orchestrator = ThreadIngestionOrchestrator(piazza_cookie)
         orchestrator.ingest_by_thread_id(thread_id=thread_id)
         logger.info(f"Successfully ingested thread {thread_id}")
-    except Exception as e:
+    except Exception:
         logger.exception(f"Background ingestion failed for thread {thread_id}")
 
 

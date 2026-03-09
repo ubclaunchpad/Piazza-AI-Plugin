@@ -2,7 +2,6 @@ import logging
 from typing import Any, List, Optional
 from uuid import UUID
 
-
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 
 from app.core.database import execute_insert, execute_query, execute_statement

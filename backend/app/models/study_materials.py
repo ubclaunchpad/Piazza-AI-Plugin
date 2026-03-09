@@ -1,7 +1,8 @@
 from datetime import datetime
-from pydantic import BaseModel, Field
-from typing import Optional, Literal
+from typing import Literal, Optional
 from uuid import UUID
+
+from pydantic import BaseModel, Field
 
 
 class QuizQuestion(BaseModel):

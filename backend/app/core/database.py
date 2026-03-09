@@ -7,7 +7,7 @@ for PostgreSQL/Supabase integration.
 
 import logging
 from contextlib import contextmanager
-from typing import Any, Generator, List, Optional
+from typing import Any, Generator, Optional
 
 import psycopg2
 from psycopg2.extras import RealDictCursor

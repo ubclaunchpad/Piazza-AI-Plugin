@@ -3,33 +3,34 @@ Study Material API Endpoints
 Generates quizzes, flashcards, etc
 """
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
 import logging
 from datetime import datetime, timezone
 from typing import Any, Optional
 from uuid import UUID
+
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from psycopg2.extras import Json
 
 from app.core.database import execute_query, execute_statement
 from app.core.supabase import supabase
 from app.models.study_materials import (
+    AllStudyMaterialsResponse,
+    FlashcardAllResponse,
+    FlashcardDeleteResponse,
+    FlashcardRequestGenerate,
+    FlashcardResponse,
+    FlashcardReviewRequest,
+    QuizDeleteResponse,
     QuizGenerateRequest,
     QuizResponse,
-    QuizSubmitRequest,
     QuizResultResponse,
-    QuizDeleteResponse,
-    FlashcardRequestGenerate,
-    FlashcardAllResponse,
-    FlashcardReviewRequest,
-    FlashcardResponse,
-    FlashcardDeleteResponse,
+    QuizSubmitRequest,
     SummaryGenerateRequest,
     SummaryResponse,
-    AllStudyMaterialsResponse,
 )
 from app.textGeneration import (
-    generate_quiz_questions,
     generate_flashcard_stream,
+    generate_quiz_questions,
     generate_summary,
 )
 
@@ -246,7 +247,7 @@ async def delete_quiz(id: UUID) -> QuizDeleteResponse:
     """
     try:
         query = """
-        DELETE FROM quizzes 
+        DELETE FROM quizzes
         WHERE id = %s
         """
         affected = execute_statement(query, (str(id),))

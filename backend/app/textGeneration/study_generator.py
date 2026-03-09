@@ -2,10 +2,10 @@ import json
 import logging
 from typing import Any, Optional
 
-from pydantic import BaseModel, TypeAdapter, ValidationError
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_groq import ChatGroq
+from pydantic import BaseModel, TypeAdapter, ValidationError
 
 from app.core.database import execute_query
 from app.models.study_materials import FlashcardCard, QuizQuestion
