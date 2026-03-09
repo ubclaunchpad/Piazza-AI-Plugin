@@ -32,5 +32,11 @@
     "service_worker": "background.js"
   },
   "permissions": ["activeTab", "storage", "cookies"],
-  "host_permissions": ["https://piazza.com/*", "http://localhost:8000/*"]
+  "host_permissions": ["https://piazza.com/*", "http://localhost:8000/*"],
+  "web_accessible_resources": [
+    {
+      "resources": ["studytab.html"],
+      "matches": ["<all_urls>"]
+    }
+  ]
 }
