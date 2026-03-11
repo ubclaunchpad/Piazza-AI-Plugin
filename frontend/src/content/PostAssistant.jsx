@@ -10,7 +10,16 @@ export default function PostAssistant({ threadId, postNum, content }) {
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
   const [user, setUser] = useState(null);
-  const [proficiency, setProficiency] = useState(1);
+  // Initialize from sessionStorage to persist user preference across reloads
+  const [proficiency, setProficiency] = useState(() => {
+    const saved = sessionStorage.getItem("piazza-ai-proficiency");
+    return saved ? Number(saved) : 1;
+  });
+
+  // Save to sessionStorage whenever proficiency changes
+  useEffect(() => {
+    sessionStorage.setItem("piazza-ai-proficiency", proficiency);
+  }, [proficiency]);
 
   useEffect(() => {
     if (typeof chrome !== "undefined" && chrome.storage) {
