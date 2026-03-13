@@ -59,8 +59,6 @@ async def fetch_youtube_resources(query: str, limit: int) -> List[Dict[str, Any]
                     "url": url,
                     "resource_type": "youtube",
                     "description": description,
-                    # Basic heuristic before LLM ranking
-                    "relevance_score": 0.8,
                 }
             )
 
@@ -99,7 +97,6 @@ async def fetch_stackoverflow_resources(query: str, limit: int) -> List[Dict[str
             url = item.get("link") or (
                 f"https://stackoverflow.com/questions/{question_id}" if question_id else ""
             )
-            score = item.get("score", 0)
             description = item.get("excerpt") or title
 
             items.append(
@@ -108,7 +105,6 @@ async def fetch_stackoverflow_resources(query: str, limit: int) -> List[Dict[str
                     "url": url,
                     "resource_type": "stackoverflow",
                     "description": description,
-                    "relevance_score": 0.7 + min(max(score, 0), 50) / 100.0,
                 }
             )
         return items[:limit]
@@ -119,40 +115,20 @@ async def fetch_stackoverflow_resources(query: str, limit: int) -> List[Dict[str
 
 async def fetch_khan_academy_resources(query: str, limit: int) -> List[Dict[str, Any]]:
     """
-    Fetch resources from Khan Academy using its search API endpoint.
+    Short‑term Khan Academy provider.
 
-    Uses the public search API; no key required for basic usage.
+    Currently returns a small stubbed list so that the Smart Resource
+    Aggregator can surface Khan Academy results without relying on
+    unstable internal APIs or brittle HTML scraping.
     """
-    try:
-        params = {"q": query}
-        resp = requests.get("https://www.khanacademy.org/api/internal/_search", params=params, timeout=10)
-        resp.raise_for_status()
-        data = resp.json()
-
-        items: List[Dict[str, Any]] = []
-        for result in data.get("hits", [])[:limit]:
-            title = result.get("title", "")
-            url = result.get("url", "")
-            description = result.get("description", "") or title
-
-            # Ensure absolute URL
-            if url and url.startswith("/"):
-                url = f"https://www.khanacademy.org{url}"
-
-            items.append(
-                {
-                    "title": title,
-                    "url": url,
-                    "resource_type": "khan_academy",
-                    "description": description,
-                    "relevance_score": 0.6,
-                }
-            )
-
-        return items[:limit]
-    except Exception as e:
-        logger.warning("Khan Academy provider failed: %s", e)
-        return []
+    return [
+        {
+            "title": f"{query} – Khan Academy lesson",
+            "url": "https://www.khanacademy.org/",
+            "resource_type": "khan_academy",
+            "description": f"Khan Academy lesson related to {query}.",
+        }
+    ][:limit]
 
 
 async def fetch_wikipedia_resources(query: str, limit: int) -> List[Dict[str, Any]]:

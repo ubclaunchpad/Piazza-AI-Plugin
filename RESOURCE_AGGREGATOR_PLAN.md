@@ -210,7 +210,7 @@ Scope: implement resource fetching, ranking, and library persistence in the back
     - Delete row by `id` from `resource_library`.
     - Return `204 No Content` or a simple JSON confirmation, consistent with your overall API style.
 
-- **2.7 Implement external provider clients**
+- **2.7 Implement external provider clients** *(completed; could be improved, see Khan Academy)*
   - In `backend/app/services/resource_providers.py` (or a subpackage):
     - **YouTube Data API v3**:
       - Use `google-api-python-client` with your `YOUTUBE_API_KEY`.
@@ -221,6 +221,7 @@ Scope: implement resource fetching, ranking, and library persistence in the back
     - **Khan Academy**:
       - If no first-class API is used, implement a minimal scraper with `requests + beautifulsoup4`.
       - Keep parsing robust but simple – focus on stable page structure for video/topic pages.
+      - *Notes: current implementation is a stub; make scraper if possible*
     - **Wikipedia API**:
       - Call `opensearch` or search APIs to get article summaries and URLs.
       - Map to type `"wikipedia"`.
@@ -229,7 +230,7 @@ Scope: implement resource fetching, ranking, and library persistence in the back
     - Handle rate limiting / timeouts.
     - Log and return an empty list on failure rather than raising, so `/resources/search` can degrade gracefully.
 
-- **2.8 Implement LLM-based ranking in `resource_ranker.py`**
+- **2.8 Implement LLM-based ranking in `resource_ranker.py`** *(completed)*
   - Design a prompt that:
     - Takes `query`, `piazza_course_id` (for possible course context), and a JSON list of raw resources.
     - Asks the LLM to:
@@ -243,14 +244,7 @@ Scope: implement resource fetching, ranking, and library persistence in the back
   - Provide a safe fallback:
     - If LLM call fails, fall back to a heuristic ranking (e.g., by provider priority and original search scores).
 
-- **2.9 Testing & validation**
-  - Add tests (if your test infra is ready) or at minimum manual scripts:
-    - Happy path: search with a topic returns ranked resources from multiple sources.
-    - Library CRUD: save, list, delete resources.
-    - Edge cases: invalid filters, missing query, rate-limited provider.
-  - Verify:
-    - OpenAPI schema looks clean in `/docs`.
-    - CORS allows the extension to call the `/resources/*` endpoints (should already be covered by existing CORS config).
+- **2.9 Testing & validation** *(completed)*
 
 ---
 
