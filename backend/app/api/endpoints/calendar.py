@@ -18,8 +18,6 @@ from app.core.supabase import supabase
 
 router = APIRouter()
 
-CLIENT_SECRETS_FILE = os.path.join(os.path.dirname(__file__), "client_secret.json")
-
 SCOPES = ["https://www.googleapis.com/auth/calendar"]
 
 REDIRECT_URI = "http://localhost:8000/api/v1/calendar/callback"
@@ -42,6 +40,22 @@ async def get_current_user(authorization: Optional[str] = Header(None)):
         logging.error(f"Authentication failed: {str(e)}")
         raise HTTPException(status_code=401, detail=f"Authentication failed: {str(e)}")
 
+
+def get_google_client_config():
+    return {
+        "web": {
+            "client_id": os.getenv("GOOGLE_CLIENT_ID"),
+            "project_id": os.getenv("GOOGLE_CLIENT_PROJECT_ID"),
+            "auth_uri": os.getenv("GOOGLE_CLIENT_AUTH_URI"),
+            "token_uri": os.getenv("GOOGLE_CLIENT_TOKEN_URI"),
+            "auth_provider_x509_cert_url": os.getenv(
+                "GOOGLE_CLIENT_AUTH_PROVIDER_X509_CERT_URL"
+            ),
+            "client_secret": os.getenv("GOOGLE_CLIENT_CLIENT_SECRET"),
+            "redirect_uris": os.getenv("GOOGLE_CLIENT_REDIRECT_URIS"),
+        }
+    }
+
 # =====================================
 # Step 1 - Start Google OAuth
 # =====================================
@@ -50,8 +64,10 @@ async def get_current_user(authorization: Optional[str] = Header(None)):
 async def calendar_auth(token: Optional[str] = Query(None)):
     user = await get_current_user(token)
 
-    flow = google_auth_oauthlib.flow.Flow.from_client_secrets_file(
-        CLIENT_SECRETS_FILE,
+    client_config = get_google_client_config()
+
+    flow = google_auth_oauthlib.flow.Flow.from_client_config(
+        client_config,
         scopes=SCOPES,
         redirect_uri=REDIRECT_URI,
     )
@@ -85,12 +101,9 @@ async def calendar_callback(state: str, code: str):
         raise HTTPException(status_code=400, detail="Invalid OAuth state")
 
     # Recreate OAuth flow
-    flow = google_auth_oauthlib.flow.Flow.from_client_secrets_file(
-        CLIENT_SECRETS_FILE,
-        scopes=SCOPES,
-        state=state,
-        redirect_uri=REDIRECT_URI,
-    )
+    client_config = get_google_client_config()
+
+    flow = google_auth_oauthlib.flow.Flow.from_client_config(client_config, scopes=SCOPES, state=state, redirect_uri=REDIRECT_URI)
 
     # Exchange code for tokens
     flow.fetch_token(code=code)
@@ -151,9 +164,9 @@ def get_valid_google_credentials(user_id: str):
     creds = Credentials(
         token=access_token,
         refresh_token=refresh_token,
-        token_uri="https://oauth2.googleapis.com/token",
-        client_id=json.load(open(CLIENT_SECRETS_FILE))["web"]["client_id"],
-        client_secret=json.load(open(CLIENT_SECRETS_FILE))["web"]["client_secret"],
+        token_uri=os.getenv("GOOGLE_CLIENT_TOKEN_URI"),
+        client_id=os.getenv("GOOGLE_CLIENT_ID"),
+        client_secret=os.getenv("GOOGLE_CLIENT_CLIENT_SECRET"),
         scopes=SCOPES,
     )
 
