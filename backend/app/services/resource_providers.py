@@ -1,77 +1,202 @@
 """
 Resource provider interfaces for the Smart Resource Aggregator.
-Returns stubbed data.
+
+Each function hits an external API and returns a list of dicts shaped
+for downstream consumption by the ranking layer and API models.
+
+If a provider is misconfigured (e.g. missing API key) or an error occurs,
+the function should raise or be caught by the caller; the /resources/search
+endpoint wraps these calls. 
 """
 
+import logging
 from typing import Any, Dict, List
+
+import requests
+from googleapiclient.discovery import build
+
+from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 async def fetch_youtube_resources(query: str, limit: int) -> List[Dict[str, Any]]:
     """
-    Fetch resources from YouTube matching the given query.
+    Fetch resources from YouTube Data API v3.
 
-    Stub implementation: returns a small fixed list in the unified resource shape.
+    Requires:
+      - settings.YOUTUBE_API_KEY to be set.
     """
-    return [
-        {
-            "title": f"{query} – YouTube overview",
-            "url": "https://www.youtube.com/",
-            "resource_type": "youtube",
-            "description": f"Introductory YouTube video explaining {query}.",
-            "relevance_score": 0.9,
-        }
-    ][:limit]
+    api_key = settings.YOUTUBE_API_KEY
+    if not api_key:
+        logger.info("YOUTUBE_API_KEY not configured; skipping YouTube provider")
+        return []
+
+    try:
+        youtube = build("youtube", "v3", developerKey=api_key)
+        search_response = (
+            youtube.search()
+            .list(
+                q=query,
+                part="snippet",
+                type="video",
+                maxResults=min(limit, 10),
+            )
+            .execute()
+        )
+
+        items: List[Dict[str, Any]] = []
+        for item in search_response.get("items", []):
+            video_id = item["id"]["videoId"]
+            snippet = item["snippet"]
+            title = snippet.get("title", "")
+            description = snippet.get("description", "")
+            url = f"https://www.youtube.com/watch?v={video_id}"
+
+            items.append(
+                {
+                    "title": title,
+                    "url": url,
+                    "resource_type": "youtube",
+                    "description": description,
+                    # Basic heuristic before LLM ranking
+                    "relevance_score": 0.8,
+                }
+            )
+
+        return items[:limit]
+    except Exception as e:
+        logger.warning("YouTube provider failed: %s", e)
+        return []
 
 
 async def fetch_stackoverflow_resources(query: str, limit: int) -> List[Dict[str, Any]]:
     """
-    Fetch resources from StackOverflow matching the given query.
+    Fetch resources from Stack Exchange (StackOverflow) search API.
 
-    Stub implementation: returns a small fixed list in the unified resource shape.
+    Optionally uses:
+      - settings.STACKEXCHANGE_API_KEY
+      - settings.STACKEXCHANGE_SITE (default 'stackoverflow')
     """
-    return [
-        {
-            "title": f"{query} – StackOverflow Q&A",
-            "url": "https://stackoverflow.com/questions/example",
-            "resource_type": "stackoverflow",
-            "description": f"Popular StackOverflow discussion related to {query}.",
-            "relevance_score": 0.85,
+    try:
+        params = {
+            "order": "desc",
+            "sort": "relevance",
+            "q": query,
+            "site": settings.STACKEXCHANGE_SITE or "stackoverflow",
+            "pagesize": min(limit, 10),
         }
-    ][:limit]
+        if settings.STACKEXCHANGE_API_KEY:
+            params["key"] = settings.STACKEXCHANGE_API_KEY
+
+        resp = requests.get("https://api.stackexchange.com/2.3/search/advanced", params=params, timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
+        items: List[Dict[str, Any]] = []
+        for item in data.get("items", []):
+            title = item.get("title", "")
+            question_id = item.get("question_id")
+            url = item.get("link") or (
+                f"https://stackoverflow.com/questions/{question_id}" if question_id else ""
+            )
+            score = item.get("score", 0)
+            description = item.get("excerpt") or title
+
+            items.append(
+                {
+                    "title": title,
+                    "url": url,
+                    "resource_type": "stackoverflow",
+                    "description": description,
+                    "relevance_score": 0.7 + min(max(score, 0), 50) / 100.0,
+                }
+            )
+        return items[:limit]
+    except Exception as e:
+        logger.warning("StackOverflow provider failed: %s", e)
+        return []
 
 
 async def fetch_khan_academy_resources(query: str, limit: int) -> List[Dict[str, Any]]:
     """
-    Fetch resources from Khan Academy matching the given query.
+    Fetch resources from Khan Academy using its search API endpoint.
 
-    Stub implementation: returns a small fixed list in the unified resource shape.
+    Uses the public search API; no key required for basic usage.
     """
-    return [
-        {
-            "title": f"{query} – Khan Academy lesson",
-            "url": "https://www.khanacademy.org/",
-            "resource_type": "khan_academy",
-            "description": f"Khan Academy lesson related to {query}.",
-            "relevance_score": 0.8,
-        }
-    ][:limit]
+    try:
+        params = {"q": query}
+        resp = requests.get("https://www.khanacademy.org/api/internal/_search", params=params, timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
+
+        items: List[Dict[str, Any]] = []
+        for result in data.get("hits", [])[:limit]:
+            title = result.get("title", "")
+            url = result.get("url", "")
+            description = result.get("description", "") or title
+
+            # Ensure absolute URL
+            if url and url.startswith("/"):
+                url = f"https://www.khanacademy.org{url}"
+
+            items.append(
+                {
+                    "title": title,
+                    "url": url,
+                    "resource_type": "khan_academy",
+                    "description": description,
+                    "relevance_score": 0.6,
+                }
+            )
+
+        return items[:limit]
+    except Exception as e:
+        logger.warning("Khan Academy provider failed: %s", e)
+        return []
 
 
 async def fetch_wikipedia_resources(query: str, limit: int) -> List[Dict[str, Any]]:
     """
-    Fetch resources from Wikipedia matching the given query.
-
-    Stub implementation: returns a small fixed list in the unified resource shape.
+    Fetch resources from Wikipedia using the opensearch API.
     """
-    return [
-        {
-            "title": f"{query} – Wikipedia article",
-            "url": "https://en.wikipedia.org/wiki/Example",
-            "resource_type": "wikipedia",
-            "description": f"Wikipedia article giving background on {query}.",
-            "relevance_score": 0.75,
+    try:
+        params = {
+            "search": query,
+            "limit": min(limit, 10),
+            "namespace": 0,
         }
-    ][:limit]
+        headers = {
+            # Use an explicit User-Agent to comply with Wikipedia API policies
+            "User-Agent": "PiazzaAI-ResourceAggregator/0.1 (contact: change-me@example.com)",
+        }
+        resp = requests.get(
+            "https://en.wikipedia.org/w/api.php?action=opensearch&format=json",
+            params=params,
+            headers=headers,
+            timeout=10,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        # opensearch returns [search term, titles[], descriptions[], links[]]
+        titles = data[1] if len(data) > 1 else []
+        descriptions = data[2] if len(data) > 2 else []
+        links = data[3] if len(data) > 3 else []
+
+        items: List[Dict[str, Any]] = []
+        for title, desc, link in zip(titles, descriptions, links):
+            items.append(
+                {
+                    "title": title,
+                    "url": link,
+                    "resource_type": "wikipedia",
+                    "description": desc or title,
+                    "relevance_score": 0.5,
+                }
+            )
+        return items[:limit]
+    except Exception as e:
+        logger.warning("Wikipedia provider failed: %s", e)
+        return []
 
 
 __all__ = [
