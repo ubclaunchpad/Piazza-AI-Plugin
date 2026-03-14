@@ -1,12 +1,41 @@
 import { useState, useEffect } from "react";
+import { useDocuments, useDocumentDownloadUrl } from "../queries/useDocument";
+import { uploadDocument } from "../api/documentApi";
 
 /* global chrome */
 export default function AssistantPage({ user, onBack, onLogout }) {
   const [activeTab, setActiveTab] = useState("chats"); // 'chats' or 'files'
+  const [page, setPage] = useState(1);
+  const [selectedDocumentId, setSelectedDocumentId] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const perPage = 5;
   const [chats, setChats] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [piazzaClassId, setPiazzaClassId] = useState(null);
   const [isCreating, setIsCreating] = useState(false);
+
+  // Fetch documents for this user/thread (using Piazza class ID as thread ID)
+  const {
+    data: documentsData,
+    isLoading: isLoadingDocuments,
+    isError: isDocumentsError,
+    refetch: refetchDocuments,
+  } = useDocuments({
+    uploaderId: user?.id,
+    piazzaCourseId: piazzaClassId,
+    page,
+    perPage,
+    enabled: !!piazzaClassId && !!user?.id,
+  });
+
+  // Get download URL for selected document
+  const { data: downloadData } = useDocumentDownloadUrl(
+    selectedDocumentId,
+    3600,
+    {
+      enabled: !!selectedDocumentId,
+    },
+  );
 
   useEffect(() => {
     fetchPiazzaInfo();
@@ -149,15 +178,77 @@ export default function AssistantPage({ user, onBack, onLogout }) {
     }
   };
 
-  const handleFileUpload = (event) => {
+  const handleFileUpload = async (event) => {
     const files = event.target.files;
-    if (files && files.length > 0) {
-      console.log(
-        "Files selected:",
-        Array.from(files).map((f) => f.name),
+    if (!piazzaClassId || !user?.id) {
+      alert(
+        "Unable to upload: Please ensure you are on a Piazza page and logged in.",
       );
-      // TODO: Handle file upload
+      return;
     }
+    if (files && files.length > 0) {
+      setIsUploading(true);
+      try {
+        // Upload each file
+        for (const file of Array.from(files)) {
+          await uploadDocument({
+            uploaderId: user.id,
+            piazzaCourseId: piazzaClassId,
+            permission: "private",
+            file,
+          });
+        }
+        alert("Files uploaded successfully!");
+        refetchDocuments();
+      } catch (error) {
+        console.error("Error uploading files:", error);
+        alert("Error uploading files. Please try again.");
+      } finally {
+        setIsUploading(false);
+      }
+    }
+  };
+
+  const handleFileClick = async (documentId) => {
+    setSelectedDocumentId(documentId);
+    // The download URL will be fetched by the useDocumentDownloadUrl hook
+    // Once available, open in new tab
+  };
+
+  // Effect to open URL when download data is available
+  if (downloadData?.download_url && selectedDocumentId) {
+    window.open(downloadData.download_url, "_blank");
+    setSelectedDocumentId(null); // Reset after opening
+  }
+
+  const totalPages = documentsData
+    ? Math.ceil(documentsData.total / perPage)
+    : 0;
+  const documents = documentsData?.documents || [];
+
+  // Helper to get file icon based on type
+  const getFileIcon = (fileType) => {
+    if (fileType?.includes("pdf")) return "📄";
+    if (fileType?.includes("word") || fileType?.includes("docx")) return "📝";
+    if (fileType?.includes("text")) return "📃";
+    return "📁";
+  };
+
+  // Helper to format file size
+  const formatFileSize = (bytes) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  // Helper to format date
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
   };
 
   return (
@@ -268,17 +359,30 @@ export default function AssistantPage({ user, onBack, onLogout }) {
             <div className="mb-4">
               <label
                 htmlFor="file-upload"
-                className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer bg-white hover:bg-gray-50 transition-colors"
+                className={`flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-gray-300 rounded-lg bg-white transition-colors ${
+                  isUploading
+                    ? "cursor-not-allowed opacity-60"
+                    : "cursor-pointer hover:bg-gray-50"
+                }`}
               >
                 <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                  <span className="text-4xl mb-2">📤</span>
-                  <p className="mb-2 text-sm text-gray-600">
-                    <span className="font-semibold">Click to upload</span> or
-                    drag and drop
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    PDF, TXT, DOCX (Max. 10MB)
-                  </p>
+                  {isUploading ? (
+                    <>
+                      <span className="w-8 h-8 border-3 border-gray-300 border-t-purple-500 rounded-full animate-spin mb-2"></span>
+                      <p className="text-sm text-gray-600">Uploading...</p>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-4xl mb-2">📤</span>
+                      <p className="mb-2 text-sm text-gray-600">
+                        <span className="font-semibold">Click to upload</span>{" "}
+                        or drag and drop
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        PDF, TXT, DOCX (Max. 10MB)
+                      </p>
+                    </>
+                  )}
                 </div>
                 <input
                   id="file-upload"
@@ -287,24 +391,108 @@ export default function AssistantPage({ user, onBack, onLogout }) {
                   multiple
                   accept=".pdf,.txt,.docx,.doc"
                   onChange={handleFileUpload}
+                  disabled={isUploading}
                 />
               </label>
             </div>
 
-            {/* Uploaded Files List (Placeholder) */}
+            {/* Uploaded Files List */}
             <div className="bg-white rounded-lg p-4 shadow-sm">
-              <h4 className="text-sm font-semibold text-gray-900 mb-3 m-0">
-                Uploaded Files
-              </h4>
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-sm font-semibold text-gray-900 m-0">
+                  Uploaded Files
+                </h4>
+                {documentsData?.total > 0 && (
+                  <span className="text-xs text-gray-500">
+                    {documentsData.total} file
+                    {documentsData.total !== 1 ? "s" : ""}
+                  </span>
+                )}
+              </div>
+
               <div className="flex flex-col gap-2">
-                {/* Placeholder - no files yet */}
-                <div className="text-center py-8">
-                  <span className="text-4xl block mb-2">📂</span>
-                  <p className="text-gray-500 text-sm">No files uploaded</p>
-                  <p className="text-gray-400 text-xs mt-1">
-                    Upload files to analyze with AI
-                  </p>
-                </div>
+                {isLoadingDocuments ? (
+                  <div className="flex items-center justify-center py-8">
+                    <span className="w-5 h-5 border-2 border-gray-300 border-t-purple-500 rounded-full animate-spin"></span>
+                    <span className="ml-2 text-sm text-gray-500">
+                      Loading...
+                    </span>
+                  </div>
+                ) : isDocumentsError ? (
+                  <div className="text-center py-8">
+                    <span className="text-4xl block mb-2">⚠️</span>
+                    <p className="text-red-500 text-sm">Error loading files</p>
+                  </div>
+                ) : documents.length === 0 ? (
+                  <div className="text-center py-8">
+                    <span className="text-4xl block mb-2">📂</span>
+                    <p className="text-gray-500 text-sm">No files uploaded</p>
+                    <p className="text-gray-400 text-xs mt-1">
+                      Upload files to analyze with AI
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    {/* File List */}
+                    {documents.map((doc) => (
+                      <div
+                        key={doc.id}
+                        className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors group"
+                      >
+                        <div
+                          className="flex items-center gap-3 flex-1 cursor-pointer min-w-0"
+                          onClick={() => handleFileClick(doc.id)}
+                        >
+                          <span className="text-2xl flex-shrink-0">
+                            {getFileIcon(doc.file_type)}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium text-gray-900 truncate m-0">
+                              {doc.file_name}
+                            </p>
+                            <p className="text-xs text-gray-500 m-0 mt-0.5">
+                              {formatFileSize(doc.file_size)} •{" "}
+                              {formatDate(doc.created_at)}
+                            </p>
+                          </div>
+                        </div>
+                        {doc.indexed && (
+                          <span
+                            className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded flex-shrink-0"
+                            title="Indexed for AI"
+                          >
+                            ✓ Indexed
+                          </span>
+                        )}
+                      </div>
+                    ))}
+
+                    {/* Pagination */}
+                    {totalPages > 1 && (
+                      <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
+                        <button
+                          onClick={() => setPage((p) => Math.max(1, p - 1))}
+                          disabled={page === 1}
+                          className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                          ← Previous
+                        </button>
+                        <span className="text-xs text-gray-500">
+                          Page {page} of {totalPages}
+                        </span>
+                        <button
+                          onClick={() =>
+                            setPage((p) => Math.min(totalPages, p + 1))
+                          }
+                          disabled={page === totalPages}
+                          className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                          Next →
+                        </button>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             </div>
           </div>

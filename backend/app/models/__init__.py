@@ -10,8 +10,24 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
+# Import Document models
+from app.models.document import (
+    DocumentBase,
+    DocumentCreate,
+    DocumentDeleteResponse,
+    DocumentListResponse,
+    DocumentResponse,
+    DocumentUpdate,
+    DocumentUploadRequest,
+    DocumentUploadResponse,
+    PermissionEnum,
+)
+
 # Import LLM models
 from app.models.llm import QueryRequest, QueryResponse
+
+# Import Post Assistant Models
+from app.models.post_assistant import PostRequest, SimplifyPostRequest
 
 
 class UserStatus(str, Enum):
@@ -63,13 +79,28 @@ class UserUpdate(BaseModel):
 
 # Export all models
 __all__ = [
+    # User models
     "UserStatus",
     "UserBase",
     "UserCreate",
     "UserResponse",
     "UserUpdate",
+    # LLM models
     "QueryRequest",
     "QueryResponse",
+    # Post assistant model
+    "PostRequest",
+    "SimplifyPostRequest",
+    # Document models
+    "PermissionEnum",
+    "DocumentBase",
+    "DocumentCreate",
+    "DocumentUpdate",
+    "DocumentResponse",
+    "DocumentUploadRequest",
+    "DocumentUploadResponse",
+    "DocumentListResponse",
+    "DocumentDeleteResponse",
 ]
 
 # TODO: Add SQLAlchemy database models when needed

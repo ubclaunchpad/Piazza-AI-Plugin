@@ -7,7 +7,7 @@ for PostgreSQL/Supabase integration.
 
 import logging
 from contextlib import contextmanager
-from typing import Generator, Optional
+from typing import Any, Generator, Optional
 
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -44,7 +44,7 @@ def init_database_pool(min_connections: int = 1, max_connections: int = 10) -> N
         raise
 
 
-def get_db_connection():
+def get_db_connection() -> psycopg2.extensions.connection:
     """
     Get a database connection from the pool.
 
@@ -71,7 +71,7 @@ def get_db_connection():
         raise
 
 
-def return_db_connection(connection) -> None:
+def return_db_connection(connection: psycopg2.extensions.connection) -> None:
     """
     Return a database connection to the pool.
 
@@ -120,7 +120,7 @@ def get_db() -> Generator[psycopg2.extensions.connection, None, None]:
             return_db_connection(connection)
 
 
-def get_direct_connection():
+def get_direct_connection() -> psycopg2.extensions.connection:
     """
     Get a direct database connection without using the pool.
 
@@ -168,7 +168,9 @@ def test_connection() -> bool:
             cursor = db.cursor()
             cursor.execute("SELECT 1 as test")
             result = cursor.fetchone()
-            success = result and result["test"] == 1
+            success = (
+                bool(result and dict(result).get("test") == 1) if result else False
+            )
 
         if success:
             logger.info("Database connection test successful")
@@ -185,7 +187,9 @@ def test_connection() -> bool:
 # Helper functions for common database operations
 
 
-def execute_statement(query: str, params=None, fetch_result: bool = False):
+def execute_statement(
+    query: str, params: Optional[tuple] = None, fetch_result: bool = False
+) -> Any:
     """
     Execute a non-SELECT statement (INSERT, UPDATE, DELETE).
 
@@ -215,7 +219,9 @@ def execute_statement(query: str, params=None, fetch_result: bool = False):
         return cursor.rowcount
 
 
-def execute_query(query: str, params=None, fetch_one: bool = False):
+def execute_query(
+    query: str, params: Optional[tuple] = None, fetch_one: bool = False
+) -> Any:
     """
     Execute a query and return results.
 
@@ -248,7 +254,9 @@ def execute_query(query: str, params=None, fetch_one: bool = False):
             return cursor.fetchall()
 
 
-def execute_insert(query: str, params=None, return_id: bool = True):
+def execute_insert(
+    query: str, params: Optional[tuple] = None, return_id: bool = True
+) -> Any:
     """
     Execute an INSERT query and optionally return the inserted ID.
 
@@ -273,7 +281,12 @@ def execute_insert(query: str, params=None, return_id: bool = True):
 
         if return_id:
             result = cursor.fetchone()
-            return result[0] if result else None
+            if result:
+                # RealDictCursor returns dict-like objects, get first value
+                result_dict = dict(result)
+                return next(iter(result_dict.values())) if result_dict else None
+            return None
+        return None
 
 
 # Initialize the connection pool when module is imported

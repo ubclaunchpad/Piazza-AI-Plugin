@@ -2,12 +2,15 @@
 Data ingestion API endpoint for Piazza threads.
 """
 
+import logging
 from typing import Any, Dict, List
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel, Field
 
 from app.threadIngestion import ThreadIngestionOrchestrator
+
+logger = logging.getLogger(__name__)
 
 
 class IngestRequest(BaseModel):
@@ -47,9 +50,9 @@ def run_ingestion_task(thread_id: str, piazza_cookie: str):
     try:
         orchestrator = ThreadIngestionOrchestrator(piazza_cookie)
         orchestrator.ingest_by_thread_id(thread_id=thread_id)
-        # We could log success here or update a status in DB if we had a jobs table
-    except Exception as e:
-        print(f"Background ingestion failed for thread {thread_id}: {e}")
+        logger.info(f"Successfully ingested thread {thread_id}")
+    except Exception:
+        logger.exception(f"Background ingestion failed for thread {thread_id}")
 
 
 @router.post("/ingest", response_model=IngestResponse)
@@ -168,8 +171,11 @@ async def get_ingestion_status(request: IngestRequest):
                 WHERE c.name = %s
             """
             result = execute_query(count_query, (request.thread_id,))
-            ingested_count = result[0]["count"] if result else 0
-        except Exception:
+            ingested_count = (
+                result[0].get("count", 0) if result and len(result) > 0 else 0
+            )
+        except Exception as e:
+            logger.warning(f"Failed to get ingested count: {e}")
             ingested_count = 0
 
         # 2. Get total posts count from Piazza API
@@ -216,11 +222,9 @@ async def get_ingestion_status(request: IngestRequest):
             WHERE piazza_course_id = %s
         """
         db_result = execute_query(db_query, (request.thread_id,))
-        last_id = (
-            db_result[0]["last_ingested_post_id"]
-            if db_result and db_result[0]["last_ingested_post_id"] is not None
-            else 0
-        )
+        last_id = 0
+        if db_result and len(db_result) > 0:
+            last_id = db_result[0].get("last_ingested_post_id") or 0
 
         return IngestionStatusResponse(
             ingested_posts_count=ingested_count,

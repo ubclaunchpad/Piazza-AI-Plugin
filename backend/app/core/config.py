@@ -40,11 +40,20 @@ class Settings(BaseSettings):
     SUPABASE_URL: str
     SUPABASE_ANON_KEY: str
     SUPABASE_SERVICE_ROLE_KEY: str
+    SUPABASE_STORAGE_BUCKET: str = "documents"
 
     # Frontend/redirect settings (used for email confirmation redirects)
     # Defaults are safe for local development.
     # Note: serve the static confirmation page at /confirm-email.html (file lives in frontend/public)
     EMAIL_CONFIRM_REDIRECT_URL: str = "http://127.0.0.1:3000/confirm-email.html"
+
+    # File Upload Configuration
+    MAX_FILE_SIZE: int = 10 * 1024 * 1024  # 10MB default
+    ALLOWED_FILE_TYPES: List[str] = [
+        "application/pdf",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",  # .docx
+        "text/plain",  # .txt
+    ]
 
     class Config:
         case_sensitive = True

@@ -39,6 +39,7 @@ function SourcesDropdown({ sources, threadId }) {
 }
 
 function ChatbotApp() {
+  const TOOLBAR_SESSION_EVENT = "piazza-ai-open-session";
   const [isExpanded, setIsExpanded] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [messages, setMessages] = useState([]);
@@ -82,8 +83,25 @@ function ChatbotApp() {
         setIsExpanded(true);
       }
     };
+
+    const toolbarSessionListener = (event) => {
+      const detail = event?.detail;
+      if (!detail?.sessionId) return;
+
+      setSessionId(detail.sessionId);
+      if (detail.title) {
+        setSessionTitle(detail.title);
+      }
+      setIsExpanded(true);
+    };
+
     chrome.runtime.onMessage.addListener(messageListener);
-    return () => chrome.runtime.onMessage.removeListener(messageListener);
+    window.addEventListener(TOOLBAR_SESSION_EVENT, toolbarSessionListener);
+
+    return () => {
+      chrome.runtime.onMessage.removeListener(messageListener);
+      window.removeEventListener(TOOLBAR_SESSION_EVENT, toolbarSessionListener);
+    };
   }, []);
 
   // Fetch most recent session or messages when needed
@@ -109,7 +127,7 @@ function ChatbotApp() {
       /\\\[\s*([^\]]+?)\s*\\\]/g,
       (match, content) => {
         return `\n$$\n${content.trim()}\n$$\n`;
-      },
+      }
     );
 
     // Replace inline math: \( ... \) -> $...$
@@ -117,7 +135,7 @@ function ChatbotApp() {
       /\\\(\s*([^)]+?)\s*\\\)/g,
       (match, content) => {
         return `$${content.trim()}$`;
-      },
+      }
     );
 
     return converted;
@@ -147,7 +165,7 @@ function ChatbotApp() {
         `${API_ENDPOINT}/chat-sessions?piazza_course_id=${threadId}`,
         {
           headers: { Authorization: `Bearer ${user.access_token}` },
-        },
+        }
       );
 
       if (response.status === 401) {
@@ -212,7 +230,7 @@ function ChatbotApp() {
         `${API_ENDPOINT}/chat-sessions/${sid}/messages`,
         {
           headers: { Authorization: `Bearer ${user.access_token}` },
-        },
+        }
       );
 
       if (response.status === 401) {
@@ -478,7 +496,7 @@ function ChatbotApp() {
                                   node.position.start.line ===
                                     node.position.end.line);
                               const match = /language-(\w+)/.exec(
-                                className || "",
+                                className || ""
                               );
 
                               return !isInline && match ? (

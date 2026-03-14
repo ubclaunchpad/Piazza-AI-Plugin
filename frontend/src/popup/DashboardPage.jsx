@@ -7,7 +7,7 @@ function IngestionStatus({ status }) {
   const percentage =
     status.total_posts_count > 0
       ? Math.round(
-          (status.ingested_posts_count / status.total_posts_count) * 100,
+          (status.ingested_posts_count / status.total_posts_count) * 100
         )
       : 0;
 
@@ -57,7 +57,7 @@ export default function DashboardPage({
       fetchIngestionStatus(piazzaInfo.classId);
       interval = setInterval(
         () => fetchIngestionStatus(piazzaInfo.classId),
-        10000,
+        10000
       );
     }
     return () => clearInterval(interval);
@@ -88,7 +88,7 @@ export default function DashboardPage({
               thread_id: classId,
               piazza_cookie: response.cookie,
             }),
-          },
+          }
         );
 
         if (statusResponse.ok) {
@@ -137,7 +137,7 @@ export default function DashboardPage({
           isPiazza: true,
           fullUrl: tab.url,
           classId: pathParts[1] || null,
-          postId: url.searchParams.get("cid") || null,
+          postId: pathParts[2] === "post" ? pathParts[3] || null : null,
           pathname: url.pathname,
           threadName: null,
         };
@@ -208,7 +208,7 @@ export default function DashboardPage({
             thread_id: piazzaInfo.classId,
             piazza_cookie: response.cookie,
           }),
-        },
+        }
       );
 
       if (!apiResponse.ok) {
@@ -223,13 +223,13 @@ export default function DashboardPage({
 
       if (data.status === "started") {
         alert(
-          "Ingestion started in background. You can continue using the extension.",
+          "Ingestion started in background. You can continue using the extension."
         );
       } else if (data.chunks_processed === 0) {
         alert("Thread is already up to date! No new posts to ingest.");
       } else {
         alert(
-          `Ingestion complete! Processed ${data.chunks_processed} new chunks.`,
+          `Ingestion complete! Processed ${data.chunks_processed} new chunks.`
         );
       }
     } catch (error) {
@@ -354,6 +354,18 @@ export default function DashboardPage({
                 >
                   <span>📊</span>
                   Assistant
+                </button>
+                <button
+                  onClick={() => {
+                    const url = new URL(chrome.runtime.getURL("studytab.html"));
+                    if (piazzaInfo?.classId)
+                      url.searchParams.set("course_id", piazzaInfo.classId);
+                    chrome.tabs.create({ url: url.toString() });
+                  }}
+                  className="flex-1 px-3 py-2 bg-gray-100 border border-gray-200 rounded-md text-xs font-medium cursor-pointer flex items-center justify-center gap-1.5 transition-all hover:bg-gray-200 hover:border-gray-300"
+                >
+                  <span>📚</span>
+                  Study Materials
                 </button>
                 <button
                   onClick={handleIngestThread}

@@ -12,6 +12,7 @@ module.exports = {
     content: "./src/content/content.js",
     background: "./src/background/background.js",
     popup: "./src/popup/main.jsx",
+    studytab: "./src/studytab/main.jsx",
   },
   output: {
     path: path.resolve(__dirname, "dist"),
@@ -72,13 +73,18 @@ module.exports = {
   plugins: [
     new webpack.DefinePlugin({
       "process.env.API_ENDPOINT": JSON.stringify(
-        process.env.API_ENDPOINT || "http://localhost:8000/api/v1",
+        process.env.API_ENDPOINT || "http://localhost:8000/api/v1"
       ),
     }),
     new HtmlWebpackPlugin({
       template: "./src/popup/index.html",
       filename: "popup.html",
       chunks: ["popup"],
+    }),
+    new HtmlWebpackPlugin({
+      template: "./src/studytab/index.html",
+      filename: "studytab.html",
+      chunks: ["studytab"],
     }),
     new CopyPlugin({
       patterns: [

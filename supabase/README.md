@@ -292,6 +292,11 @@ supabase db reset --linked
 - Visit https://status.supabase.com for platform-wide issues
 - Verify your IP is whitelisted (if connection pooling is restricted)
 - Check database resources aren't exhausted (CPU, memory, connections)
+  
+**Issues with email verification:**
+- Check for email rate limit errors. If you are running into email rate limit (429 errors), please turn off the "Confirm Email" setting in `Authentication` -> `Sign in/Providers` below
+
+<img width="2177" height="1028" alt="image" src="https://github.com/user-attachments/assets/0453cb12-e54c-4b18-89ba-ce4ae19fe662" />
 
 ---
 
