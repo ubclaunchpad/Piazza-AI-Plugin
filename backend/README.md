@@ -38,6 +38,8 @@ API_PREFIX=/api/v1
 
 ALLOWED_ORIGINS=["http://localhost:3000", "chrome-extension://*", "https://piazza.com"]
 DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres
+
+
 ```
 
 ### 3. Get Supabase Values
@@ -52,6 +54,20 @@ supabase status
 Copy the values from the output:
 
 - **Database URL** → `DATABASE_URL`
+
+4. Get Google Client Secrets:
+- First create an account in GCP (Google Cloud Platform) from console.google.com
+- Then create a project,
+- Allow API & Services
+- Create new OAuth 2.0 client. Follow their instructions to have the following values:
+
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_PROJECT_ID=
+GOOGLE_CLIENT_AUTH_URI=
+GOOGLE_CLIENT_TOKEN_URI=
+GOOGLE_CLIENT_AUTH_PROVIDER_X509_CERT_URL=
+GOOGLE_CLIENT_CLIENT_SECRET=
+GOOGLE_CLIENT_REDIRECT_URIS=
 
 ## 🚀 Quick Start
 

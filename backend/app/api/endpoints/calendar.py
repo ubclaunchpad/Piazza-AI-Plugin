@@ -204,7 +204,7 @@ class AddEventRequest(BaseModel):
 
 
 @router.post("/events")
-async def add_calendar_event(
+async def create_calendar_event(
     event: AddEventRequest,
     authorization: Optional[str] = Header(None),
 ):
