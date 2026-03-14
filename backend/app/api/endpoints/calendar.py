@@ -22,8 +22,6 @@ SCOPES = ["https://www.googleapis.com/auth/calendar"]
 
 REDIRECT_URI = "http://localhost:8000/api/v1/calendar/callback"
 
-PROVIDER_ACCOUNT_ID = "demo-account-id"
-
 async def get_current_user(authorization: Optional[str] = Header(None)):
     if not authorization:
         raise HTTPException(status_code=401, detail="Missing authorization header")
