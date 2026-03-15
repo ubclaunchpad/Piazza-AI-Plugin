@@ -171,9 +171,9 @@ export function ProficiencySelector({ value, onChange }) {
                 onChange={(e) => onChange(Number(e.target.value))}
                 className="text-xs border border-gray-200 rounded-md px-2 py-1 bg-gray-50 text-gray-700 focus:outline-none focus:border-blue-400 cursor-pointer"
             >
-                <option value={0}>Beginner</option>
-                <option value={1}>Advanced</option>
-                <option value={2}>Expert</option>
+                <option value={1}>Beginner</option>
+                <option value={2}>Advanced</option>
+                <option value={3}>Expert</option>
             </select>
         </div>
     );

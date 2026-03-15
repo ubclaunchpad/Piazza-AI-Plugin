@@ -43,7 +43,7 @@ function checkForPosts() {
     return;
   }
 
-  const content = contentElement.innerText || contentElement.textContent;
+  const content = (contentElement.innerText || contentElement.textContent || "").trim();
 
   // Extract Thread ID (Class ID)
   const threadIdMatch = window.location.pathname.match(/\/class\/([^/?]+)/);
@@ -67,7 +67,12 @@ function checkForPosts() {
      }
   }
 
-  console.log(`Piazza AI: Injecting toolbar for Post #${postNum} (Thread: ${threadId})`);
+  const normalizedPostNum = Number(postNum);
+  if (!threadId || !Number.isInteger(normalizedPostNum) || normalizedPostNum <= 0 || !content) {
+    return;
+  }
+
+  console.log(`Piazza AI: Injecting toolbar for Post #${normalizedPostNum} (Thread: ${threadId})`);
 
   // Create a container for our toolbar
   const toolbarContainer = document.createElement('div');
@@ -97,5 +102,5 @@ function checkForPosts() {
   shadowRoot.appendChild(mountPoint);
 
   const root = createRoot(mountPoint);
-  root.render(<PostAssistant threadId={threadId} postNum={postNum} content={content} />);
+  root.render(<PostAssistant threadId={threadId} postNum={normalizedPostNum} content={content} />);
 }
