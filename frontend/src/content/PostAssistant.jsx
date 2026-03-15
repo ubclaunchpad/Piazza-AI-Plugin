@@ -10,6 +10,7 @@ export default function PostAssistant({ threadId, postNum, content }) {
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
   const [user, setUser] = useState(null);
+  const [translateLanguage, setTranslateLanguage] = useState('English');
   // Initialize from sessionStorage to persist user preference across reloads
   const [proficiency, setProficiency] = useState(() => {
     const saved = sessionStorage.getItem("piazza-ai-proficiency");
@@ -128,10 +129,11 @@ export default function PostAssistant({ threadId, postNum, content }) {
           "Content-Type": "application/json",
           "Authorization": user ? `Bearer ${user.access_token}` : ""
         },
-        body: JSON.stringify({
+        body: JSON.stringify({ // Conditionally add target_language for translation
           post_num: Number(postNum),
           thread_id: threadId,
           session_id: sessionId,
+          ...(action === 'translate' && { target_language: translateLanguage }),
         })
       });
 
@@ -189,7 +191,8 @@ export default function PostAssistant({ threadId, postNum, content }) {
           <div className="flex gap-2 flex-wrap">
         <ActionButton 
             icon={<SimplifyIcon />} 
-            label="Simplify" 
+            label="Simplify"
+            title="Make the post easier to understand" 
             onClick={() => handleAction('simplify')} 
             isActive={activeAction === 'simplify'}
         />
@@ -199,25 +202,43 @@ export default function PostAssistant({ threadId, postNum, content }) {
         )}
         <ActionButton 
             icon={<SummarizeIcon />} 
-            label="Summarize" 
+            label="Summarize"
+            title="Provide a short summary of the post" 
             onClick={() => handleAction('summarize')} 
             isActive={activeAction === 'summarize'}
         />
         <ActionButton 
             icon={<SolveIcon />} 
-            label="Solve" 
+            label="Solve"
+            title="Help solve the problem in the post" 
             onClick={() => handleAction('solve')} 
             isActive={activeAction === 'solve'}
         />
         <ActionButton 
             icon={<TranslateIcon />} 
-            label="Translate" 
+            label="Translate"
+            title="Translate the post into another language" 
             onClick={() => handleAction('translate')} 
             isActive={activeAction === 'translate'}
         />
+        {activeAction === 'translate' && (
+            <select 
+                value={translateLanguage} 
+                onChange={e => setTranslateLanguage(e.target.value)}
+                className="text-xs font-medium text-gray-600 bg-gray-100 border border-black rounded-md px-2 py-1.5 appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+                <option value="English">English</option>
+                <option value="Chinese">Chinese</option>
+                <option value="Korean">Korean</option>
+                <option value="French">French</option>
+                <option value="Russian">Russian</option>
+                <option value="Spanish">Spanish</option>
+            </select>
+        )}
         <ActionButton 
             icon={<ConceptIcon />} 
-            label="Concepts" 
+            label="Concepts"
+            title="Explain and link key concepts" 
             onClick={() => handleAction('link_concepts')} 
             isActive={activeAction === 'link_concepts'}
         />
