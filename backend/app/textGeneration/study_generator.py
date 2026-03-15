@@ -163,7 +163,7 @@ def generate_quiz_questions(
         [
             (
                 "system",
-                """You are generating course quizzes from Piazza context.
+                """You are a course professor creating curriculum quizzes from Piazza context.
 Return strict JSON only. No markdown, no prose.
 Your output must conform to this Pydantic JSON schema (for `questions` only):
 {quiz_questions_schema}
@@ -314,6 +314,7 @@ def generate_flashcard_stream(
     title: str,
     tags: Optional[list[str]],
     source_posts: Optional[list[str]] = None,
+    num_cards: int = 15,
 ) -> dict[str, Any]:
     """
     Generate flashcards from ingested answered posts.
@@ -325,7 +326,7 @@ def generate_flashcard_stream(
             "model": str
         }
     """
-    chunks = _get_answered_chunks(piazza_course_id, source_posts, 20)
+    chunks = _get_answered_chunks(piazza_course_id, source_posts, min(num_cards * 2, 40))
 
     if not chunks:
         raise ValueError(
@@ -352,7 +353,7 @@ Your output must conform to this Pydantic JSON schema (for `cards` only):
 Output envelope must be:
 {{"cards": [...]}}
 Rules:
-- Generate between 10 and 20 flashcards depending on available context.
+- Generate exactly {num_cards} flashcards.
 - Each card must be grounded in the provided context.
 - card_type must be one of: "concept", "definition", "qa".
 - front: a concise question or term.
@@ -375,6 +376,7 @@ Rules:
         {
             "flashcard_schema": _flashcard_schema_json,
             "title": title,
+            "num_cards": num_cards,
             "tags_instruction": tags_instruction,
             "context": context,
         }

@@ -213,19 +213,34 @@ async def submit_quiz_answer(
 
 
 @router.get("/quiz", response_model=list[QuizResponse])
-async def get_all_quizzes() -> list[QuizResponse]:
+async def get_all_quizzes(
+    piazza_course_id: Optional[str] = None,
+    user=Depends(get_current_user),
+) -> list[QuizResponse]:
     """
-    Get all quizzes
+    Get all quizzes for the current user, optionally filtered by course.
     """
     try:
-        query = """
-        SELECT id, title, difficulty, questions,
-               COALESCE(source_posts, ARRAY[]::text[]) AS source_posts,
-               created_at
-        FROM quizzes
-        ORDER BY created_at DESC;
-        """
-        quizzes = execute_query(query)
+        if piazza_course_id:
+            query = """
+            SELECT id, title, difficulty, questions,
+                   COALESCE(source_posts, ARRAY[]::text[]) AS source_posts,
+                   created_at
+            FROM quizzes
+            WHERE user_id = %s AND piazza_course_id = %s
+            ORDER BY created_at DESC;
+            """
+            quizzes = execute_query(query, (str(user.id), piazza_course_id))
+        else:
+            query = """
+            SELECT id, title, difficulty, questions,
+                   COALESCE(source_posts, ARRAY[]::text[]) AS source_posts,
+                   created_at
+            FROM quizzes
+            WHERE user_id = %s
+            ORDER BY created_at DESC;
+            """
+            quizzes = execute_query(query, (str(user.id),))
 
         return [QuizResponse.model_validate(q) for q in (quizzes or [])]
 
@@ -283,6 +298,7 @@ async def flashcards_generate(
             title=deck_info.title,
             tags=deck_info.tags,
             source_posts=deck_info.source_posts,
+            num_cards=deck_info.num_cards,
         )
 
         deck_row = execute_query(
@@ -451,11 +467,21 @@ async def update_flashcard_mastery(
 
 
 @router.get("/flashcards", response_model=list[FlashcardAllResponse])
-async def get_all_flashcards() -> list[FlashcardAllResponse]:
+async def get_all_flashcards(
+    piazza_course_id: Optional[str] = None,
+    user=Depends(get_current_user),
+) -> list[FlashcardAllResponse]:
     try:
-        decks = execute_query(
-            "SELECT id, title, tags, created_at FROM flashcard_decks ORDER BY created_at DESC"
-        )
+        if piazza_course_id:
+            decks = execute_query(
+                "SELECT id, title, tags, created_at FROM flashcard_decks WHERE user_id = %s AND piazza_course_id = %s ORDER BY created_at DESC",
+                (str(user.id), piazza_course_id),
+            )
+        else:
+            decks = execute_query(
+                "SELECT id, title, tags, created_at FROM flashcard_decks WHERE user_id = %s ORDER BY created_at DESC",
+                (str(user.id),),
+            )
 
         result = []
         for deck in decks or []:
