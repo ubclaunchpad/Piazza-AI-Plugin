@@ -326,7 +326,9 @@ def generate_flashcard_stream(
             "model": str
         }
     """
-    chunks = _get_answered_chunks(piazza_course_id, source_posts, min(num_cards * 2, 40))
+    chunks = _get_answered_chunks(
+        piazza_course_id, source_posts, min(num_cards * 2, 40)
+    )
 
     if not chunks:
         raise ValueError(
