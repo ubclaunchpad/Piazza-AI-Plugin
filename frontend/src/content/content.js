@@ -1,6 +1,8 @@
 import { createRoot } from "react-dom/client";
 import ChatbotApp from "./ChatbotApp.jsx";
-import injectEventButtonToPosts from "./injectEventButtonToPosts.js";
+import injectEventButtonToPosts, {
+  readCurrentThreadArticleContent,
+} from "./injectEventButton.js";
 // Import CSS as a raw string - we'll inject it into shadow DOM
 import cssText from "./content.css?raw";
 
@@ -8,6 +10,36 @@ const CONTAINER_ID = "ai-chatbot-extension-root";
 let root = null;
 let shadowRoot = null;
 let observer = null;
+
+async function sendCurrentThreadArticleToBackend(content) {
+  try {
+    await fetch("http://localhost:8000/api/v1/calendar/events/parse-thread", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        // Send the full object as a string for now; backend currently
+        // expects a single `content` field.
+        content: JSON.stringify(content),
+      }),
+    });
+  } catch (err) {
+    console.error("Failed to send thread article to backend:", err);
+  }
+}
+
+function publishCurrentThreadArticle() {
+  const content = readCurrentThreadArticleContent();
+  if (!content) return false;
+
+  console.log("PIAZZA current thread article:", content);
+
+  // Send to backend so it can analyze possible dates.
+  sendCurrentThreadArticleToBackend(content);
+
+  return true;
+}
 
 // Function to inject styles into shadow DOM
 function injectStyles(shadowRoot) {
@@ -114,6 +146,7 @@ function init() {
   if (document.body) {
     injectChatbot();
     injectEventButtonToPosts();
+    setTimeout(publishCurrentThreadArticle, 200);
     setupObserver();
   } else {
     // Retry until body is available

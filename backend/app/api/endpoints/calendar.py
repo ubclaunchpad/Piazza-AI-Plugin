@@ -238,3 +238,30 @@ async def create_calendar_event(
         "event_id": created_event["id"],
         "html_link": created_event.get("htmlLink"),
     }
+
+class ParseArticleContentRequest(BaseModel):
+    content: str
+
+@router.post("/events/parse-thread")
+async def parse_article_for_event(
+    payload: ParseArticleContentRequest,
+):
+    """
+    Temporary endpoint that pretends to parse the article content
+    and returns a hard-coded example result.
+
+    In the future this should run real NLP/date extraction on
+    `payload.content` and return structured event information.
+    """
+
+    return {
+        "status": "ok",
+        "parsed_event": {
+            "event_name": "Midterm 1 CPSC 340",
+            "event_type": "exam",
+            "start_time": "2026-02-28T11:00:00",
+            "end_time": "2026-02-28T12:00:00",
+            "display_text": "Midterm 1 (CPSC 340) on Feb 28, 2026 from 11:00 AM to 12:00 PM",
+            "confidence": 0.9,
+        },
+    }

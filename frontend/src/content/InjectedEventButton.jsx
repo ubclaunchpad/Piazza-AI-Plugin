@@ -1,14 +1,15 @@
 import React, { useEffect, useState } from "react";
+import { readCurrentThreadArticleContent } from "./injectEventButton.js";
+
+const CONFIDENCE_THRESHOLD = 0.7;
 
 export default function InjectedEventButton() {
   const [status, setStatus] = useState("idle");
-  const [text, setText] = useState(
-    "📅 Possible Event: Midterm Feb 28, 2026 From 11:00 AM to 12:00 PM",
-  );
+  const [suggestion, setSuggestion] = useState(null);
 
   const [authToken, setAuthToken] = useState(null);
 
-  // Retrieve auth token from storage on mount
+  // Retrieve auth token and compute suggestion on mount
   useEffect(() => {
     chrome.storage.local.get(["authToken"], (result) => {
       if (result.authToken) {
@@ -17,6 +18,50 @@ export default function InjectedEventButton() {
         console.warn("⚠️ No auth token found in storage");
       }
     });
+
+    const content = readCurrentThreadArticleContent();
+    if (!content) {
+      setSuggestion(null);
+      return;
+    }
+
+    (async () => {
+      try {
+        const response = await fetch(
+          "http://localhost:8000/api/v1/calendar/events/parse-thread",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              content: JSON.stringify(content),
+            }),
+          },
+        );
+
+        const data = await response.json();
+        const parsed = data?.parsed_event ?? null;
+        const confidence = parsed?.confidence ?? data?.confidence ?? 0;
+
+        if (!parsed || confidence < CONFIDENCE_THRESHOLD) {
+          setSuggestion(null);
+          return;
+        }
+
+        setSuggestion({
+          event_name: parsed.event_name,
+          event_type: parsed.event_type,
+          start_time: parsed.start_time,
+          end_time: parsed.end_time,
+          display_text: parsed.display_text,
+          confidence,
+        });
+      } catch (err) {
+        console.error("Failed to fetch suggested event:", err);
+        setSuggestion(null);
+      }
+    })();
   }, []);
 
   const handleClick = async () => {
@@ -31,6 +76,12 @@ export default function InjectedEventButton() {
         return;
       }
 
+      if (!suggestion) {
+        console.warn("No event suggestion available");
+        setStatus("error");
+        return;
+      }
+
       try {
         const response = await fetch(
           "http://localhost:8000/api/v1/calendar/events",
@@ -41,30 +92,45 @@ export default function InjectedEventButton() {
               Authorization: `Bearer ${token}`,
             },
             body: JSON.stringify({
-              title: "Midterm",
-              start_time: "2026-02-28T19:00:00Z",
-              end_time: "2026-02-28T20:00:00Z",
+              title: suggestion.event_name,
+              start_time: suggestion.start_time,
+              end_time: suggestion.end_time,
             }),
           },
         );
 
-        const data = await response.json();
+        const data = await response.json().catch(() => null);
 
-        if (data.action === "link_required") {
+        if (data && data.action === "link_required") {
           window.location.href = "http://localhost:8000/api/v1/calendar/auth";
           return;
         }
 
-        if (data.status === "event_created") {
-          setText("✅ Event Added to Google Calendar");
+        if (response.ok && data && data.status === "event_created") {
           setStatus("success");
+        } else {
+          console.error("Failed to create event", {
+            status: response.status,
+            data,
+          });
+          setStatus("error");
         }
       } catch (error) {
-        setText("❌ Failed to add event");
+        console.error("Error while creating event", error);
         setStatus("error");
       }
     });
   };
+
+  if (!suggestion) {
+    return null;
+  }
+
+  const label =
+    suggestion.display_text ||
+    `📅 Possible ${suggestion.event_type ?? "event"}: ${
+      suggestion.event_name ?? "Unnamed"
+    }`;
 
   return (
     <button
@@ -97,7 +163,11 @@ export default function InjectedEventButton() {
       }
       disabled={status === "loading"}
     >
-      {text}
+      {status === "success"
+        ? "✅ Event added to Google Calendar"
+        : status === "error"
+          ? "❌ Failed to add event"
+          : label}
     </button>
   );
 }
