@@ -135,6 +135,6 @@ def update_calendar_settings(reminder_settings: str, current_user=Depends(get_cu
     """
     query = "UPDATE calendar_events SET reminder_settings = %s WHERE user_id = %s"
     result = execute_statement(query, (reminder_settings, current_user.id))
-    if result.rowcount == 0:
+    if result == 0:
         raise HTTPException(status_code=404, detail="Event not found or not owned by user")
     return {"status": "success", "reminder_settings": reminder_settings}
