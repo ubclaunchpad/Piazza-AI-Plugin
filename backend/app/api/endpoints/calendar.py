@@ -39,7 +39,7 @@ def calendar_auth():
     # encrypted_access_token = fernet.encrypt(access_token.encode())
     # encrypted_refresh_token = fernet.encrypt(refresh_token.encode())
     # Store these in calendar_tokens table
-    pass
+    raise HTTPException(status_code=501, detail="Google Calendar OAuth initiation not implemented")
 
 
 @router.get("/callback")
@@ -51,7 +51,7 @@ def calendar_callback():
         Success message or error details.
     """
     # TODO: Implement Google OAuth callback handling logic
-    pass
+    raise HTTPException(status_code=501, detail="Google Calendar OAuth callback not implemented")
 
 
 @router.post("/events", response_model=CalendarEvent)
