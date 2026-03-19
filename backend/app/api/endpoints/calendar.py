@@ -11,7 +11,6 @@ This module defines API endpoints for:
 Endpoints follow FastAPI best practices and include detailed docstrings for clarity.
 """
 
-import logging
 from typing import List
 
 from fastapi import APIRouter, HTTPException, Depends
@@ -24,7 +23,6 @@ from app.core.auth import get_current_user
 # Placeholder imports for future models and logic
 # from app.models.calendar import ...
 
-logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
