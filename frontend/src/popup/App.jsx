@@ -2,13 +2,14 @@ import { useEffect, useState } from "react";
 import LoginPage from "./LoginPage";
 import DashboardPage from "./DashboardPage";
 import AssistantPage from "./AssistantPage";
+import ResourcesPage from "./ResourcesPage";
 
 /* global chrome */
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState(null);
-  const [currentPage, setCurrentPage] = useState("dashboard"); // 'dashboard' or 'assistant'
+  const [currentPage, setCurrentPage] = useState("dashboard"); // 'dashboard', 'assistant', or 'resources'
 
   // Check if user is already logged in
   useEffect(() => {
@@ -175,12 +176,18 @@ export default function App() {
             user={user}
             onLogout={handleLogout}
             onNavigateToAssistant={() => setCurrentPage("assistant")}
+            onNavigateToResources={() => setCurrentPage("resources")}
           />
-        ) : (
+        ) : currentPage === "assistant" ? (
           <AssistantPage
             user={user}
             onBack={() => setCurrentPage("dashboard")}
             onLogout={handleLogout}
+          />
+        ) : (
+          <ResourcesPage
+            user={user}
+            onBack={() => setCurrentPage("dashboard")}
           />
         )
       ) : (

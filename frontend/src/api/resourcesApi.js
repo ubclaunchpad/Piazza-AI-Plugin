@@ -47,9 +47,10 @@ export const searchResources = async ({
  *
  * @param {Object} params
  * @param {string} params.piazzaCourseId - Optional Piazza course ID filter
+ * @param {string} params.token - Authorization bearer token (required)
  * @returns {Promise<{saved_resources: Array}>}
  */
-export const getResourceLibrary = async ({ piazzaCourseId } = {}) => {
+export const getResourceLibrary = async ({ piazzaCourseId, token } = {}) => {
   const params = new URLSearchParams();
   if (piazzaCourseId) {
     params.append("piazza_course_id", piazzaCourseId);
@@ -60,7 +61,11 @@ export const getResourceLibrary = async ({ piazzaCourseId } = {}) => {
       ? `${API_ENDPOINT}/resources/library?${params.toString()}`
       : `${API_ENDPOINT}/resources/library`;
 
-  const response = await fetch(url);
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
@@ -73,13 +78,18 @@ export const getResourceLibrary = async ({ piazzaCourseId } = {}) => {
 /**
  * Save a resource to the library.
  *
- * @param {Object} payload - Matches backend SaveResourceRequest shape.
+ * @param {Object} params
+ * @param {Object} params.payload - Matches backend SaveResourceRequest shape.
+ * @param {string} params.token - Authorization bearer token (required)
  * @returns {Promise<{id: string, message: string}>}
  */
-export const saveResource = async (payload) => {
+export const saveResource = async ({ payload, token }) => {
   const response = await fetch(`${API_ENDPOINT}/resources/library`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
     body: JSON.stringify(payload),
   });
 
@@ -94,12 +104,17 @@ export const saveResource = async (payload) => {
 /**
  * Delete a resource from the library by ID.
  *
- * @param {string} id - Resource UUID
+ * @param {Object} params
+ * @param {string} params.id - Resource UUID
+ * @param {string} params.token - Authorization bearer token (required)
  * @returns {Promise<void>}
  */
-export const deleteResource = async (id) => {
+export const deleteResource = async ({ id, token }) => {
   const response = await fetch(`${API_ENDPOINT}/resources/library/${id}`, {
     method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
   });
 
   if (!response.ok) {
