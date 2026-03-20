@@ -1,37 +1,34 @@
-"""
-Concept LLM service
-"""
+"""Concept-linking placeholder service for a single exact Piazza post."""
 
-import json
-import logging
+from app.textGeneration.post_assistant.shared import (
+    ResolvedPostContext,
+    stream_placeholder_post_response,
+)
 
-from langchain_core.messages import AIMessage
-
-from app.textGeneration.llm_service import get_session_history
-
-logger = logging.getLogger(__name__)
+SYSTEM_PROMPT = """Concept linking is intentionally left as a placeholder in this
+branch. The exact post should still be resolved and the endpoint contract should stay
+stable for the later implementation."""
 
 
-def stream_llm_concept_response(post_num: int, thread_id: str, session_id: str):
-    """stream llm response in chunks"""
+def stream_llm_concept_response(
+    *,
+    post_context: ResolvedPostContext,
+    session_id: str | None,
+):
+    """Stream a placeholder concept-linking response for one exact Piazza post."""
     message = (
-        "Temporary concept-linking response placeholder.\n\n"
-        f"Post: {post_num}\n"
-        f"Course: {thread_id}\n"
-        f"Session: {session_id}\n\n"
-        "This endpoint is wired and streaming correctly. "
-        "You can now continue with follow-up chat in the same session."
+        "Concept linking is not implemented yet.\n\n"
+        f"Resolved exact post: {post_context.post_num}\n"
+        f"Subject: {post_context.subject}\n\n"
+        "The endpoint is wired to the exact ingested post and is ready for a future "
+        "concept-linking implementation."
     )
-    try:
-        history = get_session_history(session_id)
-        history.add_user_message(
-            f"[concept-linking] Request for post {post_num} in course {thread_id}."
-        )
-        history.add_message(
-            AIMessage(content=message, response_metadata={"sources": [str(post_num)]})
-        )
-    except Exception as e:
-        logger.error(f"Failed to persist concept-linking placeholder history: {e}")
-
-    yield json.dumps({"type": "content", "content": message}) + "\n"
-    yield json.dumps({"type": "sources", "sources": [str(post_num)]}) + "\n"
+    return stream_placeholder_post_response(
+        action_name="concept-linking",
+        post_context=post_context,
+        session_id=session_id,
+        history_user_message=(
+            f"Link concepts for Piazza post {post_context.post_num}."
+        ),
+        placeholder_message=message,
+    )
