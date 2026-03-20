@@ -167,15 +167,24 @@ def test_translate_endpoint_defaults_to_english(client, monkeypatch, post_contex
     """Translate should default to English when the frontend does not send a language."""
     captured = {}
 
-    def fake_translate_stream(*, post_context, session_id, language, language_prompt_addon=""):
+    def fake_translate_stream(
+        *, post_context, session_id, language, language_prompt_addon=""
+    ):
         captured["post_num"] = post_context.post_num
         captured["session_id"] = session_id
         captured["language"] = language
         yield json.dumps({"type": "content", "content": "Translated text"}) + "\n"
-        yield json.dumps({"type": "sources", "sources": [str(post_context.post_num)]}) + "\n"
+        yield (
+            json.dumps({"type": "sources", "sources": [str(post_context.post_num)]})
+            + "\n"
+        )
 
-    monkeypatch.setattr(per_post_llm, "get_exact_post_context", lambda *_args: post_context)
-    monkeypatch.setattr(per_post_llm, "stream_llm_translate_response", fake_translate_stream)
+    monkeypatch.setattr(
+        per_post_llm, "get_exact_post_context", lambda *_args: post_context
+    )
+    monkeypatch.setattr(
+        per_post_llm, "stream_llm_translate_response", fake_translate_stream
+    )
 
     response = client.post(
         "/per-post/translate",
