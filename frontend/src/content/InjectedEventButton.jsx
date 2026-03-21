@@ -5,6 +5,7 @@ const CONFIDENCE_THRESHOLD = 0.7;
 
 export default function InjectedEventButton() {
   const [status, setStatus] = useState("idle");
+  const [errorMessage, setErrorMessage] = useState(null);
   const [suggestion, setSuggestion] = useState(null);
 
   const [authToken, setAuthToken] = useState(null);
@@ -114,6 +115,7 @@ export default function InjectedEventButton() {
             data,
           });
           setStatus("error");
+          setErrorMessage(data?.detail ?? "Failed to create event");
         }
       } catch (error) {
         console.error("Error while creating event", error);
@@ -132,41 +134,32 @@ export default function InjectedEventButton() {
       suggestion.event_name ?? "Unnamed"
     }`;
 
+  const buttonClassName = [
+    "my-injected-link",
+    "inline-block cursor-pointer border-0 rounded-md px-2 py-1.5 mt-4 ml-4",
+    "text-sm transition-colors",
+    "disabled:opacity-70 disabled:cursor-not-allowed",
+    status === "success" &&
+      "bg-green-100 text-green-900 hover:bg-green-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-500",
+    status === "error" &&
+      "bg-red-100 text-red-900 hover:bg-red-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500",
+    (status === "idle" || status === "loading") &&
+      "bg-gray-100 text-gray-900 hover:bg-gray-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-400",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
     <button
       type="button"
-      className="my-injected-link"
-      style={{
-        display: "inline-block",
-        backgroundColor:
-          status === "success"
-            ? "#d4edda"
-            : status === "error"
-              ? "#f8d7da"
-              : "#f0f0f0",
-        padding: "5px",
-        marginTop: "16px",
-        marginLeft: "16px",
-        borderRadius: "5px",
-        border: "none",
-        cursor: "pointer",
-      }}
+      className={buttonClassName}
       onClick={handleClick}
-      onMouseEnter={(e) => (e.target.style.backgroundColor = "#e0e0e0")}
-      onMouseLeave={(e) =>
-        (e.target.style.backgroundColor =
-          status === "success"
-            ? "#d4edda"
-            : status === "error"
-              ? "#f8d7da"
-              : "#f0f0f0")
-      }
       disabled={status === "loading"}
     >
       {status === "success"
         ? "✅ Event added to Google Calendar"
         : status === "error"
-          ? "❌ Failed to add event"
+          ? `❌ Failed to add event: ${errorMessage}`
           : label}
     </button>
   );

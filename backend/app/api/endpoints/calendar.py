@@ -141,7 +141,6 @@ async def calendar_callback(state: str, code: str):
 # =====================================
 
 def get_valid_google_credentials(user_id: str):
-
     record = execute_query(
         """
         SELECT access_token, refresh_token, expires_at
@@ -189,6 +188,56 @@ def get_valid_google_credentials(user_id: str):
             )
 
     return creds
+
+
+# =====================================
+# Google Calendar connection for a user
+# =====================================
+
+
+@router.get("/user/{user_id}")
+async def get_calendar_google_status(
+    user_id: str,
+    authorization: Optional[str] = Header(None),
+):
+    """
+    Check whether Google Calendar OAuth tokens exist and are valid for this user.
+
+    Uses the same logic as ``get_valid_google_credentials`` (including refresh
+    if the access token is expired). Does not return secrets.
+
+    Full URL (typical): ``GET /api/v1/calendar/user/{user_id}``
+
+    Returns **404** when no Google Calendar OAuth tokens exist for the user.
+
+    The authenticated Supabase user must match ``user_id`` (prevents probing
+    other accounts).
+    """
+    user = await get_current_user(authorization)
+    if str(user.id) != user_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Cannot access another user's calendar connection status",
+        )
+
+    creds = get_valid_google_credentials(user_id)
+    if not creds:
+        raise HTTPException(
+            status_code=404,
+            detail="Google Calendar is not linked for this user",
+        )
+
+    expiry = None
+    if creds.expiry:
+        exp = creds.expiry
+        expiry = exp.isoformat() if hasattr(exp, "isoformat") else str(exp)
+
+    return {
+        "user_id": user_id,
+        "google_calendar_connected": True,
+        "token_expires_at": expiry,
+        "has_refresh_token": bool(creds.refresh_token),
+    }
 
 
 # =====================================

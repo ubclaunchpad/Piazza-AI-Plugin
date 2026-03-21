@@ -242,15 +242,50 @@ export default function DashboardPage({
   };
 
   useEffect(() => {
-    // Check if calendar is already linked
-    chrome.storage.local.get(["calendarLinked"], (result) => {
-      if (result.calendarLinked) {
-        setLinkedToCalendar(true);
-      } else {
-        setLinkedToCalendar(false);
+    if (!user?.id || !user?.access_token) {
+      setLinkedToCalendar(false);
+      return;
+    }
+
+    const API_ENDPOINT =
+      process.env.API_ENDPOINT || "http://localhost:8000/api/v1";
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const response = await fetch(
+          `${API_ENDPOINT}/calendar/user/${user.id}`,
+          {
+            headers: {
+              Authorization: `Bearer ${user.access_token}`,
+            },
+          },
+        );
+        if (cancelled) return;
+
+        if (response.ok) {
+          const data = await response.json();
+          setLinkedToCalendar(Boolean(data?.google_calendar_connected));
+        } else if (response.status === 404) {
+          // Backend: no Google Calendar linked for this user
+          setLinkedToCalendar(false);
+        } else {
+          console.error("Error checking calendar link:", response.statusText);
+          setLinkedToCalendar(false);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          console.error("Error checking calendar link:", e);
+          setLinkedToCalendar(false);
+        }
       }
-    });
-  }, []);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, user?.access_token]);
 
   const handleCalendarLink = async () => {
     try {
