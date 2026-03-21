@@ -24,8 +24,9 @@ def _build_translate_user_prompt(
     return (
         f"Task: Translate the exact Piazza post below into {language}.\n"
         "Output requirements:\n"
-        "- Preserve the original structure when possible.\n"
-        "- Keep code, equations, URLs, filenames, and identifiers unchanged unless they are ordinary prose.\n"
+        "- Translate Accurately: Translate the entire post content (including the question, problem description, and explanations) clearly and naturally.\n"
+        "- Preserve Technical Terms: Do NOT translate programming keywords, variables, function names, code blocks, mathematical formulas, or standard industry terminology. Leave them in their original language.\n"
+        "- Maintain Tone and Format: Keep the original educational tone, and strictly preserve all markdown formatting, bullet points, and structures exactly as they appear.\n"
         "- Do not summarize or omit details.\n"
         "- If the target language is English, produce a natural English translation rather than commentary."
         f"{addon_block}\n\n"
