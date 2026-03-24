@@ -1,5 +1,14 @@
 import React, { useState, useEffect } from "react";
-import { SimplifyIcon, SummarizeIcon, SolveIcon, TranslateIcon, ConceptIcon, ActionButton, ResultDisplay, LoadingSpinner, ProficiencySelector } from "./PostAssistantUI.jsx";
+import {
+  SimplifyIcon,
+  SummarizeIcon,
+  SolveIcon,
+  TranslateIcon,
+  ActionButton,
+  ResultDisplay,
+  LoadingSpinner,
+  ProficiencySelector,
+} from "./PostAssistantUI.jsx";
 
 const API_BASE_URL = process.env.API_ENDPOINT || "http://localhost:8000/api/v1";
 const TOOLBAR_SESSION_EVENT = "piazza-ai-open-session";
@@ -116,9 +125,6 @@ export default function PostAssistant({ threadId, postNum, content }) {
         case 'translate':
           endpoint += '/translate';
           break;
-        case 'link_concepts':
-          endpoint += '/link_concepts';
-          break;
         default:
           endpoint += `/${action}`;
       }
@@ -129,11 +135,11 @@ export default function PostAssistant({ threadId, postNum, content }) {
           "Content-Type": "application/json",
           "Authorization": user ? `Bearer ${user.access_token}` : ""
         },
-        body: JSON.stringify({ // Conditionally add target_language for translation
+        body: JSON.stringify({
           post_num: Number(postNum),
           thread_id: threadId,
           session_id: sessionId,
-          ...(action === 'translate' && { target_language: translateLanguage }),
+          ...(action === 'translate' && { language: translateLanguage }),
         })
       });
 
@@ -235,13 +241,6 @@ export default function PostAssistant({ threadId, postNum, content }) {
                 <option value="Spanish">Spanish</option>
             </select>
         )}
-        <ActionButton 
-            icon={<ConceptIcon />} 
-            label="Concepts"
-            title="Explain and link key concepts" 
-            onClick={() => handleAction('link_concepts')} 
-            isActive={activeAction === 'link_concepts'}
-        />
       </div>
         </div>
 

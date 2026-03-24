@@ -8,9 +8,6 @@ from fastapi import APIRouter, HTTPException, Path
 from fastapi.responses import StreamingResponse
 
 from app.models import PostRequest, TranslatePostRequest
-from app.textGeneration.post_assistant.concept_linking import (
-    stream_llm_concept_response,
-)
 from app.textGeneration.post_assistant.shared import (
     PostAssistantContextError,
     get_exact_post_context,
@@ -115,27 +112,6 @@ async def generate_llm_translation_response(request: TranslatePostRequest):
         raise
     except Exception as e:
         logger.exception("Failed to generate translate response")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to generate response: {str(e)}",
-        )
-
-
-@router.post("/link_concepts")
-async def generate_llm_concept_linking_response(request: PostRequest):
-    try:
-        post_context = _resolve_post_or_raise(request)
-        return StreamingResponse(
-            stream_llm_concept_response(
-                post_context=post_context,
-                session_id=request.session_id,
-            ),
-            media_type="application/x-ndjson",
-        )
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.exception("Failed to generate concept-linking response")
         raise HTTPException(
             status_code=500,
             detail=f"Failed to generate response: {str(e)}",

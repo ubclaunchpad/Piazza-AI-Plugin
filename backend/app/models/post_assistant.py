@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, Field
 
 TranslateLanguage = Literal[
     "English",
@@ -36,6 +36,7 @@ class TranslatePostRequest(PostRequest):
     language: TranslateLanguage = Field(
         default="English",
         description="Target translation language.",
+        validation_alias=AliasChoices("language", "target_language"),
     )
 
 
