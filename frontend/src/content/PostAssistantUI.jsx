@@ -6,6 +6,7 @@ import rehypeKatex from "rehype-katex";
 import rehypeRaw from "rehype-raw";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { normalizeLatexForMarkdown } from "./markdownUtils.js";
 
 // --- Icons ---
 export const Icon = ({ children }) => (
@@ -42,13 +43,28 @@ export const TranslateIcon = () => (
 
 // --- Components ---
 
-export function ActionButton({ icon, label, onClick, isActive }) {
-    const baseClass = "flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 border cursor-pointer select-none";
-    const activeClass = "bg-gradient-to-br from-blue-500 to-blue-700 text-white border-transparent shadow-md transform scale-105";
-    const inactiveClass = "bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800";
+export function ActionButton({ icon, label, onClick, isActive, disabled = false, title }) {
+    const baseClass = "flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 border select-none";
+    const activeClass = "bg-gradient-to-br from-blue-500 to-blue-700 text-white border-transparent shadow-md transform scale-105 cursor-pointer";
+    const inactiveClass = "bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800 cursor-pointer";
+    const disabledClass = "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed";
+    const activeDisabledClass = "bg-blue-50 text-blue-700 border-blue-200 cursor-not-allowed";
+    const stateClass = disabled
+      ? isActive
+        ? activeDisabledClass
+        : disabledClass
+      : isActive
+        ? activeClass
+        : inactiveClass;
 
     return (
-        <button onClick={onClick} className={`${baseClass} ${isActive ? activeClass : inactiveClass}`}>
+        <button
+            type="button"
+            onClick={onClick}
+            disabled={disabled}
+            title={title}
+            className={`${baseClass} ${stateClass}`}
+        >
             {icon}
             {label}
         </button>
@@ -57,6 +73,7 @@ export function ActionButton({ icon, label, onClick, isActive }) {
 
 export function ResultDisplay({ result }) {
     const [copied, setCopied] = useState(false);
+    const renderedResult = normalizeLatexForMarkdown(result);
 
     const handleCopy = () => {
         navigator.clipboard.writeText(result);
@@ -134,7 +151,7 @@ export function ResultDisplay({ result }) {
                     ),
                 }}
             >
-                {result}
+                {renderedResult}
             </ReactMarkdown>
             </div>
         </div>
@@ -154,19 +171,53 @@ export function LoadingSpinner() {
     );
 }
 
-export function ProficiencySelector({ value, onChange }) {
+function SelectorField({ label, value, onChange, disabled = false, children }) {
     return (
-        <div className="flex items-center gap-2 ml-2 border-l pl-3 border-gray-200">
-            <span className="text-xs text-gray-500 font-medium">Level:</span>
+        <label className="flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5">
+            <span className="text-[11px] text-gray-500 font-semibold uppercase tracking-wide">
+                {label}
+            </span>
             <select 
                 value={value} 
-                onChange={(e) => onChange(Number(e.target.value))}
-                className="text-xs border border-gray-200 rounded-md px-2 py-1 bg-gray-50 text-gray-700 focus:outline-none focus:border-blue-400 cursor-pointer"
+                onChange={onChange}
+                disabled={disabled}
+                className="text-xs border border-gray-200 rounded-md px-2 py-1 bg-gray-50 text-gray-700 focus:outline-none focus:border-blue-400 disabled:cursor-not-allowed disabled:bg-gray-100"
             >
-                <option value={1}>Beginner</option>
-                <option value={2}>Advanced</option>
-                <option value={3}>Expert</option>
+                {children}
             </select>
-        </div>
+        </label>
+    );
+}
+
+export function ProficiencySelector({ value, onChange, disabled = false }) {
+    return (
+        <SelectorField
+            label="Simplify"
+            value={value}
+            onChange={(e) => onChange(Number(e.target.value))}
+            disabled={disabled}
+        >
+            <option value={1}>Beginner</option>
+            <option value={2}>Advanced</option>
+            <option value={3}>Expert</option>
+        </SelectorField>
+    );
+}
+
+export function LanguageSelector({ value, onChange, disabled = false }) {
+    return (
+        <SelectorField
+            label="Translate"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            disabled={disabled}
+        >
+            <option value="English">English</option>
+            <option value="Chinese">Chinese</option>
+            <option value="Korean">Korean</option>
+            <option value="French">French</option>
+            <option value="Russian">Russian</option>
+            <option value="Spanish">Spanish</option>
+        </SelectorField>
     );
 }
