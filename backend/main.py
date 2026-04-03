@@ -58,4 +58,6 @@ if __name__ == "__main__":
         host=settings.HOST,  # ✅ Use config!
         port=settings.PORT,  # ✅ Use config!
         reload=settings.DEBUG,  # ✅ Use config!
+        log_level="info",
+        access_log=True,
     )
