@@ -53,8 +53,9 @@ function SearchTab({ user, piazzaCourseId }) {
         filters: selectedFilters.length > 0 ? selectedFilters : undefined,
         limit: 10,
       });
-      setResults(data.results || []);
-      if (data.results.length === 0) {
+      const list = Array.isArray(data.results) ? data.results : [];
+      setResults(list);
+      if (list.length === 0) {
         setError("No resources found. Try a different search.");
       }
     } catch (err) {
@@ -175,9 +176,9 @@ function SearchTab({ user, piazzaCourseId }) {
 
         {!isLoading && results.length > 0 && (
           <div className="flex flex-col gap-3">
-            {results.map((resource, index) => (
+            {results.map((resource) => (
               <div
-                key={index}
+                key={resource.url}
                 className="p-3 border border-gray-200 rounded-lg hover:border-gray-300 hover:shadow-sm transition-all"
               >
                 <div className="flex justify-between items-start gap-2 mb-2">
@@ -198,7 +199,7 @@ function SearchTab({ user, piazzaCourseId }) {
                 <div className="flex justify-between items-center gap-2 flex-wrap">
                   <div className="flex items-center gap-2">
                     <ResourceBadge type={resource.resource_type} />
-                    {resource.relevance_score && (
+                    {Number.isFinite(resource.relevance_score) && (
                       <span className="text-xs text-gray-500">
                         Match: {Math.round(resource.relevance_score * 100)}%
                       </span>
@@ -337,9 +338,9 @@ function LibraryTab({ user, piazzaCourseId }) {
                 <div className="flex justify-between items-center gap-2 flex-wrap">
                   <div className="flex items-center gap-2">
                     <ResourceBadge type={resource.resource_type} />
-                    {resource.relevance_score && (
+                    {Number.isFinite(resource.relevance_score) && (
                       <span className="text-xs text-gray-500">
-                        {Math.round(resource.relevance_score * 100)}%
+                        Match: {Math.round(resource.relevance_score * 100)}%
                       </span>
                     )}
                     <span className="text-xs text-gray-400">
