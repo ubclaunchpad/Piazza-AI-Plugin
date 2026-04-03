@@ -17,3 +17,4 @@ pgvector
 google_auth_oauthlib
 itsdangerous
 google-api-python-client
+pyasn1>=0.6.3
