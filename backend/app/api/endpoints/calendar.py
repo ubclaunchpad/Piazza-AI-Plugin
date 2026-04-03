@@ -1,4 +1,19 @@
-from typing import Optional
+"""
+Calendar endpoint handlers for Google Calendar integration.
+
+This module defines API endpoints for:
+- Initiating Google OAuth flow
+- Handling OAuth callback and storing tokens
+- Creating calendar events
+- Listing user's synced events
+- Updating reminder preferences
+
+Endpoints follow FastAPI best practices and include detailed docstrings for clarity.
+"""
+
+import logging
+from typing import Any, Dict, Optional
+
 from fastapi import APIRouter, HTTPException, Header, Query
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
@@ -13,10 +28,14 @@ import json
 import base64
 from datetime import datetime, timezone
 
+from psycopg2.extras import Json
+
 from app.core.database import execute_statement, execute_query
 from app.core.supabase import supabase
 
 router = APIRouter()
+
+logger = logging.getLogger(__name__)
 
 SCOPES = ["https://www.googleapis.com/auth/calendar"]
 
@@ -33,9 +52,7 @@ async def get_current_user(authorization: Optional[str] = Header(None)):
             raise HTTPException(status_code=401, detail="Invalid token")
         return user.user
     except Exception as e:
-        import logging
-
-        logging.error(f"Authentication failed: {str(e)}")
+        logger.error("Authentication failed: %s", e)
         raise HTTPException(status_code=401, detail=f"Authentication failed: {str(e)}")
 
 
@@ -60,6 +77,9 @@ def get_google_client_config():
 
 @router.get("/auth")
 async def calendar_auth(token: Optional[str] = Query(None)):
+    """
+    Handle OAuth callback and store tokens for the authenticated user.
+    """
     user = await get_current_user(token)
 
     client_config = get_google_client_config()
@@ -90,6 +110,12 @@ async def calendar_auth(token: Optional[str] = Query(None)):
 
 @router.get("/callback")
 async def calendar_callback(state: str, code: str):
+    """
+    Handle Google OAuth callback and store access tokens.
+
+    Returns:
+        Success message or error details.
+    """
     try:
         # Decode OAuth state
         decoded = json.loads(base64.urlsafe_b64decode(state.encode()).decode())
@@ -244,10 +270,35 @@ async def get_calendar_google_status(
 # Add Event Endpoint
 # =====================================
 
+
+def _parse_iso_datetime(value: str) -> Optional[datetime]:
+    if not value or not str(value).strip():
+        return None
+    v = str(value).strip()
+    if v.endswith("Z"):
+        v = v[:-1] + "+00:00"
+    try:
+        dt = datetime.fromisoformat(v)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt
+    except ValueError:
+        return None
+
+
+class PiazzaSourceContext(BaseModel):
+    thread_summary: Optional[str] = None
+    thread_updated_at: Optional[str] = None
+
+
 class AddEventRequest(BaseModel):
     title: str
     start_time: str
     end_time: str
+    piazza_course_id: Optional[str] = None
+    source_post_number: Optional[str] = None
+    source_context: Optional[PiazzaSourceContext] = None
+    reminder_settings: Optional[Dict[str, Any]] = None
 
 
 @router.post("/events")
@@ -255,7 +306,9 @@ async def create_calendar_event(
     event: AddEventRequest,
     authorization: Optional[str] = Header(None),
 ):
-
+    """
+    Create the event in Google Calendar, then insert a matching row into ``calendar_events``.
+    """
     user = await get_current_user(authorization)
 
     creds = get_valid_google_credentials(user.id)
@@ -282,9 +335,61 @@ async def create_calendar_event(
         body=event_body,
     ).execute()
 
+    google_event_id = created_event["id"]
+    start_dt = _parse_iso_datetime(event.start_time)
+    end_dt = _parse_iso_datetime(event.end_time)
+
+    merged_reminders: Dict[str, Any] = {}
+    if event.reminder_settings:
+        merged_reminders.update(event.reminder_settings)
+    if event.source_context is not None:
+        sc = event.source_context.model_dump(exclude_none=True)
+        if sc:
+            merged_reminders["piazza_source"] = sc
+
+    try:
+        execute_statement(
+            """
+            INSERT INTO calendar_events (
+                user_id,
+                piazza_course_id,
+                google_event_id,
+                title,
+                event_start_at,
+                event_end_at,
+                source_post_number,
+                reminder_settings
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            (
+                str(user.id),
+                event.piazza_course_id,
+                google_event_id,
+                event.title,
+                start_dt,
+                end_dt,
+                event.source_post_number,
+                Json(merged_reminders) if merged_reminders else None,
+            ),
+        )
+    except Exception as e:
+        logger.exception(
+            "Google event created but calendar_events insert failed user=%s google_id=%s",
+            user.id,
+            google_event_id,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "Event was created in Google Calendar but could not be saved to the database. "
+                f"google_event_id={google_event_id}. Error: {e!s}"
+            ),
+        )
+
     return {
         "status": "event_created",
-        "event_id": created_event["id"],
+        "event_id": google_event_id,
         "html_link": created_event.get("htmlLink"),
     }
 

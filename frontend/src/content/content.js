@@ -1,8 +1,10 @@
 import { createRoot } from "react-dom/client";
 import ChatbotApp from "./ChatbotApp.jsx";
 import injectEventButtonToPosts, {
-  readCurrentThreadArticleContent,
+  readArticleContent,
 } from "./injectEventButton.js";
+
+const API_ENDPOINT = process.env.API_ENDPOINT || "http://localhost:8000/api/v1";
 // Import CSS as a raw string - we'll inject it into shadow DOM
 import cssText from "./content.css?raw";
 
@@ -10,17 +12,24 @@ const CONTAINER_ID = "ai-chatbot-extension-root";
 let root = null;
 let shadowRoot = null;
 let observer = null;
+let feedObserver = null;
+let injectDebounceTimer = null;
 
-async function sendCurrentThreadArticleToBackend(content) {
+function scheduleInjectEventButtons() {
+  clearTimeout(injectDebounceTimer);
+  injectDebounceTimer = setTimeout(() => {
+    injectEventButtonToPosts();
+  }, 350);
+}
+
+async function sendArticleContentToBackend(content) {
   try {
-    await fetch("http://localhost:8000/api/v1/calendar/events/parse-thread", {
+    await fetch(`${API_ENDPOINT}/calendar/events/parse-thread`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        // Send the full object as a string for now; backend currently
-        // expects a single `content` field.
         content: JSON.stringify(content),
       }),
     });
@@ -29,16 +38,19 @@ async function sendCurrentThreadArticleToBackend(content) {
   }
 }
 
-function publishCurrentThreadArticle() {
-  const content = readCurrentThreadArticleContent();
-  if (!content) return false;
-
-  console.log("PIAZZA current thread article:", content);
-
-  // Send to backend so it can analyze possible dates.
-  sendCurrentThreadArticleToBackend(content);
-
-  return true;
+function publishVisibleThreadArticles() {
+  const containers = document.querySelectorAll("div#qanda-content");
+  let any = false;
+  containers.forEach((container) => {
+    const article = container.querySelector("article#qaContentViewId");
+    if (!article) return;
+    const content = readArticleContent(article);
+    if (!content) return;
+    any = true;
+    console.log("PIAZZA thread article:", content);
+    sendArticleContentToBackend(content);
+  });
+  return any;
 }
 
 // Function to inject styles into shadow DOM
@@ -141,13 +153,25 @@ function setupObserver() {
   console.log("👁️ Observer started watching for DOM changes");
 }
 
+function setupFeedObserver() {
+  if (!document.body) return;
+  if (feedObserver) {
+    feedObserver.disconnect();
+  }
+  feedObserver = new MutationObserver(() => {
+    scheduleInjectEventButtons();
+  });
+  feedObserver.observe(document.body, { childList: true, subtree: true });
+}
+
 // Wait for DOM to be ready
 function init() {
   if (document.body) {
     injectChatbot();
     injectEventButtonToPosts();
-    setTimeout(publishCurrentThreadArticle, 200);
+    setTimeout(publishVisibleThreadArticles, 200);
     setupObserver();
+    setupFeedObserver();
   } else {
     // Retry until body is available
     setTimeout(init, 10);
@@ -206,5 +230,6 @@ setInterval(() => {
     console.log("URL changed, checking chatbot...");
     setTimeout(injectChatbot, 200);
     setTimeout(injectEventButtonToPosts, 200);
+    setTimeout(scheduleInjectEventButtons, 400);
   }
 }, 500);
