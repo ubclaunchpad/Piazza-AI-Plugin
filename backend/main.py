@@ -4,7 +4,6 @@ Piazza AI Plugin Backend
 Minimal FastAPI backend for the Piazza AI browser extension.
 """
 
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
