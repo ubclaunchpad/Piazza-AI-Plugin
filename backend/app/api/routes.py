@@ -6,7 +6,17 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 # Import endpoint routers
-from app.api.endpoints import auth, chat_sessions, documents, example, ingestion, llm, resources
+from app.api.endpoints import (
+    auth,
+    chat_sessions,
+    documents,
+    example,
+    ingestion,
+    llm,
+    per_post_llm,
+    study_materials,
+    resources
+)
 
 # Create main API router
 api_router = APIRouter()
@@ -40,6 +50,16 @@ api_router.include_router(documents.router, prefix="/documents", tags=["document
 # Include resource aggregator endpoints
 api_router.include_router(
     resources.router, prefix="/resources", tags=["resources"]
+)
+
+# Include post assistant endpoints
+api_router.include_router(
+    per_post_llm.router, prefix="/per-post", tags=["post-assistant"]
+)
+
+# Include study material generator endpoints
+api_router.include_router(
+    study_materials.router, prefix="/study", tags=["study-materials"]
 )
 
 

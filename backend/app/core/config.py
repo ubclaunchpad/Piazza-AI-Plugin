@@ -5,7 +5,7 @@ This module handles all application settings with environment variable support,
 type validation, and centralized configuration management.
 """
 
-from typing import List
+from typing import List, Optional
 
 from dotenv import load_dotenv
 from pydantic_settings import BaseSettings
@@ -57,8 +57,8 @@ class Settings(BaseSettings):
 
     # External resource provider configuration
     # API keys are optional here and should be provided via environment variables in deployments.
-    YOUTUBE_API_KEY: str | None = None
-    STACKEXCHANGE_API_KEY: str | None = None
+    YOUTUBE_API_KEY: Optional[str] = None
+    STACKEXCHANGE_API_KEY: Optional[str] = None
     STACKEXCHANGE_SITE: str = "stackoverflow"
 
     # Resource search defaults

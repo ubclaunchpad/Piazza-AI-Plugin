@@ -12,6 +12,7 @@ module.exports = {
     content: "./src/content/content.js",
     background: "./src/background/background.js",
     popup: "./src/popup/main.jsx",
+    studytab: "./src/studytab/main.jsx",
   },
   output: {
     path: path.resolve(__dirname, "dist"),
@@ -79,6 +80,11 @@ module.exports = {
       template: "./src/popup/index.html",
       filename: "popup.html",
       chunks: ["popup"],
+    }),
+    new HtmlWebpackPlugin({
+      template: "./src/studytab/index.html",
+      filename: "studytab.html",
+      chunks: ["studytab"],
     }),
     new CopyPlugin({
       patterns: [
