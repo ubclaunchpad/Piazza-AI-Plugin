@@ -38,6 +38,7 @@ SCOPES = ["https://www.googleapis.com/auth/calendar"]
 
 REDIRECT_URI = "http://localhost:8000/api/v1/calendar/callback"
 
+
 async def get_current_user(authorization: Optional[str] = Header(None)):
     if not authorization:
         raise HTTPException(status_code=401, detail="Missing authorization header")
@@ -68,9 +69,11 @@ def get_google_client_config():
         }
     }
 
+
 # =====================================
 # Step 1 - Start Google OAuth
 # =====================================
+
 
 @router.get("/auth")
 async def calendar_auth(token: Optional[str] = Query(None)):
@@ -105,6 +108,7 @@ async def calendar_auth(token: Optional[str] = Query(None)):
 # Step 2 - Google Callback
 # =====================================
 
+
 @router.get("/callback")
 async def calendar_callback(state: str, code: str):
     """
@@ -124,7 +128,9 @@ async def calendar_callback(state: str, code: str):
     # Recreate OAuth flow
     client_config = get_google_client_config()
 
-    flow = google_auth_oauthlib.flow.Flow.from_client_config(client_config, scopes=SCOPES, state=state, redirect_uri=REDIRECT_URI)
+    flow = google_auth_oauthlib.flow.Flow.from_client_config(
+        client_config, scopes=SCOPES, state=state, redirect_uri=REDIRECT_URI
+    )
 
     # Exchange code for tokens
     flow.fetch_token(code=code)
@@ -163,6 +169,7 @@ async def calendar_callback(state: str, code: str):
 # Helper - Get Valid Credentials
 # =====================================
 
+
 def get_valid_google_credentials(user_id: str):
     record = execute_query(
         """
@@ -196,7 +203,6 @@ def get_valid_google_credentials(user_id: str):
             expires_at = expires_at.replace(tzinfo=timezone.utc)
 
         if expires_at <= datetime.now(timezone.utc):
-
             creds.refresh(Request())
 
             execute_statement(
@@ -327,10 +333,14 @@ async def create_calendar_event(
         },
     }
 
-    created_event = service.events().insert(
-        calendarId="primary",
-        body=event_body,
-    ).execute()
+    created_event = (
+        service.events()
+        .insert(
+            calendarId="primary",
+            body=event_body,
+        )
+        .execute()
+    )
 
     google_event_id = created_event["id"]
     start_dt = _parse_iso_datetime(event.start_time)
@@ -390,8 +400,10 @@ async def create_calendar_event(
         "html_link": created_event.get("htmlLink"),
     }
 
+
 class ParseArticleContentRequest(BaseModel):
     content: str
+
 
 @router.post("/events/parse-thread")
 async def parse_article_for_event(
