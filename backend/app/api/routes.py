@@ -8,8 +8,9 @@ from pydantic import BaseModel
 # Import endpoint routers
 from app.api.endpoints import (
     auth,
+    calendar,
     chat_sessions,
-    calendar, documents,
+    documents,
     example,
     ingestion,
     llm,

@@ -11,26 +11,23 @@ This module defines API endpoints for:
 Endpoints follow FastAPI best practices and include detailed docstrings for clarity.
 """
 
+import base64
+import json
 import logging
+import os
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, HTTPException, Header, Query
-from fastapi.responses import RedirectResponse
-from pydantic import BaseModel
-
 import google_auth_oauthlib.flow
+from fastapi import APIRouter, Header, HTTPException, Query
+from fastapi.responses import RedirectResponse
+from google.auth.transport.requests import Request  # IMPORTANT
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
-from google.auth.transport.requests import Request  # IMPORTANT
-
-import os
-import json
-import base64
-from datetime import datetime, timezone
-
 from psycopg2.extras import Json
+from pydantic import BaseModel
 
-from app.core.database import execute_statement, execute_query
+from app.core.database import execute_query, execute_statement
 from app.core.supabase import supabase
 
 router = APIRouter()
