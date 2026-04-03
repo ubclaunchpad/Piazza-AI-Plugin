@@ -11,6 +11,7 @@ endpoint wraps these calls.
 
 import logging
 from typing import Any, Dict, List
+from urllib.parse import urlencode
 
 import requests
 from googleapiclient.discovery import build
@@ -113,20 +114,27 @@ async def fetch_stackoverflow_resources(query: str, limit: int) -> List[Dict[str
         return []
 
 
+def _khan_academy_search_url(query: str) -> str:
+    """Khan site search URL (stub provider does not call their API)."""
+    q = (query or "").strip()
+    params = {"referer": "/", "page_search_query": q}
+    return f"https://www.khanacademy.org/search?{urlencode(params)}"
+
+
 async def fetch_khan_academy_resources(query: str, limit: int) -> List[Dict[str, Any]]:
     """
     Short‑term Khan Academy provider.
 
-    Currently returns a small stubbed list so that the Smart Resource
-    Aggregator can surface Khan Academy results without relying on
-    unstable internal APIs or brittle HTML scraping.
+    Returns a single item linking to Khan Academy's on-site search for the
+    query (no API; avoids brittle scraping until a stable integration exists).
     """
+    q = (query or "").strip()
     return [
         {
-            "title": f"{query} – Khan Academy lesson",
-            "url": "https://www.khanacademy.org/",
+            "title": f'Search Khan Academy for "{q}"',
+            "url": _khan_academy_search_url(query),
             "resource_type": "khan_academy",
-            "description": f"Khan Academy lesson related to {query}.",
+            "description": f"Open Khan Academy search results for {q}.",
         }
     ][:limit]
 
