@@ -125,16 +125,24 @@ async def search_resources(payload: ResourceSearchRequest) -> ResourceSearchResp
     )
     trimmed = ranked[:limit]
 
-    results = [
-        ResourceSearchItem(
-            title=item.get("title", ""),
-            url=item.get("url", ""),
-            resource_type=item.get("resource_type", "other"),
-            description=item.get("description", ""),
-            relevance_score=float(item.get("relevance_score", 0.5)),
+    results = []
+    for item in trimmed:
+        raw_score = item.get("relevance_score")
+        relevance_score = None
+        if raw_score is not None:
+            try:
+                relevance_score = float(raw_score)
+            except (TypeError, ValueError):
+                relevance_score = None
+        results.append(
+            ResourceSearchItem(
+                title=item.get("title", ""),
+                url=item.get("url", ""),
+                resource_type=item.get("resource_type", "other"),
+                description=item.get("description", ""),
+                relevance_score=relevance_score,
+            )
         )
-        for item in trimmed
-    ]
     return ResourceSearchResponse(results=results)
 
 

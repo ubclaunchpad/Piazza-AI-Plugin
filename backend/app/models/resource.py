@@ -34,7 +34,7 @@ class ResourceSearchItem(BaseModel):
     url: str
     resource_type: str
     description: str
-    relevance_score: float
+    relevance_score: Optional[float] = None
 
 
 class ResourceSearchResponse(BaseModel):

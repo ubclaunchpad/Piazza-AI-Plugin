@@ -199,7 +199,9 @@ function SearchTab({ user, piazzaCourseId }) {
                 <div className="flex justify-between items-center gap-2 flex-wrap">
                   <div className="flex items-center gap-2">
                     <ResourceBadge type={resource.resource_type} />
-                    {Number.isFinite(resource.relevance_score) && (
+                    {resource.relevance_score == null ? (
+                      <span className="text-xs text-gray-500">Unscored</span>
+                    ) : (
                       <span className="text-xs text-gray-500">
                         Match: {Math.round(resource.relevance_score * 100)}%
                       </span>
@@ -338,7 +340,9 @@ function LibraryTab({ user, piazzaCourseId }) {
                 <div className="flex justify-between items-center gap-2 flex-wrap">
                   <div className="flex items-center gap-2">
                     <ResourceBadge type={resource.resource_type} />
-                    {Number.isFinite(resource.relevance_score) && (
+                    {resource.relevance_score == null ? (
+                      <span className="text-xs text-gray-500">Unscored</span>
+                    ) : (
                       <span className="text-xs text-gray-500">
                         Match: {Math.round(resource.relevance_score * 100)}%
                       </span>
