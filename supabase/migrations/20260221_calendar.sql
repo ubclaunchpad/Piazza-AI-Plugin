@@ -1,4 +1,4 @@
-\CREATE TABLE calendar_tokens (
+CREATE TABLE calendar_tokens (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     access_token BYTEA NOT NULL,
