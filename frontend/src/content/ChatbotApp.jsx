@@ -39,6 +39,7 @@ function SourcesDropdown({ sources, threadId }) {
 }
 
 function ChatbotApp() {
+  const TOOLBAR_SESSION_EVENT = "piazza-ai-open-session";
   const [isExpanded, setIsExpanded] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [messages, setMessages] = useState([]);
@@ -82,8 +83,25 @@ function ChatbotApp() {
         setIsExpanded(true);
       }
     };
+
+    const toolbarSessionListener = (event) => {
+      const detail = event?.detail;
+      if (!detail?.sessionId) return;
+
+      setSessionId(detail.sessionId);
+      if (detail.title) {
+        setSessionTitle(detail.title);
+      }
+      setIsExpanded(true);
+    };
+
     chrome.runtime.onMessage.addListener(messageListener);
-    return () => chrome.runtime.onMessage.removeListener(messageListener);
+    window.addEventListener(TOOLBAR_SESSION_EVENT, toolbarSessionListener);
+
+    return () => {
+      chrome.runtime.onMessage.removeListener(messageListener);
+      window.removeEventListener(TOOLBAR_SESSION_EVENT, toolbarSessionListener);
+    };
   }, []);
 
   // Fetch most recent session or messages when needed
