@@ -14,6 +14,7 @@ from app.api.endpoints import (
     ingestion,
     llm,
     per_post_llm,
+    resources,
     study_materials,
 )
 
@@ -45,6 +46,9 @@ api_router.include_router(chat_sessions.router, tags=["chat-sessions"])
 
 # Include document endpoints
 api_router.include_router(documents.router, prefix="/documents", tags=["documents"])
+
+# Include resource aggregator endpoints
+api_router.include_router(resources.router, prefix="/resources", tags=["resources"])
 
 # Include post assistant endpoints
 api_router.include_router(

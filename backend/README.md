@@ -53,6 +53,14 @@ Copy the values from the output:
 
 - **Database URL** → `DATABASE_URL`
 
+## 🌐 Resource Aggregator Configuration (when enabled)
+
+When using the Smart Resource Aggregator feature, configure the following environment variables (see `app/core/config.py` for details):
+
+- `YOUTUBE_API_KEY` – API key for YouTube Data API v3.
+- `STACKEXCHANGE_API_KEY` – API key for Stack Exchange (optional depending on usage).
+- `STACKEXCHANGE_SITE` – Stack Exchange site to query (default: `stackoverflow`).
+
 ## 🚀 Quick Start
 
 ### 1. Install Dependencies
@@ -180,3 +188,4 @@ export ENVIRONMENT=production
 # Run with multiple workers
 uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4
 ```
+
