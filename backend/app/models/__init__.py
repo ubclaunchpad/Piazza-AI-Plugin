@@ -27,7 +27,12 @@ from app.models.document import (
 from app.models.llm import QueryRequest, QueryResponse
 
 # Import Post Assistant Models
-from app.models.post_assistant import PostRequest, SimplifyPostRequest
+from app.models.post_assistant import (
+    PostRequest,
+    SimplifyPostRequest,
+    TranslateLanguage,
+    TranslatePostRequest,
+)
 
 # Import Resource aggregator models
 from app.models.resource import (
@@ -102,6 +107,8 @@ __all__ = [
     # Post assistant model
     "PostRequest",
     "SimplifyPostRequest",
+    "TranslateLanguage",
+    "TranslatePostRequest",
     # Document models
     "PermissionEnum",
     "DocumentBase",
