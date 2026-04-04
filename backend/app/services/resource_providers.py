@@ -6,7 +6,7 @@ for downstream consumption by the ranking layer and API models.
 
 If a provider is misconfigured (e.g. missing API key) or an error occurs,
 the function should raise or be caught by the caller; the /resources/search
-endpoint wraps these calls. 
+endpoint wraps these calls.
 """
 
 import logging
