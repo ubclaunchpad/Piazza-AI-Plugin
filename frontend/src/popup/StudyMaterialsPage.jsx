@@ -60,6 +60,7 @@ export default function StudyMaterialsPage({ user, onLogout, piazzaCourseId }) {
   // Dashboard list state
   const [quizList, setQuizList] = useState(null);
   const [flashcardList, setFlashcardList] = useState(null);
+  const [lastLoadedCourseId, setLastLoadedCourseId] = useState(undefined);
   const [dashboardLoading, setDashboardLoading] = useState({ quiz: false, flashcards: false });
   const [dashboardError, setDashboardError] = useState({ quiz: null, flashcards: null });
 
@@ -102,13 +103,12 @@ export default function StudyMaterialsPage({ user, onLogout, piazzaCourseId }) {
     Authorization: `Bearer ${user.access_token}`,
   };
 
-  const fetchQuizList = async () => {
+  const fetchQuizList = async (courseId) => {
     setDashboardLoading(prev => ({ ...prev, quiz: true }));
     setDashboardError(prev => ({ ...prev, quiz: null }));
     try {
-      const piazza_course_id = await resolveCourseId();
-      const url = piazza_course_id
-        ? `${API_ENDPOINT}/study/quiz?piazza_course_id=${encodeURIComponent(piazza_course_id)}`
+      const url = courseId
+        ? `${API_ENDPOINT}/study/quiz/course/${encodeURIComponent(courseId)}`
         : `${API_ENDPOINT}/study/quiz`;
       const res = await fetch(url, { headers: authHeaders });
       if (res.status === 401) { onLogout(); return; }
@@ -121,13 +121,12 @@ export default function StudyMaterialsPage({ user, onLogout, piazzaCourseId }) {
     }
   };
 
-  const fetchFlashcardList = async () => {
+  const fetchFlashcardList = async (courseId) => {
     setDashboardLoading(prev => ({ ...prev, flashcards: true }));
     setDashboardError(prev => ({ ...prev, flashcards: null }));
     try {
-      const piazza_course_id = await resolveCourseId();
-      const url = piazza_course_id
-        ? `${API_ENDPOINT}/study/flashcards?piazza_course_id=${encodeURIComponent(piazza_course_id)}`
+      const url = courseId
+        ? `${API_ENDPOINT}/study/flashcards/course/${encodeURIComponent(courseId)}`
         : `${API_ENDPOINT}/study/flashcards`;
       const res = await fetch(url, { headers: authHeaders });
       if (res.status === 401) { onLogout(); return; }
@@ -142,14 +141,22 @@ export default function StudyMaterialsPage({ user, onLogout, piazzaCourseId }) {
 
   const handleNavigate = async (key) => {
     if (key === "home") { setView("home"); return; }
-    if (key === "quiz") {
-      setView("quiz");
-      if (quizList === null) fetchQuizList();
-      return;
-    }
-    if (key === "flashcards") {
-      setView("flashcards");
-      if (flashcardList === null) fetchFlashcardList();
+    if (key === "quiz" || key === "flashcards") {
+      const courseId = await resolveCourseId();
+      const courseChanged = courseId !== lastLoadedCourseId;
+      if (key === "quiz") {
+        setView("quiz");
+        if (quizList === null || courseChanged) {
+          setLastLoadedCourseId(courseId);
+          fetchQuizList(courseId);
+        }
+      } else {
+        setView("flashcards");
+        if (flashcardList === null || courseChanged) {
+          setLastLoadedCourseId(courseId);
+          fetchFlashcardList(courseId);
+        }
+      }
       return;
     }
     // Summary

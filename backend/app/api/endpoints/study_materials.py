@@ -5,8 +5,9 @@ Generates quizzes, flashcards, etc
 
 import logging
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any, Optional, Annotated
 from uuid import UUID
+from supabase_auth.types import User, UserResponse
 
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 from psycopg2.extras import Json
@@ -39,7 +40,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-async def get_current_user(authorization: Optional[str] = Header(None)) -> Any:
+async def get_current_user(authorization: Optional[str] = Header(None)) -> User:
     """Validate authorization token and return current user."""
     if not authorization:
         raise HTTPException(status_code=401, detail="Missing authorization header")
@@ -61,7 +62,7 @@ async def get_current_user(authorization: Optional[str] = Header(None)) -> Any:
 
 @router.post("/quiz/generate", response_model=QuizResponse)
 async def quiz_generate(
-    quiz_info: QuizGenerateRequest, user=Depends(get_current_user)
+    quiz_info: QuizGenerateRequest, user: Annotated[User, Depends(get_current_user)]
 ) -> QuizResponse:
     try:
         generated = generate_quiz_questions(
@@ -118,17 +119,22 @@ async def quiz_generate(
 
 
 @router.get("/quiz/{id}", response_model=QuizResponse)
-async def get_quiz(id: UUID) -> QuizResponse:
+async def get_quiz(id: UUID, user: Annotated[User, Depends(get_current_user)]) -> QuizResponse:
     try:
+
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+            )
         query = """
         SELECT id, title, difficulty, questions,
                COALESCE(source_posts, ARRAY[]::text[]) AS source_posts,
                created_at
         FROM quizzes
-        WHERE id = %s
+        WHERE id = %s AND user_id = %s
         """
 
-        quiz = execute_query(query, (str(id),), fetch_one=True)
+        quiz = execute_query(query, (str(id), str(user.id)), fetch_one=True)
 
         if not quiz:
             raise HTTPException(
@@ -150,12 +156,13 @@ async def get_quiz(id: UUID) -> QuizResponse:
 
 @router.post("/quiz/{id}/submit", response_model=QuizResultResponse)
 async def submit_quiz_answer(
-    id: UUID, submission: QuizSubmitRequest
+    id: UUID, submission: QuizSubmitRequest, 
+    user: Annotated[User, Depends(get_current_user)]
 ) -> QuizResultResponse:
     try:
         quiz = execute_query(
-            "SELECT id, questions FROM quizzes WHERE id = %s",
-            (str(id),),
+            "SELECT id, questions FROM quizzes WHERE id = %s AND user_id = %s",
+            (str(id), str(user.id)),
             fetch_one=True,
         )
         if not quiz:
@@ -188,10 +195,10 @@ async def submit_quiz_answer(
 
         execute_statement(
             """
-            INSERT INTO quiz_attempts (quiz_id, answers, score, completed_at)
-            VALUES (%s, %s, %s, %s)
+            INSERT INTO quiz_attempts (quiz_id, user_id, answers, score, completed_at)
+            VALUES (%s, %s, %s, %s, %s)
             """,
-            (str(id), Json(user_answers), score, now),
+            (str(id), str(user.id), Json(user_answers), score, now),
         )
 
         return QuizResultResponse(
@@ -214,39 +221,23 @@ async def submit_quiz_answer(
 
 @router.get("/quiz", response_model=list[QuizResponse])
 async def get_all_quizzes(
-    piazza_course_id: Optional[str] = None,
-    user=Depends(get_current_user),
+    user: Annotated[User, Depends(get_current_user)],
 ) -> list[QuizResponse]:
-    """
-    Get all quizzes for the current user, optionally filtered by course.
-    """
+    """Get all quizzes for the current user."""
     try:
-        if piazza_course_id:
-            query = """
-            SELECT id, title, difficulty, questions,
-                   COALESCE(source_posts, ARRAY[]::text[]) AS source_posts,
-                   created_at
-            FROM quizzes
-            WHERE user_id = %s AND piazza_course_id = %s
-            ORDER BY created_at DESC;
-            """
-            quizzes = execute_query(query, (str(user.id), piazza_course_id))
-        else:
-            query = """
-            SELECT id, title, difficulty, questions,
-                   COALESCE(source_posts, ARRAY[]::text[]) AS source_posts,
-                   created_at
-            FROM quizzes
-            WHERE user_id = %s
-            ORDER BY created_at DESC;
-            """
-            quizzes = execute_query(query, (str(user.id),))
-
+        query = """
+        SELECT id, title, difficulty, questions,
+               COALESCE(source_posts, ARRAY[]::text[]) AS source_posts,
+               created_at
+        FROM quizzes
+        WHERE user_id = %s
+        ORDER BY created_at DESC;
+        """
+        quizzes = execute_query(query, (str(user.id),))
         return [QuizResponse.model_validate(q) for q in (quizzes or [])]
 
     except HTTPException:
         raise
-
     except Exception as e:
         logger.exception("Failed to fetch quizzes")
         raise HTTPException(
@@ -255,17 +246,44 @@ async def get_all_quizzes(
         )
 
 
+@router.get("/quiz/course/{piazza_course_id}", response_model=list[QuizResponse])
+async def get_quizzes_by_course(
+    piazza_course_id: str, user: Annotated[User, Depends(get_current_user)]
+) -> list[QuizResponse]:
+    """Get all quizzes for the current user in a specific course."""
+    try:
+        query = """
+        SELECT id, title, difficulty, questions,
+               COALESCE(source_posts, ARRAY[]::text[]) AS source_posts,
+               created_at
+        FROM quizzes
+        WHERE user_id = %s AND piazza_course_id = %s
+        ORDER BY created_at DESC;
+        """
+        quizzes = execute_query(query, (str(user.id), piazza_course_id))
+        return [QuizResponse.model_validate(q) for q in (quizzes or [])]
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Failed to fetch quizzes by course")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch quizzes: {str(e)}",
+        )
+
+
 @router.delete("/quiz/{id}", response_model=QuizDeleteResponse)
-async def delete_quiz(id: UUID) -> QuizDeleteResponse:
+async def delete_quiz(id: UUID, user: Annotated[User, Depends(get_current_user)]) -> QuizDeleteResponse:
     """
     Delete given quiz from quiz id
     """
     try:
         query = """
         DELETE FROM quizzes
-        WHERE id = %s
+        WHERE id = %s AND user_id = %s
         """
-        affected = execute_statement(query, (str(id),))
+        affected = execute_statement(query, (str(id), str(user.id)))
 
         if affected == 0:
             raise HTTPException(
@@ -288,9 +306,32 @@ async def delete_quiz(id: UUID) -> QuizDeleteResponse:
 # -------- FLASHCARDS -------- #
 
 
+def _build_flashcard_response(decks: list | None) -> list[FlashcardAllResponse]:
+    result = []
+    for deck in decks or []:
+        cards_rows = execute_query(
+            """
+            SELECT id, front, back, card_type,
+                   ease_factor, interval_days, next_review, review_count
+            FROM flashcards WHERE deck_id = %s ORDER BY id
+            """,
+            (str(deck["id"]),),
+        )
+        result.append(
+            FlashcardAllResponse(
+                id=deck["id"],
+                title=deck["title"],
+                tags=deck["tags"],
+                created_at=deck["created_at"],
+                cards=[FlashcardResponse.model_validate(r) for r in (cards_rows or [])],
+            )
+        )
+    return result
+
+
 @router.post("/flashcards/generate", response_model=FlashcardAllResponse)
 async def flashcards_generate(
-    deck_info: FlashcardRequestGenerate, user=Depends(get_current_user)
+    deck_info: FlashcardRequestGenerate, user:Annotated[User, Depends(get_current_user)]
 ) -> FlashcardAllResponse:
     try:
         generated = generate_flashcard_stream(
@@ -359,11 +400,11 @@ async def flashcards_generate(
 
 
 @router.get("/flashcards/{deck_id}", response_model=FlashcardAllResponse)
-async def get_flashcards(deck_id: UUID) -> FlashcardAllResponse:
+async def get_flashcards(deck_id: UUID, user: Annotated[User, Depends(get_current_user)]) -> FlashcardAllResponse:
     try:
         deck_row = execute_query(
-            "SELECT id, title, tags, created_at FROM flashcard_decks WHERE id = %s",
-            (str(deck_id),),
+            "SELECT id, title, tags, created_at FROM flashcard_decks WHERE id = %s AND user_id = %s",
+            (str(deck_id), str(user.id)),
             fetch_one=True,
         )
 
@@ -401,16 +442,18 @@ async def get_flashcards(deck_id: UUID) -> FlashcardAllResponse:
 
 @router.put("/flashcards/{card_id}/progress", response_model=FlashcardResponse)
 async def update_flashcard_mastery(
-    card_id: UUID, review: FlashcardReviewRequest
+    card_id: UUID, review: FlashcardReviewRequest, user: Annotated[User, Depends(get_current_user)]
 ) -> FlashcardResponse:
     """Apply one SM-2 review step to a single flashcard. quality 0-5."""
     try:
         card = execute_query(
             """
-            SELECT id, ease_factor, interval_days, review_count
-            FROM flashcards WHERE id = %s
+            SELECT f.id, f.ease_factor, f.interval_days, f.review_count
+            FROM flashcards f
+            JOIN flashcard_decks d ON f.deck_id = d.id
+            WHERE f.id = %s AND d.user_id = %s
             """,
-            (str(card_id),),
+            (str(card_id), str(user.id)),
             fetch_one=True,
         )
 
@@ -468,44 +511,15 @@ async def update_flashcard_mastery(
 
 @router.get("/flashcards", response_model=list[FlashcardAllResponse])
 async def get_all_flashcards(
-    piazza_course_id: Optional[str] = None,
-    user=Depends(get_current_user),
+    user: Annotated[User, Depends(get_current_user)],
 ) -> list[FlashcardAllResponse]:
+    """Get all flashcard decks for the current user."""
     try:
-        if piazza_course_id:
-            decks = execute_query(
-                "SELECT id, title, tags, created_at FROM flashcard_decks WHERE user_id = %s AND piazza_course_id = %s ORDER BY created_at DESC",
-                (str(user.id), piazza_course_id),
-            )
-        else:
-            decks = execute_query(
-                "SELECT id, title, tags, created_at FROM flashcard_decks WHERE user_id = %s ORDER BY created_at DESC",
-                (str(user.id),),
-            )
-
-        result = []
-        for deck in decks or []:
-            cards_rows = execute_query(
-                """
-                SELECT id, front, back, card_type,
-                       ease_factor, interval_days, next_review, review_count
-                FROM flashcards WHERE deck_id = %s ORDER BY id
-                """,
-                (str(deck["id"]),),
-            )
-            result.append(
-                FlashcardAllResponse(
-                    id=deck["id"],
-                    title=deck["title"],
-                    tags=deck["tags"],
-                    created_at=deck["created_at"],
-                    cards=[
-                        FlashcardResponse.model_validate(r) for r in (cards_rows or [])
-                    ],
-                )
-            )
-
-        return result
+        decks = execute_query(
+            "SELECT id, title, tags, created_at FROM flashcard_decks WHERE user_id = %s ORDER BY created_at DESC",
+            (str(user.id),),
+        )
+        return _build_flashcard_response(decks)
 
     except Exception as e:
         logger.exception("Failed to fetch flashcard decks")
@@ -515,11 +529,31 @@ async def get_all_flashcards(
         )
 
 
+@router.get("/flashcards/course/{piazza_course_id}", response_model=list[FlashcardAllResponse])
+async def get_flashcards_by_course(
+    piazza_course_id: str, user: Annotated[User, Depends(get_current_user)]
+) -> list[FlashcardAllResponse]:
+    """Get all flashcard decks for the current user in a specific course."""
+    try:
+        decks = execute_query(
+            "SELECT id, title, tags, created_at FROM flashcard_decks WHERE user_id = %s AND piazza_course_id = %s ORDER BY created_at DESC",
+            (str(user.id), piazza_course_id),
+        )
+        return _build_flashcard_response(decks)
+
+    except Exception as e:
+        logger.exception("Failed to fetch flashcard decks by course")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch flashcard decks: {str(e)}",
+        )
+
+
 @router.delete("/flashcards/{deck_id}", response_model=FlashcardDeleteResponse)
-async def delete_flashcard_deck(deck_id: UUID) -> FlashcardDeleteResponse:
+async def delete_flashcard_deck(deck_id: UUID, user: Annotated[User, Depends(get_current_user)]) -> FlashcardDeleteResponse:
     try:
         affected = execute_statement(
-            "DELETE FROM flashcard_decks WHERE id = %s", (str(deck_id),)
+            "DELETE FROM flashcard_decks WHERE id = %s AND user_id = %s", (str(deck_id), str(user.id))
         )
 
         if affected == 0:
@@ -544,7 +578,7 @@ async def delete_flashcard_deck(deck_id: UUID) -> FlashcardDeleteResponse:
 
 @router.post("/summary/generate", response_model=SummaryResponse)
 async def summary_generate(
-    summary_info: SummaryGenerateRequest, user=Depends(get_current_user)
+    summary_info: SummaryGenerateRequest, user: Annotated[User, Depends(get_current_user)]
 ) -> SummaryResponse:
     try:
         generated = generate_summary(
@@ -594,7 +628,9 @@ async def summary_generate(
 
 
 @router.get("/materials", response_model=AllStudyMaterialsResponse)
-async def list_all_study_materials(piazza_course_id: str) -> AllStudyMaterialsResponse:
+async def list_all_study_materials(
+    piazza_course_id: str, user: Annotated[User, Depends(get_current_user)]
+) -> AllStudyMaterialsResponse:
     try:
         quiz_rows = execute_query(
             """
@@ -602,15 +638,15 @@ async def list_all_study_materials(piazza_course_id: str) -> AllStudyMaterialsRe
                    COALESCE(source_posts, ARRAY[]::text[]) AS source_posts,
                    created_at
             FROM quizzes
-            WHERE piazza_course_id = %s
+            WHERE piazza_course_id = %s AND user_id = %s
             ORDER BY created_at DESC
             """,
-            (piazza_course_id,),
+            (piazza_course_id, str(user.id)),
         )
 
         deck_rows = execute_query(
-            "SELECT id, title, tags, created_at FROM flashcard_decks WHERE piazza_course_id = %s ORDER BY created_at DESC",
-            (piazza_course_id,),
+            "SELECT id, title, tags, created_at FROM flashcard_decks WHERE piazza_course_id = %s AND user_id = %s ORDER BY created_at DESC",
+            (piazza_course_id, str(user.id)),
         )
 
         flashcard_decks = []
@@ -641,10 +677,10 @@ async def list_all_study_materials(piazza_course_id: str) -> AllStudyMaterialsRe
                    COALESCE(source_posts, ARRAY[]::text[]) AS source_posts,
                    created_at
             FROM summaries
-            WHERE piazza_course_id = %s
+            WHERE piazza_course_id = %s AND user_id = %s
             ORDER BY created_at DESC
             """,
-            (piazza_course_id,),
+            (piazza_course_id, str(user.id)),
         )
 
         return AllStudyMaterialsResponse(
