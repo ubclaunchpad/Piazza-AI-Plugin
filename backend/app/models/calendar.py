@@ -1,12 +1,14 @@
+from uuid import UUID
+from datetime import datetime
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Dict, Any
 
 class CalendarEvent(BaseModel):
-    id: str
-    user_id: str
-    piazza_course_id: str
-    google_event_id: str
+    id: UUID
+    user_id: UUID
+    piazza_course_id: UUID
+    google_event_id: Optional[str] = None
     title: str
-    event_date: str
+    event_date: datetime
     source_post_number: Optional[str] = None
-    reminder_settings: Optional[str] = None
+    reminder_settings: Optional[Dict[str, Any]] = None
