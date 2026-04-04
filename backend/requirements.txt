@@ -221,7 +221,7 @@ psycopg-pool==3.3.0
     # via langchain-postgres
 psycopg2-binary==2.9.11
     # via -r requirements.in
-pyasn1==0.6.2
+pyasn1==0.6.3
     # via pyasn1-modules
 pyasn1-modules==0.4.2
     # via google-auth

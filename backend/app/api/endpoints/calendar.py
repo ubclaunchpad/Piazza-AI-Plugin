@@ -13,12 +13,11 @@ Endpoints follow FastAPI best practices and include detailed docstrings for clar
 
 from typing import List
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, Depends, HTTPException
 
+from app.api.endpoints.chat_sessions import get_current_user as _get_current_user
 from app.core.database import execute_query, execute_statement
 from app.models.calendar import CalendarEvent
-from app.core.encryption import fernet
-from app.api.endpoints.chat_sessions import get_current_user as _get_current_user
 
 get_current_user = _get_current_user
 
@@ -39,7 +38,9 @@ def calendar_auth():
     # encrypted_access_token = fernet.encrypt(access_token.encode())
     # encrypted_refresh_token = fernet.encrypt(refresh_token.encode())
     # Store these in calendar_tokens table
-    raise HTTPException(status_code=501, detail="Google Calendar OAuth initiation not implemented")
+    raise HTTPException(
+        status_code=501, detail="Google Calendar OAuth initiation not implemented"
+    )
 
 
 @router.get("/callback")
@@ -51,7 +52,9 @@ def calendar_callback():
         Success message or error details.
     """
     # TODO: Implement Google OAuth callback handling logic
-    raise HTTPException(status_code=501, detail="Google Calendar OAuth callback not implemented")
+    raise HTTPException(
+        status_code=501, detail="Google Calendar OAuth callback not implemented"
+    )
 
 
 @router.post("/events", response_model=CalendarEvent)
@@ -123,7 +126,9 @@ def get_calendar_event(event_id: str, current_user=Depends(get_current_user)):
 
 
 @router.put("/settings")
-def update_calendar_settings(reminder_settings: str, current_user=Depends(get_current_user)):
+def update_calendar_settings(
+    reminder_settings: str, current_user=Depends(get_current_user)
+):
     """
     Update user's calendar integration settings, such as reminder preferences.
 
@@ -136,5 +141,7 @@ def update_calendar_settings(reminder_settings: str, current_user=Depends(get_cu
     query = "UPDATE calendar_events SET reminder_settings = %s WHERE user_id = %s"
     result = execute_statement(query, (reminder_settings, current_user.id))
     if result == 0:
-        raise HTTPException(status_code=404, detail="Event not found or not owned by user")
+        raise HTTPException(
+            status_code=404, detail="Event not found or not owned by user"
+        )
     return {"status": "success", "reminder_settings": reminder_settings}
