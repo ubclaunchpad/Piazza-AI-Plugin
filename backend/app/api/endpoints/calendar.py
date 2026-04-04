@@ -11,6 +11,7 @@ This module defines API endpoints for:
 Endpoints follow FastAPI best practices and include detailed docstrings for clarity.
 """
 
+import json
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -78,14 +79,14 @@ def create_calendar_event(event: CalendarEvent, current_user=Depends(get_current
     """
 
     params = (
-        event.id,
-        current_user.id,
-        event.piazza_course_id,
+        str(event.id),
+        str(current_user.id),
+        str(event.piazza_course_id),
         event.google_event_id,
         event.title,
         event.event_date,
         event.source_post_number,
-        event.reminder_settings,
+        json.dumps(event.reminder_settings) if event.reminder_settings else None,
     )
 
     execute_statement(query, params)
@@ -103,7 +104,7 @@ def list_calendar_events(current_user=Depends(get_current_user)):
     """
 
     query = "SELECT * FROM calendar_events WHERE user_id = %s"
-    results = execute_query(query, (current_user.id,))
+    results = execute_query(query, (str(current_user.id),))
     return [CalendarEvent(**event) for event in results]
 
 
@@ -119,7 +120,7 @@ def get_calendar_event(event_id: str, current_user=Depends(get_current_user)):
         CalendarEvent: The event data, or raises 404 if not found.
     """
     query = "SELECT * FROM calendar_events WHERE id = %s AND user_id = %s"
-    result = execute_query(query, (event_id, current_user.id), fetch_one=True)
+    result = execute_query(query, (event_id, str(current_user.id)), fetch_one=True)
     if not result:
         raise HTTPException(status_code=404, detail="Event not found")
     return CalendarEvent(**result)
@@ -139,7 +140,7 @@ def update_calendar_settings(
         Updated settings or confirmation message.
     """
     query = "UPDATE calendar_events SET reminder_settings = %s WHERE user_id = %s"
-    result = execute_statement(query, (reminder_settings, current_user.id))
+    result = execute_statement(query, (reminder_settings, str(current_user.id)))
     if result == 0:
         raise HTTPException(
             status_code=404, detail="Event not found or not owned by user"
