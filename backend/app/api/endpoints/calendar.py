@@ -18,10 +18,10 @@ from fastapi import APIRouter, HTTPException, Depends
 from app.core.database import execute_query, execute_statement
 from app.models.calendar import CalendarEvent
 from app.core.encryption import fernet
-from app.core.auth import get_current_user
+from app.api.endpoints.chat_sessions import get_current_user as _get_current_user
 
-# Placeholder imports for future models and logic
-# from app.models.calendar import ...
+get_current_user = _get_current_user
+
 
 router = APIRouter()
 
