@@ -122,6 +122,19 @@ def _build_context(chunks: list[dict[str, Any]]) -> tuple[str, list[str]]:
     return "\n\n".join(context_blocks), source_posts
 
 
+_MAX_CONTEXT_CHARS = 12_000  # ~3000 tokens, leaves room for system prompt + output
+
+
+def _truncate_context(context: str, max_chars: int = _MAX_CONTEXT_CHARS) -> str:
+    if len(context) <= max_chars:
+        return context
+    truncated = context[:max_chars]
+    last_boundary = truncated.rfind("\n\n[Post ")
+    if last_boundary > max_chars // 2:
+        return truncated[:last_boundary]
+    return truncated
+
+
 def generate_quiz_questions(
     *,
     piazza_course_id: str,
@@ -151,11 +164,12 @@ def generate_quiz_questions(
         )
 
     context, resolved_source_posts = _build_context(chunks)
+    context = _truncate_context(context)
 
     llm = ChatGroq(
         model=QUIZ_MODEL,
         temperature=0.2,
-        max_tokens=6000,
+        max_tokens=3000,
         max_retries=3,
     )
 
@@ -246,6 +260,7 @@ def generate_summary(
         )
 
     context, resolved_source_posts = _build_context(chunks)
+    context = _truncate_context(context)
 
     type_instructions = {
         "thread": (
@@ -270,7 +285,7 @@ def generate_summary(
     llm = ChatGroq(
         model=QUIZ_MODEL,
         temperature=0.3,
-        max_tokens=4000,
+        max_tokens=2500,
         max_retries=3,
     )
 
@@ -336,11 +351,12 @@ def generate_flashcard_stream(
         )
 
     context, resolved_source_posts = _build_context(chunks)
+    context = _truncate_context(context)
 
     llm = ChatGroq(
         model=QUIZ_MODEL,
         temperature=0.2,
-        max_tokens=6000,
+        max_tokens=3000,
         max_retries=3,
     )
 
