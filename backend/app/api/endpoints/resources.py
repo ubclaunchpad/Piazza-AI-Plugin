@@ -6,9 +6,8 @@ This module defines the API surface for the Smart Resource Aggregator feature.
 
 import asyncio
 import logging
-from datetime import datetime, timezone
 from typing import Optional
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 
@@ -18,10 +17,10 @@ from app.models import (
     ResourceSearchItem,
     ResourceSearchRequest,
     ResourceSearchResponse,
-    SaveResourceRequest,
-    SaveResourceResponse,
     SavedResource,
     SavedResourceListResponse,
+    SaveResourceRequest,
+    SaveResourceResponse,
 )
 from app.services.resource_providers import (
     fetch_khan_academy_resources,
@@ -105,9 +104,7 @@ async def search_resources(payload: ResourceSearchRequest) -> ResourceSearchResp
             return []
 
     tasks = [
-        fetch_safe(name, fn)
-        for name, fn in PROVIDER_MAP.items()
-        if name in enabled
+        fetch_safe(name, fn) for name, fn in PROVIDER_MAP.items() if name in enabled
     ]
     results_per_provider = await asyncio.gather(*tasks)
 
@@ -153,7 +150,9 @@ async def search_resources(payload: ResourceSearchRequest) -> ResourceSearchResp
 )
 async def get_resource_library(
     user=Depends(get_current_user),
-    piazza_course_id: Optional[str] = Query(None, description="Filter by Piazza course ID"),
+    piazza_course_id: Optional[str] = Query(
+        None, description="Filter by Piazza course ID"
+    ),
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
 ) -> SavedResourceListResponse:
@@ -177,12 +176,14 @@ async def get_resource_library(
         offset = (page - 1) * per_page
         params.extend([per_page, offset])
 
-        total_row = execute_query(count_sql, tuple(params[: len(params) - 2]), fetch_one=True)
+        total_row = execute_query(
+            count_sql, tuple(params[: len(params) - 2]), fetch_one=True
+        )
         total = int(total_row["total"]) if total_row else 0
 
         rows = execute_query(base_sql, tuple(params))
         if not rows:
-            return SavedResourceListResponse(saved_resources=[])
+            return SavedResourceListResponse(saved_resources=[], total=total)
 
         saved = [
             SavedResource(
@@ -192,13 +193,15 @@ async def get_resource_library(
                 url=row["url"],
                 resource_type=row["resource_type"] or "other",
                 description=row["description"],
-                relevance_score=float(row["relevance_score"]) if row["relevance_score"] is not None else None,
+                relevance_score=float(row["relevance_score"])
+                if row["relevance_score"] is not None
+                else None,
                 piazza_course_id=row["piazza_course_id"] or "",
                 created_at=row["created_at"],
             )
             for row in rows
         ]
-        return SavedResourceListResponse(saved_resources=saved)
+        return SavedResourceListResponse(saved_resources=saved, total=total)
     except HTTPException:
         raise
     except Exception as e:
@@ -308,4 +311,3 @@ async def delete_resource_from_library(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to delete resource",
         )
-

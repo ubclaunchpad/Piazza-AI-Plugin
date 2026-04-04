@@ -105,11 +105,11 @@ def rank_resources(
         system_prompt = (
             "You are ranking external learning resources for a university student.\n"
             "Given a query and a list of candidate resources (each has a unique "
-            "\"index\" field — use it exactly in your output), assign every resource "
+            '"index" field — use it exactly in your output), assign every resource '
             "a relevance_score between 0.0 and 1.0 (higher is more relevant) and, if "
             "helpful, improve the description to be concise and student-friendly.\n\n"
             "You must include one entry in your JSON array for each candidate input "
-            "item, with the matching \"index\".\n\n"
+            'item, with the matching "index".\n\n'
             "Return ONLY valid JSON: an array of objects with fields:\n"
             "  index (int, must match the candidate's index),\n"
             "  relevance_score (float in [0,1]),\n"
@@ -208,4 +208,3 @@ def rank_resources(
 
 
 __all__ = ["rank_resources"]
-

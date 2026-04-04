@@ -61,6 +61,7 @@ class SavedResourceListResponse(BaseModel):
     """Response body for GET /resources/library."""
 
     saved_resources: List[SavedResource]
+    total: int = Field(..., description="Total rows matching filter (all pages)")
 
 
 class SaveResourceRequest(BaseModel):
@@ -91,4 +92,3 @@ __all__ = [
     "SaveResourceRequest",
     "SaveResourceResponse",
 ]
-

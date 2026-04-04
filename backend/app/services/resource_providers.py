@@ -88,7 +88,11 @@ async def fetch_stackoverflow_resources(query: str, limit: int) -> List[Dict[str
         if settings.STACKEXCHANGE_API_KEY:
             params["key"] = settings.STACKEXCHANGE_API_KEY
 
-        resp = requests.get("https://api.stackexchange.com/2.3/search/advanced", params=params, timeout=10)
+        resp = requests.get(
+            "https://api.stackexchange.com/2.3/search/advanced",
+            params=params,
+            timeout=10,
+        )
         resp.raise_for_status()
         data = resp.json()
         items: List[Dict[str, Any]] = []
@@ -96,7 +100,9 @@ async def fetch_stackoverflow_resources(query: str, limit: int) -> List[Dict[str
             title = item.get("title", "")
             question_id = item.get("question_id")
             url = item.get("link") or (
-                f"https://stackoverflow.com/questions/{question_id}" if question_id else ""
+                f"https://stackoverflow.com/questions/{question_id}"
+                if question_id
+                else ""
             )
             description = item.get("excerpt") or title
 
@@ -189,4 +195,3 @@ __all__ = [
     "fetch_khan_academy_resources",
     "fetch_wikipedia_resources",
 ]
-

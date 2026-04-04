@@ -26,19 +26,19 @@ from app.models.document import (
 # Import LLM models
 from app.models.llm import QueryRequest, QueryResponse
 
+# Import Post Assistant Models
+from app.models.post_assistant import PostRequest, SimplifyPostRequest
+
 # Import Resource aggregator models
 from app.models.resource import (
-    ResourceSearchRequest,
     ResourceSearchItem,
+    ResourceSearchRequest,
     ResourceSearchResponse,
     SavedResource,
     SavedResourceListResponse,
     SaveResourceRequest,
     SaveResourceResponse,
 )
-
-# Import Post Assistant Models
-from app.models.post_assistant import PostRequest, SimplifyPostRequest
 
 
 class UserStatus(str, Enum):
