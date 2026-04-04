@@ -60,16 +60,22 @@ distro==1.9.0
     #   openai
 dnspython==2.8.0
     # via email-validator
+easyocr==1.7.2
+    # via -r requirements.in
 email-validator==2.3.0
     # via pydantic
 exceptiongroup==1.3.1
     # via anyio
 fastapi==0.123.10
     # via -r requirements.in
+filelock==3.20.3
+    # via torch
 frozenlist==1.8.0
     # via
     #   aiohttp
     #   aiosignal
+fsspec==2026.1.0
+    # via torch
 greenlet==3.3.0
     # via sqlalchemy
 groq==0.37.1
@@ -108,6 +114,10 @@ idna==3.11
     #   httpx
     #   requests
     #   yarl
+imageio==2.37.2
+    # via scikit-image
+jinja2==3.1.6
+    # via torch
 jiter==0.12.0
     # via openai
 jsonpatch==1.33
@@ -155,8 +165,14 @@ langsmith==0.4.55
     #   langchain-classic
     #   langchain-community
     #   langchain-core
+lazy-loader==0.4
+    # via scikit-image
+markupsafe==3.0.3
+    # via jinja2
 marshmallow==3.26.1
     # via dataclasses-json
+mpmath==1.3.0
+    # via sympy
 multidict==6.7.0
     # via
     #   aiohttp
@@ -164,12 +180,29 @@ multidict==6.7.0
 mypy-extensions==1.1.0
     # via typing-inspect
 numpy==2.2.6
+networkx==3.6.1
     # via
+    #   scikit-image
+    #   torch
+ninja==1.13.0
+    # via easyocr
+numpy==2.3.5
+    # via
+    #   easyocr
+    #   imageio
     #   langchain-community
     #   langchain-postgres
+    #   opencv-python-headless
     #   pgvector
+    #   scikit-image
+    #   scipy
+    #   shapely
+    #   tifffile
+    #   torchvision
 openai==2.9.0
     # via langchain-openai
+opencv-python-headless==4.13.0.90
+    # via easyocr
 orjson==3.11.4
     # via
     #   langgraph-sdk
@@ -181,11 +214,19 @@ packaging==25.0
     #   deprecation
     #   langchain-core
     #   langsmith
+    #   lazy-loader
     #   marshmallow
+    #   scikit-image
 pgvector==0.3.6
     # via
     #   -r requirements.in
     #   langchain-postgres
+pillow==12.1.0
+    # via
+    #   easyocr
+    #   imageio
+    #   scikit-image
+    #   torchvision
 postgrest==2.25.0
     # via supabase
 propcache==0.4.1
@@ -200,6 +241,8 @@ psycopg-pool==3.3.0
     # via langchain-postgres
 psycopg2-binary==2.9.11
     # via -r requirements.in
+pyclipper==1.4.0
+    # via easyocr
 pycparser==2.23
     # via cffi
 pydantic[email]==2.12.5
@@ -226,6 +269,10 @@ pydantic-settings==2.12.0
     #   langchain-community
 pyjwt[crypto]==2.10.1
     # via supabase-auth
+pymupdf==1.26.7
+    # via -r requirements.in
+python-bidi==0.6.7
+    # via easyocr
 python-dotenv==1.2.1
     # via
     #   -r requirements.in
@@ -235,6 +282,7 @@ python-multipart==0.0.22
     # via -r requirements.in
 pyyaml==6.0.3
     # via
+    #   easyocr
     #   langchain-classic
     #   langchain-community
     #   langchain-core
@@ -252,6 +300,14 @@ requests==2.32.5
     #   tiktoken
 requests-toolbelt==1.0.0
     # via langsmith
+scikit-image==0.26.0
+    # via easyocr
+scipy==1.17.0
+    # via
+    #   easyocr
+    #   scikit-image
+shapely==2.1.2
+    # via easyocr
 sniffio==1.3.1
     # via
     #   groq
@@ -276,12 +332,22 @@ supabase-auth==2.25.0
     # via supabase
 supabase-functions==2.25.0
     # via supabase
+sympy==1.14.0
+    # via torch
 tenacity==9.1.2
     # via
     #   langchain-community
     #   langchain-core
+tifffile==2026.1.14
+    # via scikit-image
 tiktoken==0.12.0
     # via langchain-openai
+torch==2.10.0
+    # via
+    #   easyocr
+    #   torchvision
+torchvision==0.25.0
+    # via easyocr
 tqdm==4.67.1
     # via openai
 typing-extensions==4.15.0
@@ -302,6 +368,7 @@ typing-extensions==4.15.0
     #   realtime
     #   sqlalchemy
     #   starlette
+    #   torch
     #   typing-inspect
     #   typing-inspection
     #   uvicorn
@@ -338,3 +405,6 @@ yarl==1.22.0
     #   supabase-functions
 zstandard==0.25.0
     # via langsmith
+
+# The following packages are considered to be unsafe in a requirements file:
+# setuptools

@@ -1,0 +1,7 @@
+# Testing
+pytest
+
+# Format 
+black
+ruff
+mypy
