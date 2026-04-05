@@ -33,10 +33,14 @@ function IngestionStatus({ status }) {
   );
 }
 
+const QUICK_ACTION_BTN_CLASS =
+  "min-h-[4.5rem] w-full px-2 py-2 bg-gray-100 border border-gray-200 rounded-md text-[13px] font-medium cursor-pointer flex items-center justify-center gap-1.5 text-center leading-snug transition-all hover:bg-gray-200 hover:border-gray-300";
+
 export default function DashboardPage({
   user,
   onLogout,
   onNavigateToAssistant,
+  onNavigateToResources,
 }) {
   const [currentTab, setCurrentTab] = useState(null);
   const [piazzaInfo, setPiazzaInfo] = useState(null);
@@ -415,31 +419,21 @@ export default function DashboardPage({
                 )}
               </div>
 
-              {/* Quick Actions */}
-              <div className="flex gap-2 mt-2">
+              {/* Quick Actions — 2×2: Assistant & Ingest (top); Study Materials & Resources (bottom) */}
+              <div className="grid grid-cols-2 gap-2 mt-2">
                 <button
+                  type="button"
                   onClick={onNavigateToAssistant}
-                  className="flex-1 px-3 py-2 bg-gray-100 border border-gray-200 rounded-md text-xs font-medium cursor-pointer flex items-center justify-center gap-1.5 transition-all hover:bg-gray-200 hover:border-gray-300"
+                  className={QUICK_ACTION_BTN_CLASS}
                 >
                   <span>📊</span>
                   Assistant
                 </button>
                 <button
-                  onClick={() => {
-                    const url = new URL(chrome.runtime.getURL("studytab.html"));
-                    if (piazzaInfo?.classId)
-                      url.searchParams.set("course_id", piazzaInfo.classId);
-                    chrome.tabs.create({ url: url.toString() });
-                  }}
-                  className="flex-1 px-3 py-2 bg-gray-100 border border-gray-200 rounded-md text-xs font-medium cursor-pointer flex items-center justify-center gap-1.5 transition-all hover:bg-gray-200 hover:border-gray-300"
-                >
-                  <span>📚</span>
-                  Study Materials
-                </button>
-                <button
+                  type="button"
                   onClick={handleIngestThread}
                   disabled={isIngesting}
-                  className="flex-1 px-3 py-2 bg-gray-100 border border-gray-200 rounded-md text-xs font-medium cursor-pointer flex items-center justify-center gap-1.5 transition-all hover:bg-gray-200 hover:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className={`${QUICK_ACTION_BTN_CLASS} disabled:opacity-50 disabled:cursor-not-allowed`}
                 >
                   {isIngesting ? (
                     <>
@@ -452,6 +446,27 @@ export default function DashboardPage({
                       Ingest Thread
                     </>
                   )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const url = new URL(chrome.runtime.getURL("studytab.html"));
+                    if (piazzaInfo?.classId)
+                      url.searchParams.set("course_id", piazzaInfo.classId);
+                    chrome.tabs.create({ url: url.toString() });
+                  }}
+                  className={QUICK_ACTION_BTN_CLASS}
+                >
+                  <span>📚</span>
+                  Study Materials
+                </button>
+                <button
+                  type="button"
+                  onClick={onNavigateToResources}
+                  className={QUICK_ACTION_BTN_CLASS}
+                >
+                  <span>🌐</span>
+                  Resources
                 </button>
                 <button
                   onClick={() => {

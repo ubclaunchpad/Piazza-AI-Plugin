@@ -56,6 +56,7 @@ Copy the values from the output:
 - **Database URL** → `DATABASE_URL`
 
 4. Get Google Client Secrets:
+
 - First create an account in GCP (Google Cloud Platform) from console.google.com
 - Then create a project,
 - Allow API & Services
@@ -68,6 +69,14 @@ GOOGLE_CLIENT_TOKEN_URI=
 GOOGLE_CLIENT_AUTH_PROVIDER_X509_CERT_URL=
 GOOGLE_CLIENT_CLIENT_SECRET=
 GOOGLE_CLIENT_REDIRECT_URIS=
+
+## 🌐 Resource Aggregator Configuration (when enabled)
+
+When using the Smart Resource Aggregator feature, configure the following environment variables (see `app/core/config.py` for details):
+
+- `YOUTUBE_API_KEY` – API key for YouTube Data API v3.
+- `STACKEXCHANGE_API_KEY` – API key for Stack Exchange (optional depending on usage).
+- `STACKEXCHANGE_SITE` – Stack Exchange site to query (default: `stackoverflow`).
 
 ## 🚀 Quick Start
 
