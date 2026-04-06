@@ -270,7 +270,7 @@ export default function DashboardPage({
 
         if (response.ok) {
           const data = await response.json();
-          setLinkedToCalendar(Boolean(data?.google_calendar_connected));
+          setLinkedToCalendar(Boolean(data?.connected));
         } else if (response.status === 404) {
           // Backend: no Google Calendar linked for this user
           setLinkedToCalendar(false);
