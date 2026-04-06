@@ -102,8 +102,15 @@ export default function InjectedEventButton({ article }) {
   const [status, setStatus] = useState("idle");
   const [errorMessage, setErrorMessage] = useState(null);
   const [suggestion, setSuggestion] = useState(null);
+  const [existingEventUrl, setExistingEventUrl] = useState(null);
 
   useEffect(() => {
+    setParsePhase("checking");
+    setStatus("idle");
+    setErrorMessage(null);
+    setSuggestion(null);
+    setExistingEventUrl(null);
+
     if (!article || !(article instanceof Element)) {
       setParsePhase("done");
       return;
@@ -117,6 +124,54 @@ export default function InjectedEventButton({ article }) {
       if (!content || cancelled) {
         setParsePhase("done");
         return;
+      }
+
+      const postNr = content?.threadId ?? getPiazzaCidFromLocation();
+      const courseId =
+        content?.piazzaCourseId ?? getPiazzaCourseIdFromLocation();
+
+      // Check if this post already has a saved event before parsing.
+      if (postNr != null && String(postNr).trim() !== "") {
+        try {
+          const token = await new Promise((resolve) => {
+            chrome.storage.local.get(["authToken"], (result) => {
+              resolve(result?.authToken || null);
+            });
+          });
+
+          if (token && !cancelled) {
+            const params = new URLSearchParams({
+              source_post_number: String(postNr).trim(),
+            });
+            if (courseId != null && String(courseId).trim() !== "") {
+              params.set("piazza_course_id", String(courseId).trim());
+            }
+
+            const existingResponse = await fetch(
+              `${API_ENDPOINT}/calendar/events/by-source?${params.toString()}`,
+              {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                },
+                signal: ac.signal,
+              },
+            );
+
+            if (existingResponse.ok && !cancelled) {
+              const existingData = await existingResponse.json();
+              if (existingData?.exists) {
+                setStatus("exists");
+                setExistingEventUrl(existingData?.html_link ?? null);
+                setParsePhase("done");
+                return;
+              }
+            }
+          }
+        } catch (error) {
+          if (!cancelled && error?.name !== "AbortError") {
+            console.error("Failed to check existing calendar event:", error);
+          }
+        }
       }
 
       const fp = fingerprintArticleContent(content);
@@ -183,6 +238,15 @@ export default function InjectedEventButton({ article }) {
   }, [article]);
 
   const handleClick = async () => {
+    if (status === "exists") {
+      window.open(
+        existingEventUrl || "https://calendar.google.com/calendar/u/0/r",
+        "_blank",
+        "noopener,noreferrer",
+      );
+      return;
+    }
+
     setStatus("loading");
 
     chrome.storage.local.get(["authToken"], async (result) => {
@@ -225,8 +289,9 @@ export default function InjectedEventButton({ article }) {
           return;
         }
 
-        if (response.ok && data && data.status === "event_created") {
+        if (response.ok && data) {
           setStatus("success");
+          setExistingEventUrl(data?.link ?? null);
         } else {
           console.error("Failed to create event", {
             status: response.status,
@@ -250,6 +315,19 @@ export default function InjectedEventButton({ article }) {
     );
   }
 
+  if (status === "exists") {
+    return (
+      <button
+        type="button"
+        className="piazza-ai-calendar-btn piazza-ai-calendar-btn--success"
+        onClick={handleClick}
+      >
+        <CalendarIcon variant="success" />
+        <span>Event already added - Open in Google Calendar</span>
+      </button>
+    );
+  }
+
   if (!suggestion) {
     return null;
   }
@@ -261,7 +339,11 @@ export default function InjectedEventButton({ article }) {
     }`;
 
   const variant =
-    status === "success" ? "success" : status === "error" ? "error" : "idle";
+    status === "success" || status === "exists"
+      ? "success"
+      : status === "error"
+        ? "error"
+        : "idle";
 
   return (
     <button
@@ -274,6 +356,11 @@ export default function InjectedEventButton({ article }) {
         <>
           <CalendarIcon variant="success" />
           <span>Event added to Google Calendar</span>
+        </>
+      ) : status === "exists" ? (
+        <>
+          <CalendarIcon variant="success" />
+          <span>Event already added - Open in Google Calendar</span>
         </>
       ) : status === "error" ? (
         <>

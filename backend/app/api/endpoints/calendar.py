@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import google_auth_oauthlib.flow
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Header, HTTPException, Query
 from fastapi.responses import RedirectResponse
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -123,20 +123,29 @@ async def calendar_callback(state: str, code: str):
     flow.fetch_token(code=code)
     creds = flow.credentials
 
-    execute_statement(
+    # Use update-then-insert instead of ON CONFLICT to support older schemas
+    # where calendar_tokens.user_id may not yet be uniquely constrained.
+    updated = execute_statement(
         """
-        INSERT INTO calendar_tokens (
-            user_id, access_token, refresh_token, expires_at
-        )
-        VALUES (%s, %s, %s, %s)
-        ON CONFLICT (user_id) DO UPDATE SET
-            access_token = EXCLUDED.access_token,
-            refresh_token = EXCLUDED.refresh_token,
-            expires_at = EXCLUDED.expires_at,
-            updated_at = NOW();
+        UPDATE calendar_tokens
+        SET access_token = %s,
+            refresh_token = %s,
+            expires_at = %s,
+            updated_at = NOW()
+        WHERE user_id = %s
         """,
-        (user_id, creds.token, creds.refresh_token, creds.expiry),
+        (creds.token, creds.refresh_token, creds.expiry, user_id),
     )
+    if updated == 0:
+        execute_statement(
+            """
+            INSERT INTO calendar_tokens (
+                user_id, access_token, refresh_token, expires_at
+            )
+            VALUES (%s, %s, %s, %s)
+            """,
+            (user_id, creds.token, creds.refresh_token, creds.expiry),
+        )
 
     return RedirectResponse("https://piazza.com")
 
@@ -207,9 +216,11 @@ async def get_calendar_status(
     if not creds:
         raise HTTPException(404, "Google Calendar not connected")
 
+    expiry = creds.expiry.isoformat() if creds.expiry else None
     return {
         "connected": True,
-        "expires_at": creds.expiry.isoformat() if creds.expiry else None,
+        "expires_at": expiry,
+        "token_expires_at": expiry,
         "has_refresh_token": bool(creds.refresh_token),
     }
 
@@ -278,12 +289,10 @@ async def create_calendar_event(
                 event.start_time,
                 event.end_time,
                 event.source_post_number,
-                Json(event.reminder_settings)
-                if event.reminder_settings
-                else None,
+                Json(event.reminder_settings) if event.reminder_settings else None,
             ),
         )
-    except Exception as e:
+    except Exception:
         logger.exception("DB insert failed after Google event creation")
         raise HTTPException(
             500,
@@ -312,6 +321,81 @@ async def list_calendar_events(
     )
 
     return results
+
+
+# =====================================
+# Check Existing Event By Source Post
+# =====================================
+@router.get("/events/by-source")
+async def get_event_by_source(
+    source_post_number: str = Query(..., min_length=1),
+    piazza_course_id: Optional[str] = Query(None),
+    authorization: Optional[str] = Header(None),
+):
+    """
+    Return whether a calendar event already exists for a post/course for the user.
+    Also tries to return the Google Calendar HTML link for opening the event.
+    """
+    user = await get_current_user(authorization)
+
+    course_id = piazza_course_id.strip() if piazza_course_id else None
+    post_num = source_post_number.strip()
+
+    if course_id:
+        result = execute_query(
+            """
+            SELECT id, google_event_id
+            FROM calendar_events
+            WHERE user_id = %s
+              AND source_post_number = %s
+              AND piazza_course_id = %s
+            ORDER BY created_at DESC
+            LIMIT 1
+            """,
+            (str(user.id), post_num, course_id),
+            fetch_one=True,
+        )
+    else:
+        result = execute_query(
+            """
+            SELECT id, google_event_id
+            FROM calendar_events
+            WHERE user_id = %s
+              AND source_post_number = %s
+            ORDER BY created_at DESC
+            LIMIT 1
+            """,
+            (str(user.id), post_num),
+            fetch_one=True,
+        )
+
+    if not result:
+        return {"exists": False}
+
+    html_link = None
+    google_event_id = result.get("google_event_id")
+    if google_event_id:
+        try:
+            creds = get_valid_google_credentials(str(user.id))
+            if creds:
+                service = build("calendar", "v3", credentials=creds)
+                event = (
+                    service.events()
+                    .get(calendarId="primary", eventId=google_event_id)
+                    .execute()
+                )
+                html_link = event.get("htmlLink")
+        except Exception as e:
+            logger.warning(
+                "Failed to resolve htmlLink for event_id=%s: %s", google_event_id, e
+            )
+
+    return {
+        "exists": True,
+        "event_id": result["id"],
+        "google_event_id": google_event_id,
+        "html_link": html_link,
+    }
 
 
 # =====================================
@@ -357,13 +441,10 @@ async def update_calendar_settings(
 
     return {"status": "updated"}
 
-class ParseArticleContentRequest(BaseModel):
-    content: str
-
 
 @router.post("/events/parse-thread")
 async def parse_article_for_event(
-    payload: ParseArticleContentRequest,
+    payload: str,
 ):
     """
     Temporary endpoint that pretends to parse the article content
@@ -378,10 +459,9 @@ async def parse_article_for_event(
         "parsed_event": {
             "event_name": "Midterm 1 CPSC 340",
             "event_type": "exam",
-            "start_time": "2026-02-28T11:00:00",
-            "end_time": "2026-02-28T12:00:00",
+            "start_time": "2026-02-28T11:00:00-08:00",
+            "end_time": "2026-02-28T12:00:00-08:00",
             "display_text": "Midterm 1 (CPSC 340) on Feb 28, 2026 from 11:00 AM to 12:00 PM",
             "confidence": 0.9,
         },
     }
-    
