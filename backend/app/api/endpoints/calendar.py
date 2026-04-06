@@ -237,6 +237,10 @@ class AddEventRequest(BaseModel):
     reminder_settings: Optional[Dict[str, Any]] = None
 
 
+class ParseArticleContentRequest(BaseModel):
+    content: str
+
+
 # =====================================
 # Create Event
 # =====================================
@@ -444,15 +448,25 @@ async def update_calendar_settings(
 
 @router.post("/events/parse-thread")
 async def parse_article_for_event(
-    payload: str,
+    payload: Optional[ParseArticleContentRequest] = None,
+    content: Optional[str] = Query(None),
+    payload_query: Optional[str] = Query(None, alias="payload"),
 ):
     """
     Temporary endpoint that pretends to parse the article content
     and returns a hard-coded example result.
 
     In the future this should run real NLP/date extraction on
-    `payload.content` and return structured event information.
+    provided content and return structured event information.
     """
+    raw_content = (
+        (payload.content if payload else None) or content or payload_query or ""
+    )
+    if not raw_content.strip():
+        raise HTTPException(
+            status_code=422,
+            detail="Missing content. Provide JSON body {\"content\": ...} or query param content/payload.",
+        )
 
     return {
         "status": "ok",
