@@ -465,7 +465,7 @@ async def parse_article_for_event(
     if not raw_content.strip():
         raise HTTPException(
             status_code=422,
-            detail="Missing content. Provide JSON body {\"content\": ...} or query param content/payload.",
+            detail='Missing content. Provide JSON body {"content": ...} or query param content/payload.',
         )
 
     return {
