@@ -2,23 +2,12 @@
 API routes for Piazza AI backend.
 """
 
+from backend.app.api.endpoints import calendar
 from fastapi import APIRouter
 from pydantic import BaseModel
 
 # Import endpoint routers
-from app.api.endpoints import (
-    auth,
-    date_extraction,
-    calendar,
-    chat_sessions,
-    documents,
-    example,
-    ingestion,
-    llm,
-    per_post_llm,
-    resources,
-    study_materials,
-)
+from app.api.endpoints import auth, chat_sessions, documents, example, ingestion, llm
 
 # Create main API router
 api_router = APIRouter()
@@ -49,26 +38,8 @@ api_router.include_router(chat_sessions.router, tags=["chat-sessions"])
 # Include document endpoints
 api_router.include_router(documents.router, prefix="/documents", tags=["documents"])
 
-# Include calendar endpoints
-api_router.include_router(calendar.router, prefix="/calendar", tags=["calendar"])
-# Include resource aggregator endpoints
-api_router.include_router(resources.router, prefix="/resources", tags=["resources"])
-
-# Include post assistant endpoints
-api_router.include_router(
-    per_post_llm.router, prefix="/per-post", tags=["post-assistant"]
-)
-
-# Include study material generator endpoints
-api_router.include_router(
-    study_materials.router, prefix="/study", tags=["study-materials"]
-)
 # Include google calendar auth endpoints
-api_router.include_router(calendar.router, prefix="/calendar", tags=["calendar"])
-
-# Include calendar endpoints
-api_router.include_router(date_extraction.router, prefix="/calendar", tags=["calendar"])
-
+api_router.include_router(calendar.router, prefix="/calendar", tags=["calendar-auth"])
 
 @api_router.get("/health", response_model=MessageResponse)
 def health_check():
