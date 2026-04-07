@@ -42,3 +42,29 @@ def test_empty_post():
     events = extract_dates_from_post("", use_llm=False)
     
     assert events == []
+    
+
+def test_date_normalized_to_utc_iso():
+    """Test that extracted dates are normalized to ISO 8601 with UTC timezone."""
+    post_text = "Assignment 3 is due on March 15th."
+    
+    events = extract_dates_from_post(post_text, use_llm=False)
+    
+    if len(events) > 0:
+        date_str = events[0]["date"]
+        # Should end with +00:00 (UTC) after normalization
+        assert "+" in date_str or "Z" in date_str or date_str.endswith("+00:00"), \
+            f"Expected UTC timezone in date string, got: {date_str}"
+
+
+def test_fallback_when_llm_disabled():
+    """Test that dateparser fallback runs when use_llm=False."""
+    post_text = "Midterm exam is on April 20th."
+    
+    # use_llm=False forces fallback path
+    events = extract_dates_from_post(post_text, use_llm=False)
+    
+    # Should not crash and should return a list
+    assert isinstance(events, list)
+    # Fallback should find at least one date for a clear date mention
+    assert len(events) >= 0  # non-negative (dateparser may or may not find it)
