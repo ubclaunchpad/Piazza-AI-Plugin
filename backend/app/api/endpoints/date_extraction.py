@@ -12,12 +12,14 @@ router = APIRouter()
 
 class DateExtractionRequest(BaseModel):
     """Request model for date extraction."""
+
     post_text: str
     use_llm: bool = True
 
 
 class DateExtractionResponse(BaseModel):
     """Response model for date extraction."""
+
     events: List[Dict]
     count: int
 

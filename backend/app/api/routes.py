@@ -41,6 +41,7 @@ api_router.include_router(documents.router, prefix="/documents", tags=["document
 # Include google calendar auth endpoints
 api_router.include_router(calendar.router, prefix="/calendar", tags=["calendar-auth"])
 
+
 @api_router.get("/health", response_model=MessageResponse)
 def health_check():
     """Health check endpoint example."""

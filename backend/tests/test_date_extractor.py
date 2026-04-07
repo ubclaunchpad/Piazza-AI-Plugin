@@ -3,7 +3,9 @@ from app.textGeneration.date_extractor import extract_dates_from_post
 
 def test_extract_assignment_due_date():
     """Test extraction of assignment due date."""
-    post_text = "Assignment 3 is due on March 15th at 11:59 PM. Please submit on Piazza."
+    post_text = (
+        "Assignment 3 is due on March 15th at 11:59 PM. Please submit on Piazza."
+    )
 
     events = extract_dates_from_post(post_text, use_llm=False)
 
@@ -17,7 +19,9 @@ def test_extract_assignment_due_date():
 
 def test_extract_exam_date():
     """Test extraction of exam date."""
-    post_text = "Reminder: Midterm exam is scheduled for next Friday at 2 PM in room 101."
+    post_text = (
+        "Reminder: Midterm exam is scheduled for next Friday at 2 PM in room 101."
+    )
 
     events = extract_dates_from_post(post_text, use_llm=False)
 
@@ -52,8 +56,9 @@ def test_date_normalized_to_utc_iso():
     if len(events) > 0:
         date_str = events[0]["date"]
         # Should end with +00:00 (UTC) after normalization
-        assert "+" in date_str or "Z" in date_str or date_str.endswith("+00:00"), \
+        assert "+" in date_str or "Z" in date_str or date_str.endswith("+00:00"), (
             f"Expected UTC timezone in date string, got: {date_str}"
+        )
 
 
 def test_fallback_when_llm_disabled():

@@ -28,6 +28,7 @@ PROVIDER = "google"
 # Supabase Auth
 # =========================
 
+
 async def get_current_user(authorization: Optional[str] = Header(None)):
     if not authorization:
         raise HTTPException(status_code=401, detail="Missing authorization header")
@@ -45,13 +46,12 @@ async def get_current_user(authorization: Optional[str] = Header(None)):
 # Step 1 - Start Google Linking
 # =========================
 
+
 @router.get("/auth")
 async def calendar_auth(user=Depends(get_current_user)):
 
     flow = google_auth_oauthlib.flow.Flow.from_client_secrets_file(
-        CLIENT_SECRETS_FILE,
-        scopes=SCOPES,
-        redirect_uri=REDIRECT_URI
+        CLIENT_SECRETS_FILE, scopes=SCOPES, redirect_uri=REDIRECT_URI
     )
 
     # Encode user_id inside state
@@ -63,7 +63,7 @@ async def calendar_auth(user=Depends(get_current_user)):
         access_type="offline",
         include_granted_scopes="true",
         prompt="consent",
-        state=state_data
+        state=state_data,
     )
 
     return {"auth_url": authorization_url}
@@ -73,6 +73,7 @@ async def calendar_auth(user=Depends(get_current_user)):
 # Step 2 - Google Callback
 # =========================
 
+
 @router.get("/callback")
 async def calendar_callback(state: str, code: str):
 
@@ -81,10 +82,7 @@ async def calendar_callback(state: str, code: str):
     user_id = decoded["user_id"]
 
     flow = google_auth_oauthlib.flow.Flow.from_client_secrets_file(
-        CLIENT_SECRETS_FILE,
-        scopes=SCOPES,
-        state=state,
-        redirect_uri=REDIRECT_URI
+        CLIENT_SECRETS_FILE, scopes=SCOPES, state=state, redirect_uri=REDIRECT_URI
     )
 
     flow.fetch_token(code=code)
@@ -119,6 +117,7 @@ async def calendar_callback(state: str, code: str):
 # =========================
 # Helper - Get Valid Credentials
 # =========================
+
 
 def get_valid_google_credentials(user_id: str):
 
@@ -163,12 +162,10 @@ def get_valid_google_credentials(user_id: str):
 # Add Event Endpoint
 # =========================
 
+
 @router.post("/add-event")
 async def add_calendar_event(
-    title: str,
-    start_time: str,
-    end_time: str,
-    user=Depends(get_current_user)
+    title: str, start_time: str, end_time: str, user=Depends(get_current_user)
 ):
 
     creds = get_valid_google_credentials(user.id)
@@ -184,12 +181,6 @@ async def add_calendar_event(
         "end": {"dateTime": end_time, "timeZone": "UTC"},
     }
 
-    created_event = service.events().insert(
-        calendarId="primary",
-        body=event
-    ).execute()
+    created_event = service.events().insert(calendarId="primary", body=event).execute()
 
-    return {
-        "status": "event_created",
-        "event_id": created_event["id"]
-    }
+    return {"status": "event_created", "event_id": created_event["id"]}

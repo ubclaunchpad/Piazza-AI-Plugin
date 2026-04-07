@@ -17,16 +17,25 @@ from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
+
 class ExtractedEvent(BaseModel):
-    """ Schema for extracted event data. """
+    """Schema for extracted event data."""
+
     title: str = Field(description="Brief title for the event.")
     date: str = Field(description="Event date in ISO format (YYYY-MM-DD)")
-    event_type: str = Field(description="Type of the event: assignment, exam, office_hours, deadline, meeting, or other")
-    confidence: float = Field(description="Confidence score for the extraction between 0 and 1")
+    event_type: str = Field(
+        description="Type of the event: assignment, exam, office_hours, deadline, meeting, or other"
+    )
+    confidence: float = Field(
+        description="Confidence score for the extraction between 0 and 1"
+    )
+
 
 class DateExtractionResult(BaseModel):
-    """ Container for all extracted events. """
+    """Container for all extracted events."""
+
     events: List[ExtractedEvent] = Field(default_factory=list)
+
 
 def extract_dates_with_llm(post_text: str) -> List[Dict]:
     """
@@ -40,22 +49,20 @@ def extract_dates_with_llm(post_text: str) -> List[Dict]:
     """
 
     try:
-
         api_key = os.getenv("GROQ_API_KEY")
         if not api_key:
             logger.debug("GROQ_API_KEY not set - skipping LLM extraction")
             return []
 
-        llm = ChatGroq(
-            model="llama-3.3-70b-versatile",
-            temperature=0,
-            api_key=api_key
-        )
+        llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0, api_key=api_key)
 
         structured_llm = llm.with_structured_output(DateExtractionResult)
 
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", """You are an expert at extracting academic event dates from text.
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                (
+                    "system",
+                    """You are an expert at extracting academic event dates from text.
 Your task is to identify all mentions of dates and their associated events in Piazza posts.
 
 Event types to look for:
@@ -77,9 +84,14 @@ Examples:
 - "Midterm on March 15th" → date: 2024-03-15, type: exam, title: "Midterm Exam"
 - "Office hours this Thursday 2-4pm" → date: (calculate date), type: office_hours, title: "Office Hours"
 
-Return an empty list if no dates are found."""),
-            ("human", "Extract all dates and events from this Piazza post:\n\n{text}")
-        ])
+Return an empty list if no dates are found.""",
+                ),
+                (
+                    "human",
+                    "Extract all dates and events from this Piazza post:\n\n{text}",
+                ),
+            ]
+        )
 
         # Run extraction
         chain = prompt | structured_llm
@@ -93,6 +105,7 @@ Return an empty list if no dates are found."""),
     except Exception as e:
         logger.error(f"LLM date extraction failed: {e}")
         return []
+
 
 def extract_dates_with_dateparser(post_text: str) -> List[Dict]:
     """
@@ -111,22 +124,21 @@ def extract_dates_with_dateparser(post_text: str) -> List[Dict]:
         # Try parsing the entire text first
         parsed_date = dateparser.parse(
             post_text,
-            settings={
-                "PREFER_DATES_FROM": "future",
-                "RETURN_AS_TIMEZONE_AWARE": False
-            }
+            settings={"PREFER_DATES_FROM": "future", "RETURN_AS_TIMEZONE_AWARE": False},
         )
 
         if parsed_date:
-            events.append({
-                "date": parsed_date.strftime("%Y-%m-%d"),
-                "event_type": "other",
-                "title": post_text.strip()[:50],
-                "confidence": 0.6
-            })
+            events.append(
+                {
+                    "date": parsed_date.strftime("%Y-%m-%d"),
+                    "event_type": "other",
+                    "title": post_text.strip()[:50],
+                    "confidence": 0.6,
+                }
+            )
 
         # Also try splitting by sentences and periods
-        for separator in ['. ', '! ', '? ', '\n']:
+        for separator in [". ", "! ", "? ", "\n"]:
             sentences = post_text.split(separator)
 
             for sentence in sentences:
@@ -137,17 +149,19 @@ def extract_dates_with_dateparser(post_text: str) -> List[Dict]:
                     sentence,
                     settings={
                         "PREFER_DATES_FROM": "future",
-                        "RETURN_AS_TIMEZONE_AWARE": False
-                    }
+                        "RETURN_AS_TIMEZONE_AWARE": False,
+                    },
                 )
 
                 if parsed_date:
-                    events.append({
-                        "date": parsed_date.strftime("%Y-%m-%d"),
-                        "event_type": "other",
-                        "title": sentence.strip()[:50],
-                        "confidence": 0.5
-                    })
+                    events.append(
+                        {
+                            "date": parsed_date.strftime("%Y-%m-%d"),
+                            "event_type": "other",
+                            "title": sentence.strip()[:50],
+                            "confidence": 0.5,
+                        }
+                    )
 
         logger.info(f"Extracted {len(events)} events using dateparser fallback")
 
@@ -155,6 +169,7 @@ def extract_dates_with_dateparser(post_text: str) -> List[Dict]:
         logger.error(f"Dateparser extraction failed: {e}")
 
     return events
+
 
 def extract_dates_from_post(post_text: str, use_llm: bool = True) -> List[Dict]:
     """
