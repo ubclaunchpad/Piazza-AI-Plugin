@@ -8,7 +8,7 @@ Falls back to dateparser for additional date detection.
 import os 
 import logging
 from typing import List, Dict
-from datetime import datetime
+from datetime import datetime, timezone
 from pydantic import BaseModel, Field
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
@@ -198,6 +198,14 @@ def extract_dates_from_post(post_text: str, use_llm: bool = True) -> List[Dict]:
     for event in sorted(events, key=lambda x: x["confidence"], reverse=True):
         if event["date"] not in seen_dates:
             seen_dates.add(event["date"])
+
+            try:
+                dt = datetime.fromisoformat(event["date"])
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                event["date"] = dt.isoformat()
+            except ValueError:
+                pass
             unique_events.append(event)
     
     logger.info(f"Final result: {len(unique_events)} unique events extracted")
