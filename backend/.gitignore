@@ -176,3 +176,4 @@ logs/
 # node_modules/  # if adding any frontend build tools
 
 client_secret.json 
+secret.key
