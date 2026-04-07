@@ -1,4 +1,6 @@
-dateparser
+dateparser==1.2.0
+google-api-python-client==2.108.0
+google-auth-oauthlib==1.2.0
 fastapi==0.123.10
 uvicorn[standard]
 pydantic[email]
@@ -16,3 +18,9 @@ langchain-groq
 langchain-postgres==0.0.16
 pgvector
 spacy
+google-api-python-client
+google_auth_oauthlib
+itsdangerous
+pyasn1>=0.6.3
+requests
+beautifulsoup4

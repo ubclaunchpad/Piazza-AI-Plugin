@@ -9,12 +9,14 @@ from pydantic import BaseModel
 from app.api.endpoints import (
     auth,
     date_extraction,
+    calendar,
     chat_sessions,
     documents,
     example,
     ingestion,
     llm,
     per_post_llm,
+    resources,
     study_materials,
 )
 
@@ -47,6 +49,11 @@ api_router.include_router(chat_sessions.router, tags=["chat-sessions"])
 # Include document endpoints
 api_router.include_router(documents.router, prefix="/documents", tags=["documents"])
 
+# Include calendar endpoints
+api_router.include_router(calendar.router, prefix="/calendar", tags=["calendar"])
+# Include resource aggregator endpoints
+api_router.include_router(resources.router, prefix="/resources", tags=["resources"])
+
 # Include post assistant endpoints
 api_router.include_router(
     per_post_llm.router, prefix="/per-post", tags=["post-assistant"]
@@ -56,6 +63,8 @@ api_router.include_router(
 api_router.include_router(
     study_materials.router, prefix="/study", tags=["study-materials"]
 )
+# Include google calendar auth endpoints
+api_router.include_router(calendar.router, prefix="/calendar", tags=["calendar"])
 
 # Include calendar endpoints
 api_router.include_router(date_extraction.router, prefix="/calendar", tags=["calendar"])

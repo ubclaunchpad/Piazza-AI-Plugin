@@ -38,6 +38,8 @@ API_PREFIX=/api/v1
 
 ALLOWED_ORIGINS=["http://localhost:3000", "chrome-extension://*", "https://piazza.com"]
 DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres
+
+
 ```
 
 ### 3. Get Supabase Values
@@ -52,6 +54,30 @@ supabase status
 Copy the values from the output:
 
 - **Database URL** → `DATABASE_URL`
+
+4. Create a Google Cloud project and OAuth client:
+
+- Go to Google Cloud Console
+- Enable Google Calendar API
+- Create OAuth credentials (Web application)
+- Add redirect URI (e.g. http://localhost:8000/api/calendar/oauth/callback)
+- Download client_secret.json
+- Add the following credentials to .env:
+  GOOGLE_CLIENT_ID=...
+  GOOGLE_CLIENT_PROJECT_ID=...
+  GOOGLE_CLIENT_AUTH_URI=...
+  GOOGLE_CLIENT_TOKEN_URI=...
+  GOOGLE_CLIENT_AUTH_PROVIDER_X509_CERT_URL=....
+  GOOGLE_CLIENT_CLIENT_SECRET=
+  GOOGLE_CLIENT_REDIRECT_URIS=...
+
+## 🌐 Resource Aggregator Configuration (when enabled)
+
+When using the Smart Resource Aggregator feature, configure the following environment variables (see `app/core/config.py` for details):
+
+- `YOUTUBE_API_KEY` – API key for YouTube Data API v3.
+- `STACKEXCHANGE_API_KEY` – API key for Stack Exchange (optional depending on usage).
+- `STACKEXCHANGE_SITE` – Stack Exchange site to query (default: `stackoverflow`).
 
 ## 🚀 Quick Start
 
