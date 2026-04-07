@@ -60,6 +60,8 @@ cymem==2.0.13
     #   preshed
     #   spacy
     #   thinc
+dateparser==1.1.8
+    # via date_extractor
 dataclasses-json==0.6.7
     # via langchain-community
 deprecation==2.1.0
