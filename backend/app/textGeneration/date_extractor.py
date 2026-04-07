@@ -46,10 +46,16 @@ def extract_dates_with_llm(post_text: str) -> List[Dict]:
     """
 
     try:
+
+        api_key = os.getenv("GROQ_API_KEY")
+        if not api_key:
+            logger.debug("GROQ_API_KEY not set - skipping LLM extraction")
+            return []
+        
         llm = ChatGroq(
-            model="mixtral-8x7b-32768",
+            model="llama-3.1-70b-versatile",
             temperature=0,
-            api_key=os.getenv("GROQ_API_KEY")
+            api_key=api_key
         )
         
         structured_llm = llm.with_structured_output(DateExtractionResult)
