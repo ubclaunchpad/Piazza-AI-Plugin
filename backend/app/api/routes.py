@@ -8,6 +8,7 @@ from pydantic import BaseModel
 # Import endpoint routers
 from app.api.endpoints import (
     auth,
+    date_extraction,
     chat_sessions,
     documents,
     example,
@@ -55,6 +56,9 @@ api_router.include_router(
 api_router.include_router(
     study_materials.router, prefix="/study", tags=["study-materials"]
 )
+
+# Include calendar endpoints
+api_router.include_router(date_extraction.router, prefix="/calendar", tags=["calendar"])
 
 
 @api_router.get("/health", response_model=MessageResponse)
