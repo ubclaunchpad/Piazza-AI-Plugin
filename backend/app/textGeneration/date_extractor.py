@@ -53,7 +53,7 @@ def extract_dates_with_llm(post_text: str) -> List[Dict]:
             return []
         
         llm = ChatGroq(
-            model="llama-3.1-70b-versatile",
+            model="llama-3.3-70b-versatile",
             temperature=0,
             api_key=api_key
         )
