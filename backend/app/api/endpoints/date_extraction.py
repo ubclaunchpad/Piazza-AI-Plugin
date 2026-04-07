@@ -2,9 +2,11 @@
 Calendar date extraction endpoints.
 """
 
+from typing import Dict, List
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import List, Dict
+
 from app.textGeneration.date_extractor import extract_dates_from_post
 
 router = APIRouter()
