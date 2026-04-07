@@ -17,6 +17,7 @@ langchain-openai
 langchain-groq
 langchain-postgres==0.0.16
 pgvector
+spacy
 google-api-python-client
 google_auth_oauthlib
 itsdangerous

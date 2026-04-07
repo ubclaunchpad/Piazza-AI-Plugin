@@ -8,6 +8,7 @@ from pydantic import BaseModel
 # Import endpoint routers
 from app.api.endpoints import (
     auth,
+    date_extraction,
     calendar,
     chat_sessions,
     documents,
@@ -64,6 +65,9 @@ api_router.include_router(
 )
 # Include google calendar auth endpoints
 api_router.include_router(calendar.router, prefix="/calendar", tags=["calendar"])
+
+# Include calendar endpoints
+api_router.include_router(date_extraction.router, prefix="/calendar", tags=["calendar"])
 
 
 @api_router.get("/health", response_model=MessageResponse)
