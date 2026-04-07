@@ -13,15 +13,8 @@ from pydantic import BaseModel, Field
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
 import dateparser
-import spacy
 
 logger = logging.getLogger(__name__)
-
-try:
-    nlp = spacy.load("en_core_web_sm")
-except OSError:
-    logger.warning("Spacy model not found, Run: python -m spacy download en_core_web_sm")
-    nlp = None
 
 class ExtractedEvent(BaseModel):
     """ Schema for extracted event data. """
