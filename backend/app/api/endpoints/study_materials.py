@@ -5,12 +5,12 @@ Generates quizzes, flashcards, etc
 
 import logging
 from datetime import datetime, timezone
-from typing import Any, Optional, Annotated
+from typing import Annotated, Optional
 from uuid import UUID
-from supabase_auth.types import User, UserResponse
 
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 from psycopg2.extras import Json
+from supabase_auth.types import User
 
 from app.core.database import execute_query, execute_statement
 from app.core.supabase import supabase
@@ -156,7 +156,7 @@ async def get_quiz(id: UUID, user: Annotated[User, Depends(get_current_user)]) -
 
 @router.post("/quiz/{id}/submit", response_model=QuizResultResponse)
 async def submit_quiz_answer(
-    id: UUID, submission: QuizSubmitRequest, 
+    id: UUID, submission: QuizSubmitRequest,
     user: Annotated[User, Depends(get_current_user)]
 ) -> QuizResultResponse:
     try:
