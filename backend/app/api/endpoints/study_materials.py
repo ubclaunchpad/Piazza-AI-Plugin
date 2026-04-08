@@ -119,9 +119,10 @@ async def quiz_generate(
 
 
 @router.get("/quiz/{id}", response_model=QuizResponse)
-async def get_quiz(id: UUID, user: Annotated[User, Depends(get_current_user)]) -> QuizResponse:
+async def get_quiz(
+    id: UUID, user: Annotated[User, Depends(get_current_user)]
+) -> QuizResponse:
     try:
-
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
@@ -156,8 +157,9 @@ async def get_quiz(id: UUID, user: Annotated[User, Depends(get_current_user)]) -
 
 @router.post("/quiz/{id}/submit", response_model=QuizResultResponse)
 async def submit_quiz_answer(
-    id: UUID, submission: QuizSubmitRequest,
-    user: Annotated[User, Depends(get_current_user)]
+    id: UUID,
+    submission: QuizSubmitRequest,
+    user: Annotated[User, Depends(get_current_user)],
 ) -> QuizResultResponse:
     try:
         quiz = execute_query(
@@ -274,7 +276,9 @@ async def get_quizzes_by_course(
 
 
 @router.delete("/quiz/{id}", response_model=QuizDeleteResponse)
-async def delete_quiz(id: UUID, user: Annotated[User, Depends(get_current_user)]) -> QuizDeleteResponse:
+async def delete_quiz(
+    id: UUID, user: Annotated[User, Depends(get_current_user)]
+) -> QuizDeleteResponse:
     """
     Delete given quiz from quiz id
     """
@@ -331,7 +335,8 @@ def _build_flashcard_response(decks: list | None) -> list[FlashcardAllResponse]:
 
 @router.post("/flashcards/generate", response_model=FlashcardAllResponse)
 async def flashcards_generate(
-    deck_info: FlashcardRequestGenerate, user:Annotated[User, Depends(get_current_user)]
+    deck_info: FlashcardRequestGenerate,
+    user: Annotated[User, Depends(get_current_user)],
 ) -> FlashcardAllResponse:
     try:
         generated = generate_flashcard_stream(
@@ -400,7 +405,9 @@ async def flashcards_generate(
 
 
 @router.get("/flashcards/{deck_id}", response_model=FlashcardAllResponse)
-async def get_flashcards(deck_id: UUID, user: Annotated[User, Depends(get_current_user)]) -> FlashcardAllResponse:
+async def get_flashcards(
+    deck_id: UUID, user: Annotated[User, Depends(get_current_user)]
+) -> FlashcardAllResponse:
     try:
         deck_row = execute_query(
             "SELECT id, title, tags, created_at FROM flashcard_decks WHERE id = %s AND user_id = %s",
@@ -442,7 +449,9 @@ async def get_flashcards(deck_id: UUID, user: Annotated[User, Depends(get_curren
 
 @router.put("/flashcards/{card_id}/progress", response_model=FlashcardResponse)
 async def update_flashcard_mastery(
-    card_id: UUID, review: FlashcardReviewRequest, user: Annotated[User, Depends(get_current_user)]
+    card_id: UUID,
+    review: FlashcardReviewRequest,
+    user: Annotated[User, Depends(get_current_user)],
 ) -> FlashcardResponse:
     """Apply one SM-2 review step to a single flashcard. quality 0-5."""
     try:
@@ -529,7 +538,9 @@ async def get_all_flashcards(
         )
 
 
-@router.get("/flashcards/course/{piazza_course_id}", response_model=list[FlashcardAllResponse])
+@router.get(
+    "/flashcards/course/{piazza_course_id}", response_model=list[FlashcardAllResponse]
+)
 async def get_flashcards_by_course(
     piazza_course_id: str, user: Annotated[User, Depends(get_current_user)]
 ) -> list[FlashcardAllResponse]:
@@ -550,10 +561,13 @@ async def get_flashcards_by_course(
 
 
 @router.delete("/flashcards/{deck_id}", response_model=FlashcardDeleteResponse)
-async def delete_flashcard_deck(deck_id: UUID, user: Annotated[User, Depends(get_current_user)]) -> FlashcardDeleteResponse:
+async def delete_flashcard_deck(
+    deck_id: UUID, user: Annotated[User, Depends(get_current_user)]
+) -> FlashcardDeleteResponse:
     try:
         affected = execute_statement(
-            "DELETE FROM flashcard_decks WHERE id = %s AND user_id = %s", (str(deck_id), str(user.id))
+            "DELETE FROM flashcard_decks WHERE id = %s AND user_id = %s",
+            (str(deck_id), str(user.id)),
         )
 
         if affected == 0:
@@ -578,7 +592,8 @@ async def delete_flashcard_deck(deck_id: UUID, user: Annotated[User, Depends(get
 
 @router.post("/summary/generate", response_model=SummaryResponse)
 async def summary_generate(
-    summary_info: SummaryGenerateRequest, user: Annotated[User, Depends(get_current_user)]
+    summary_info: SummaryGenerateRequest,
+    user: Annotated[User, Depends(get_current_user)],
 ) -> SummaryResponse:
     try:
         generated = generate_summary(
