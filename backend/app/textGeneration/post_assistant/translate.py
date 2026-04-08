@@ -1,37 +1,58 @@
-"""
-Translation LLM service
-"""
+"""Translation LLM service for a single exact Piazza post."""
 
-import json
-import logging
+from app.textGeneration.post_assistant.shared import (
+    ResolvedPostContext,
+    format_post_context,
+    stream_post_assistant_response,
+)
 
-from langchain_core.messages import AIMessage
+SYSTEM_PROMPT = """You are a precise university teaching assistant translating a single
+Piazza post. Translate the prose faithfully into the requested language while keeping
+code blocks, inline code, math notation, URLs, and technical identifiers intact unless
+they should obviously remain unchanged."""
 
-from app.textGeneration.llm_service import get_session_history
 
-logger = logging.getLogger(__name__)
+def _build_translate_user_prompt(
+    post_context: ResolvedPostContext,
+    language: str,
+    language_prompt_addon: str = "",
+) -> str:
+    """Build the one-shot user prompt for translate."""
+    addon = language_prompt_addon.strip()
+    addon_block = f"\nAdditional translation guidance:\n{addon}\n" if addon else ""
 
-
-def stream_llm_translate_response(post_num: int, thread_id: str, session_id: str):
-    """stream llm response in chunks"""
-    message = (
-        "Temporary translate response placeholder.\n\n"
-        f"Post: {post_num}\n"
-        f"Course: {thread_id}\n"
-        f"Session: {session_id}\n\n"
-        "This endpoint is wired and streaming correctly. "
-        "You can now continue with follow-up chat in the same session."
+    return (
+        f"Task: Translate the exact Piazza post below into {language}.\n"
+        "Output requirements:\n"
+        "- Translate Accurately: Translate the entire post content (including the question, problem description, and explanations) clearly and naturally.\n"
+        "- Preserve Technical Terms: Do NOT translate programming keywords, variables, function names, code blocks, mathematical formulas, or standard industry terminology. Leave them in their original language.\n"
+        "- Maintain Tone and Format: Keep the original educational tone, and strictly preserve all markdown formatting, bullet points, and structures exactly as they appear.\n"
+        "- Do not summarize or omit details.\n"
+        "- If the target language is English, produce a natural English translation rather than commentary."
+        f"{addon_block}\n\n"
+        f"{format_post_context(post_context)}"
     )
-    try:
-        history = get_session_history(session_id)
-        history.add_user_message(
-            f"[translate] Request for post {post_num} in course {thread_id}."
-        )
-        history.add_message(
-            AIMessage(content=message, response_metadata={"sources": [str(post_num)]})
-        )
-    except Exception as e:
-        logger.error(f"Failed to persist translate placeholder history: {e}")
 
-    yield json.dumps({"type": "content", "content": message}) + "\n"
-    yield json.dumps({"type": "sources", "sources": [str(post_num)]}) + "\n"
+
+def stream_llm_translate_response(
+    *,
+    post_context: ResolvedPostContext,
+    session_id: str | None,
+    language: str,
+    language_prompt_addon: str = "",
+):
+    """Stream a translation for one exact Piazza post."""
+    return stream_post_assistant_response(
+        action_name="translate",
+        post_context=post_context,
+        session_id=session_id,
+        system_prompt=SYSTEM_PROMPT,
+        user_prompt=_build_translate_user_prompt(
+            post_context=post_context,
+            language=language,
+            language_prompt_addon=language_prompt_addon,
+        ),
+        history_user_message=(
+            f"Translate Piazza post {post_context.post_num} into {language}."
+        ),
+    )

@@ -1,37 +1,41 @@
-"""
-Summarization LLM service
-"""
+"""Summarization LLM service for a single exact Piazza post."""
 
-import json
-import logging
+from app.textGeneration.post_assistant.shared import (
+    ResolvedPostContext,
+    format_post_context,
+    stream_post_assistant_response,
+)
 
-from langchain_core.messages import AIMessage
+SYSTEM_PROMPT = """You are a university teaching assistant summarizing a single Piazza post.
+Produce a concise, well-structured summary that captures the main question, the key
+answer or resolution, and any follow-up details that matter for students. Keep the
+summary grounded in the exact post only."""
 
-from app.textGeneration.llm_service import get_session_history
 
-logger = logging.getLogger(__name__)
-
-
-def stream_llm_summary_response(post_num: int, thread_id: str, session_id: str):
-    """stream llm response in chunks"""
-    message = (
-        "Temporary summarize response placeholder.\n\n"
-        f"Post: {post_num}\n"
-        f"Course: {thread_id}\n"
-        f"Session: {session_id}\n\n"
-        "This endpoint is wired and streaming correctly. "
-        "You can now continue with follow-up chat in the same session."
+def _build_summary_user_prompt(post_context: ResolvedPostContext) -> str:
+    """Build the one-shot user prompt for summarize."""
+    return (
+        "Task: Summarize the exact Piazza post below.\n"
+        "Output requirements:\n"
+        "- Lead with the main topic or question.\n"
+        "- Capture the most important answer, resolution, or clarification.\n"
+        "- Mention follow-ups or caveats only if they materially change understanding.\n"
+        "- Use short bullets or short sections.\n\n"
+        f"{format_post_context(post_context)}"
     )
-    try:
-        history = get_session_history(session_id)
-        history.add_user_message(
-            f"[summarize] Request for post {post_num} in course {thread_id}."
-        )
-        history.add_message(
-            AIMessage(content=message, response_metadata={"sources": [str(post_num)]})
-        )
-    except Exception as e:
-        logger.error(f"Failed to persist summarize placeholder history: {e}")
 
-    yield json.dumps({"type": "content", "content": message}) + "\n"
-    yield json.dumps({"type": "sources", "sources": [str(post_num)]}) + "\n"
+
+def stream_llm_summary_response(
+    *,
+    post_context: ResolvedPostContext,
+    session_id: str | None,
+):
+    """Stream a summary for one exact Piazza post."""
+    return stream_post_assistant_response(
+        action_name="summarize",
+        post_context=post_context,
+        session_id=session_id,
+        system_prompt=SYSTEM_PROMPT,
+        user_prompt=_build_summary_user_prompt(post_context),
+        history_user_message=f"Summarize Piazza post {post_context.post_num}.",
+    )
