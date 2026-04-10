@@ -122,6 +122,19 @@ def _build_context(chunks: list[dict[str, Any]]) -> tuple[str, list[str]]:
     return "\n\n".join(context_blocks), source_posts
 
 
+_MAX_CONTEXT_CHARS = 12_000  # ~3000 tokens, leaves room for system prompt + output
+
+
+def _truncate_context(context: str, max_chars: int = _MAX_CONTEXT_CHARS) -> str:
+    if len(context) <= max_chars:
+        return context
+    truncated = context[:max_chars]
+    last_boundary = truncated.rfind("\n\n[Post ")
+    if last_boundary > max_chars // 2:
+        return truncated[:last_boundary]
+    return truncated
+
+
 def generate_quiz_questions(
     *,
     piazza_course_id: str,
@@ -151,11 +164,12 @@ def generate_quiz_questions(
         )
 
     context, resolved_source_posts = _build_context(chunks)
+    context = _truncate_context(context)
 
     llm = ChatGroq(
         model=QUIZ_MODEL,
         temperature=0.2,
-        max_tokens=6000,
+        max_tokens=3000,
         max_retries=3,
     )
 
@@ -163,7 +177,7 @@ def generate_quiz_questions(
         [
             (
                 "system",
-                """You are generating course quizzes from Piazza context.
+                """You are a course professor creating curriculum quizzes from Piazza context.
 Return strict JSON only. No markdown, no prose.
 Your output must conform to this Pydantic JSON schema (for `questions` only):
 {quiz_questions_schema}
@@ -246,6 +260,7 @@ def generate_summary(
         )
 
     context, resolved_source_posts = _build_context(chunks)
+    context = _truncate_context(context)
 
     type_instructions = {
         "thread": (
@@ -270,7 +285,7 @@ def generate_summary(
     llm = ChatGroq(
         model=QUIZ_MODEL,
         temperature=0.3,
-        max_tokens=4000,
+        max_tokens=2500,
         max_retries=3,
     )
 
@@ -314,6 +329,7 @@ def generate_flashcard_stream(
     title: str,
     tags: Optional[list[str]],
     source_posts: Optional[list[str]] = None,
+    num_cards: int = 15,
 ) -> dict[str, Any]:
     """
     Generate flashcards from ingested answered posts.
@@ -325,7 +341,9 @@ def generate_flashcard_stream(
             "model": str
         }
     """
-    chunks = _get_answered_chunks(piazza_course_id, source_posts, 20)
+    chunks = _get_answered_chunks(
+        piazza_course_id, source_posts, min(num_cards * 2, 40)
+    )
 
     if not chunks:
         raise ValueError(
@@ -333,11 +351,12 @@ def generate_flashcard_stream(
         )
 
     context, resolved_source_posts = _build_context(chunks)
+    context = _truncate_context(context)
 
     llm = ChatGroq(
         model=QUIZ_MODEL,
         temperature=0.2,
-        max_tokens=6000,
+        max_tokens=3000,
         max_retries=3,
     )
 
@@ -352,7 +371,7 @@ Your output must conform to this Pydantic JSON schema (for `cards` only):
 Output envelope must be:
 {{"cards": [...]}}
 Rules:
-- Generate between 10 and 20 flashcards depending on available context.
+- Generate exactly {num_cards} flashcards.
 - Each card must be grounded in the provided context.
 - card_type must be one of: "concept", "definition", "qa".
 - front: a concise question or term.
@@ -375,6 +394,7 @@ Rules:
         {
             "flashcard_schema": _flashcard_schema_json,
             "title": title,
+            "num_cards": num_cards,
             "tags_instruction": tags_instruction,
             "context": context,
         }
