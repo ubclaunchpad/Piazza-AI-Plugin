@@ -56,9 +56,9 @@ def test_date_normalized_to_utc_iso():
     if len(events) > 0:
         date_str = events[0]["date"]
         # Should end with +00:00 (UTC) after normalization
-        assert "+" in date_str or "Z" in date_str or date_str.endswith("+00:00"), (
-            f"Expected UTC timezone in date string, got: {date_str}"
-        )
+        assert (
+            "+" in date_str or "Z" in date_str or date_str.endswith("+00:00")
+        ), f"Expected UTC timezone in date string, got: {date_str}"
 
 
 def test_fallback_when_llm_disabled():

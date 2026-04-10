@@ -105,7 +105,9 @@ def extract_dates_with_llm(post_text: str) -> List[Dict]:
             logger.debug("GROQ_API_KEY not set - skipping LLM extraction")
             return []
 
-        llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0, api_key=SecretStr(api_key))
+        llm = ChatGroq(
+            model="llama-3.3-70b-versatile", temperature=0, api_key=SecretStr(api_key)
+        )
 
         structured_llm = llm.with_structured_output(DateExtractionResult)
 
@@ -250,7 +252,9 @@ def extract_dates_with_dateparser(post_text: str) -> List[Dict]:
     return events
 
 
-def extract_dates_from_post(thread_input: ThreadInput, use_llm: bool = True) -> List[Dict]:
+def extract_dates_from_post(
+    thread_input: ThreadInput, use_llm: bool = True
+) -> List[Dict]:
     """
     Main function to extract dates from structured Piazza thread input.
 

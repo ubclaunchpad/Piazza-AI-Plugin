@@ -31,7 +31,10 @@ def extract_dates(request: DateExtractionRequest):
     """
     Extract dates and events from a Piazza post.
     """
-    if not request.input.threadSummary.strip() and not request.input.threadContent.strip():
+    if (
+        not request.input.threadSummary.strip()
+        and not request.input.threadContent.strip()
+    ):
         raise HTTPException(
             status_code=400,
             detail="input.threadSummary or input.threadContent is required",

@@ -53,7 +53,9 @@ api_router.include_router(documents.router, prefix="/documents", tags=["document
 api_router.include_router(calendar.router, prefix="/calendar", tags=["calendar-auth"])
 
 # Include calendar date extraction endpoints
-api_router.include_router(date_extraction.router, prefix="/calendar", tags=["calendar-date-extraction"])
+api_router.include_router(
+    date_extraction.router, prefix="/calendar", tags=["calendar-date-extraction"]
+)
 
 # Include resource aggregator endpoints
 api_router.include_router(resources.router, prefix="/resources", tags=["resources"])
@@ -67,6 +69,7 @@ api_router.include_router(
 api_router.include_router(
     study_materials.router, prefix="/study", tags=["study-materials"]
 )
+
 
 @api_router.get("/health", response_model=MessageResponse)
 def health_check():
