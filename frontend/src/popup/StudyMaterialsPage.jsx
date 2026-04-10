@@ -1,4 +1,6 @@
 import { useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 /* global chrome */
 const API_ENDPOINT = process.env.API_ENDPOINT || "http://localhost:8000/api/v1";
@@ -370,7 +372,7 @@ export default function StudyMaterialsPage({ user, onLogout, piazzaCourseId }) {
           theme={theme}
           view={view}
           isLoading={summaryLoading}
-          result={summaryResult}
+          result={summaryResult?.content ?? ""}
           error={summaryError}
         />
       )}
@@ -1915,6 +1917,11 @@ function HomePage({ theme, onNavigate }) {
 }
 
 function SectionView({ theme, view, isLoading, result, error }) {
+  const markdownResult =
+    typeof result === "string"
+      ? result.replace(/\\r\\n/g, "\n").replace(/\\n/g, "\n").replace(/\r\n/g, "\n")
+      : "";
+
   return (
     <div className="flex flex-col flex-1 px-6" style={{ paddingBottom: "48px" }}>
       {/* Content area */}
@@ -1960,19 +1967,54 @@ function SectionView({ theme, view, isLoading, result, error }) {
                 {SECTION_ITEMS.find(n => n.key === view)?.label}
               </h3>
             </div>
-            <pre
+            <div
               style={{
                 padding: "16px 20px",
                 fontSize: "12px",
                 color: theme.textMuted,
                 overflowX: "auto",
-                whiteSpace: "pre-wrap",
+                whiteSpace: "normal",
                 wordBreak: "break-word",
                 margin: 0,
               }}
             >
-              {JSON.stringify(result, null, 2)}
-            </pre>
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={{
+                  p: ({ children }) => <p style={{ margin: "0 0 10px 0", lineHeight: "1.6" }}>{children}</p>,
+                  ul: ({ children }) => <ul style={{ margin: "0 0 10px 18px" }}>{children}</ul>,
+                  ol: ({ children }) => <ol style={{ margin: "0 0 10px 18px" }}>{children}</ol>,
+                  li: ({ children }) => <li style={{ marginBottom: "4px" }}>{children}</li>,
+                  code: ({ children }) => (
+                    <code
+                      style={{
+                        backgroundColor: "rgba(125, 125, 125, 0.15)",
+                        padding: "2px 4px",
+                        borderRadius: "4px",
+                        fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+                      }}
+                    >
+                      {children}
+                    </code>
+                  ),
+                  pre: ({ children }) => (
+                    <pre
+                      style={{
+                        backgroundColor: "rgba(125, 125, 125, 0.12)",
+                        padding: "10px",
+                        borderRadius: "8px",
+                        overflowX: "auto",
+                        margin: "0 0 10px 0",
+                      }}
+                    >
+                      {children}
+                    </pre>
+                  ),
+                }}
+              >
+                {markdownResult}
+              </ReactMarkdown>
+            </div>
           </div>
         )}
       </div>
