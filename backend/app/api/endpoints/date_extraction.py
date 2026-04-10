@@ -7,7 +7,7 @@ from typing import Dict, List
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from app.textGeneration.date_extractor import extract_dates_from_post
+from app.textGeneration.date_extractor import ThreadInput, extract_dates_from_post
 
 router = APIRouter()
 
@@ -15,7 +15,7 @@ router = APIRouter()
 class DateExtractionRequest(BaseModel):
     """Request model for date extraction."""
 
-    post_text: str
+    input: "ThreadInput"
     use_llm: bool = True
 
 
@@ -31,9 +31,11 @@ def extract_dates(request: DateExtractionRequest):
     """
     Extract dates and events from a Piazza post.
     """
-    if not request.post_text or not request.post_text.strip():
-        raise HTTPException(status_code=400, detail="post_text cannot be empty")
+    if not request.input.threadSummary.strip() and not request.input.threadContent.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="input.threadSummary or input.threadContent is required",
+        )
 
-    events = extract_dates_from_post(request.post_text, use_llm=request.use_llm)
-
+    events = extract_dates_from_post(request.input, use_llm=request.use_llm)
     return DateExtractionResponse(events=events, count=len(events))

@@ -7,25 +7,66 @@ Falls back to dateparser for additional date detection.
 
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta
 from typing import Dict, List
+from zoneinfo import ZoneInfo
 
 import dateparser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_groq import ChatGroq
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, SecretStr
 
 logger = logging.getLogger(__name__)
+VANCOUVER_TZ = ZoneInfo("America/Vancouver")
+
+
+def _format_time_label(iso_value: str) -> str:
+    """Format ISO datetime into a user-friendly Vancouver time label."""
+    dt = datetime.fromisoformat(iso_value)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=VANCOUVER_TZ)
+    else:
+        dt = dt.astimezone(VANCOUVER_TZ)
+    return dt.strftime("%b %d %I:%M %p")
+
+
+def _compose_event_name(base_name: str, start_time: str, end_time: str) -> str:
+    """
+    Ensure event_name includes start/end time context when available.
+    """
+    base = (base_name or "Detected Event").strip()
+
+    try:
+        start_label = _format_time_label(start_time) if start_time else ""
+    except Exception:
+        start_label = ""
+
+    try:
+        end_label = _format_time_label(end_time) if end_time else ""
+    except Exception:
+        end_label = ""
+
+    if start_label and end_label:
+        return f"{base} ({start_label} - {end_label})"
+    if start_label:
+        return f"{base} ({start_label})"
+    return base
 
 
 class ExtractedEvent(BaseModel):
     """Schema for extracted event data."""
 
-    title: str = Field(description="Brief title for the event.")
-    date: str = Field(description="Event date in ISO format (YYYY-MM-DD)")
+    event_name: str = Field(description="Brief title for the event.")
     event_type: str = Field(
         description="Type of the event: assignment, exam, office_hours, deadline, meeting, or other"
     )
+    start_time: str = Field(
+        description="Event start datetime in ISO 8601 format with timezone."
+    )
+    end_time: str = Field(
+        description="Event end datetime in ISO 8601 format with timezone."
+    )
+    display_text: str = Field(description="Short user-facing event description.")
     confidence: float = Field(
         description="Confidence score for the extraction between 0 and 1"
     )
@@ -37,6 +78,16 @@ class DateExtractionResult(BaseModel):
     events: List[ExtractedEvent] = Field(default_factory=list)
 
 
+class ThreadInput(BaseModel):
+    """Structured Piazza thread input."""
+
+    threadId: str
+    piazzaCourseId: str
+    threadSummary: str
+    threadUpdatedAt: str
+    threadContent: str
+
+
 def extract_dates_with_llm(post_text: str) -> List[Dict]:
     """
     Extract dates and event details from post text using ChatGroq.
@@ -45,7 +96,7 @@ def extract_dates_with_llm(post_text: str) -> List[Dict]:
         post_text (str): The text content of the Piazza post.
 
     Returns:
-        List of extracted events with date, type, title, and confidence
+        List of extracted events in calendar UI shape.
     """
 
     try:
@@ -54,7 +105,7 @@ def extract_dates_with_llm(post_text: str) -> List[Dict]:
             logger.debug("GROQ_API_KEY not set - skipping LLM extraction")
             return []
 
-        llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0, api_key=api_key)
+        llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0, api_key=SecretStr(api_key))
 
         structured_llm = llm.with_structured_output(DateExtractionResult)
 
@@ -74,15 +125,17 @@ Event types to look for:
 - other: any other time-sensitive event
 
 For each date found:
-1. Convert to ISO format (YYYY-MM-DD). If only day/month given, assume current or next year.
-2. Identify the event type from the list above.
-3. Create a brief, clear title (max 20 chars)
-4. Assign confidence score (0-1) based on how clearly the date/event is mentioned.
+1. Return start_time and end_time in ISO 8601 (timezone-aware if possible).
+2. If only a date is known, choose a reasonable default one-hour slot.
+3. Use Vancouver timezone (America/Vancouver) for inferred/local times.
+4. Identify the event type from the list above.
+5. Create event_name (max 40 chars) and display_text (short, readable).
+6. Assign confidence score (0-1) based on how clearly the date/event is mentioned.
 
 Examples:
-- "Assignment 3 is due next Friday" → date: (calculate date), type: assignment, title: "Assignment 3 Due"
-- "Midterm on March 15th" → date: 2024-03-15, type: exam, title: "Midterm Exam"
-- "Office hours this Thursday 2-4pm" → date: (calculate date), type: office_hours, title: "Office Hours"
+- "Assignment 3 is due next Friday" → start_time/end_time, type: assignment, event_name: "Assignment 3 Due"
+- "Midterm on March 15th" → start_time/end_time, type: exam, event_name: "Midterm Exam"
+- "Office hours this Thursday 2-4pm" → start_time/end_time, type: office_hours, event_name: "Office Hours"
 
 Return an empty list if no dates are found.""",
                 ),
@@ -97,8 +150,20 @@ Return an empty list if no dates are found.""",
         chain = prompt | structured_llm
         result = chain.invoke({"text": post_text})
 
-        # Convert to list of dicts
-        events = [event.dict() for event in result.events]
+        # Normalize model/dict output to a list of event dicts.
+        if isinstance(result, DateExtractionResult):
+            extracted_events = result.events
+        elif isinstance(result, dict):
+            raw_events = result.get("events", [])
+            extracted_events = [
+                event if isinstance(event, ExtractedEvent) else ExtractedEvent(**event)
+                for event in raw_events
+                if isinstance(event, (ExtractedEvent, dict))
+            ]
+        else:
+            extracted_events = []
+
+        events = [event.model_dump() for event in extracted_events]
         logger.info(f"Extracted {len(events)} events using LLM")
         return events
 
@@ -115,7 +180,7 @@ def extract_dates_with_dateparser(post_text: str) -> List[Dict]:
         post_text (str): The text content of the Piazza post.
 
     Returns:
-        List of extracted events with date, type, title, and confidence
+        List of extracted events in calendar UI shape.
     """
 
     events = []
@@ -128,11 +193,18 @@ def extract_dates_with_dateparser(post_text: str) -> List[Dict]:
         )
 
         if parsed_date:
+            if parsed_date.tzinfo is None:
+                parsed_date = parsed_date.replace(tzinfo=VANCOUVER_TZ)
+            else:
+                parsed_date = parsed_date.astimezone(VANCOUVER_TZ)
+            end_dt = parsed_date + timedelta(hours=1)
             events.append(
                 {
-                    "date": parsed_date.strftime("%Y-%m-%d"),
+                    "event_name": "Detected Event",
                     "event_type": "other",
-                    "title": post_text.strip()[:50],
+                    "start_time": parsed_date.isoformat(),
+                    "end_time": end_dt.isoformat(),
+                    "display_text": post_text.strip()[:80],
                     "confidence": 0.6,
                 }
             )
@@ -154,11 +226,18 @@ def extract_dates_with_dateparser(post_text: str) -> List[Dict]:
                 )
 
                 if parsed_date:
+                    if parsed_date.tzinfo is None:
+                        parsed_date = parsed_date.replace(tzinfo=VANCOUVER_TZ)
+                    else:
+                        parsed_date = parsed_date.astimezone(VANCOUVER_TZ)
+                    end_dt = parsed_date + timedelta(hours=1)
                     events.append(
                         {
-                            "date": parsed_date.strftime("%Y-%m-%d"),
+                            "event_name": "Detected Event",
                             "event_type": "other",
-                            "title": sentence.strip()[:50],
+                            "start_time": parsed_date.isoformat(),
+                            "end_time": end_dt.isoformat(),
+                            "display_text": sentence.strip()[:80],
                             "confidence": 0.5,
                         }
                     )
@@ -171,49 +250,91 @@ def extract_dates_with_dateparser(post_text: str) -> List[Dict]:
     return events
 
 
-def extract_dates_from_post(post_text: str, use_llm: bool = True) -> List[Dict]:
+def extract_dates_from_post(thread_input: ThreadInput, use_llm: bool = True) -> List[Dict]:
     """
-    Main function to extract dates from Piazza post text.
+    Main function to extract dates from structured Piazza thread input.
 
     Tries LLM-based extraction first, falls back to dateparser if needed.
 
     Args:
-        post_text (str): The text content of the Piazza post.
+        thread_input (ThreadInput): The structured thread input.
         use_llm: Whether to use LLM (defaults to True)
 
     Returns:
-        List of extracted events: [{"date": "2024-03-15", "event_type": "exam", "title": "Midterm", "confidence": 0.95}]
+        List of extracted events:
+        [{"event_name":"Midterm","event_type":"exam","start_time":"...","end_time":"...","display_text":"...","confidence":0.95}]
     """
-    if not post_text or not post_text.strip():
+    normalized_text = "\n".join(
+        part
+        for part in [
+            thread_input.threadSummary.strip(),
+            thread_input.threadContent.strip(),
+            (
+                f"Metadata: thread_id={thread_input.threadId}, "
+                f"course_id={thread_input.piazzaCourseId}, "
+                f"thread_updated_at={thread_input.threadUpdatedAt}"
+            ),
+        ]
+        if part
+    ).strip()
+
+    if not normalized_text or not normalized_text.strip():
         return []
 
     events = []
 
     # Try LLM extraction first
     if use_llm:
-        events = extract_dates_with_llm(post_text)
+        events = extract_dates_with_llm(normalized_text)
 
     # Fallback to dateparser if LLM found nothing
     if not events:
         logger.info("Falling back to dateparser for date extraction")
-        events = extract_dates_with_dateparser(post_text)
+        events = extract_dates_with_dateparser(normalized_text)
 
-    # Remove duplicates and sort by confidence
-    seen_dates = set()
+    # Remove duplicates by start_time and sort by confidence
+    seen_start_times = set()
     unique_events = []
 
     for event in sorted(events, key=lambda x: x["confidence"], reverse=True):
-        if event["date"] not in seen_dates:
-            seen_dates.add(event["date"])
+        start_time = event.get("start_time")
+        if not start_time or start_time in seen_start_times:
+            continue
 
-            try:
-                dt = datetime.fromisoformat(event["date"])
-                if dt.tzinfo is None:
-                    dt = dt.replace(tzinfo=timezone.utc)
-                event["date"] = dt.isoformat()
-            except ValueError:
-                pass
-            unique_events.append(event)
+        seen_start_times.add(start_time)
+
+        try:
+            start_dt = datetime.fromisoformat(event["start_time"])
+            if start_dt.tzinfo is None:
+                start_dt = start_dt.replace(tzinfo=VANCOUVER_TZ)
+            else:
+                start_dt = start_dt.astimezone(VANCOUVER_TZ)
+            event["start_time"] = start_dt.isoformat()
+
+            end_raw = event.get("end_time")
+            if end_raw:
+                end_dt = datetime.fromisoformat(end_raw)
+                if end_dt.tzinfo is None:
+                    end_dt = end_dt.replace(tzinfo=VANCOUVER_TZ)
+                else:
+                    end_dt = end_dt.astimezone(VANCOUVER_TZ)
+                event["end_time"] = end_dt.isoformat()
+            else:
+                event["end_time"] = (start_dt + timedelta(hours=1)).isoformat()
+        except ValueError:
+            # Ignore invalid datetime format from model/fallback output.
+            continue
+
+        event.setdefault("event_name", "Detected Event")
+        event.setdefault("event_type", "other")
+        event.setdefault("display_text", event["event_name"])
+        event.setdefault("confidence", 0.5)
+        event["event_name"] = _compose_event_name(
+            event["event_name"],
+            event.get("start_time", ""),
+            event.get("end_time", ""),
+        )
+        unique_events.append(event)
 
     logger.info(f"Final result: {len(unique_events)} unique events extracted")
     return unique_events

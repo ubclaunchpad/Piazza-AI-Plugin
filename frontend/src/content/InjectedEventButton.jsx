@@ -99,17 +99,61 @@ function buildAddEventRequestBody(suggestion, articleContent, piazzaCourseId) {
 
 export default function InjectedEventButton({ article }) {
   const [parsePhase, setParsePhase] = useState("checking");
-  const [status, setStatus] = useState("idle");
-  const [errorMessage, setErrorMessage] = useState(null);
-  const [suggestion, setSuggestion] = useState(null);
-  const [existingEventUrl, setExistingEventUrl] = useState(null);
+  const [suggestions, setSuggestions] = useState([]);
+  const [eventStatuses, setEventStatuses] = useState({});
+  const [eventErrors, setEventErrors] = useState({});
+  const [eventLinks, setEventLinks] = useState({});
+
+  const getSuggestionKey = (item) =>
+    `${item?.start_time ?? ""}|${item?.end_time ?? ""}|${item?.event_name ?? ""}`;
+
+  const toEpoch = (value) => {
+    if (!value) return null;
+    const ts = Date.parse(value);
+    return Number.isNaN(ts) ? null : ts;
+  };
+
+  const sameInstant = (a, b) => {
+    const ta = toEpoch(a);
+    const tb = toEpoch(b);
+    if (ta != null && tb != null) return ta === tb;
+    return String(a ?? "") === String(b ?? "");
+  };
+
+  const suggestionMatchesExisting = (suggestion, existing) => {
+    const existingTitle = existing?.title ?? existing?.event_name ?? "";
+    const existingStart = existing?.event_start_at ?? existing?.start_time ?? "";
+    const existingEnd = existing?.event_end_at ?? existing?.end_time ?? "";
+    return (
+      String(suggestion?.event_name ?? "").trim() === String(existingTitle).trim() &&
+      sameInstant(suggestion?.start_time, existingStart) &&
+      sameInstant(suggestion?.end_time, existingEnd)
+    );
+  };
+
+  const markExistingSuggestions = (nextSuggestions, existingEvents) => {
+    const nextStatuses = {};
+    const nextLinks = {};
+    for (const item of nextSuggestions) {
+      const key = getSuggestionKey(item);
+      const match = existingEvents.find((evt) => suggestionMatchesExisting(item, evt));
+      if (match) {
+        nextStatuses[key] = "exists";
+      }
+      if (match?.html_link) {
+        nextLinks[key] = match.html_link;
+      }
+    }
+    setEventStatuses(nextStatuses);
+    setEventLinks(nextLinks);
+  };
 
   useEffect(() => {
     setParsePhase("checking");
-    setStatus("idle");
-    setErrorMessage(null);
-    setSuggestion(null);
-    setExistingEventUrl(null);
+    setSuggestions([]);
+    setEventStatuses({});
+    setEventErrors({});
+    setEventLinks({});
 
     if (!article || !(article instanceof Element)) {
       setParsePhase("done");
@@ -129,47 +173,50 @@ export default function InjectedEventButton({ article }) {
       const postNr = content?.threadId ?? getPiazzaCidFromLocation();
       const courseId =
         content?.piazzaCourseId ?? getPiazzaCourseIdFromLocation();
-
-      // Check if this post already has a saved event before parsing.
-      if (postNr != null && String(postNr).trim() !== "") {
-        try {
-          const token = await new Promise((resolve) => {
-            chrome.storage.local.get(["authToken"], (result) => {
-              resolve(result?.authToken || null);
-            });
+      let token = null;
+      let existingEvents = [];
+      try {
+        token = await new Promise((resolve) => {
+          chrome.storage.local.get(["authToken"], (result) => {
+            resolve(result?.authToken || null);
           });
+        });
+      } catch (error) {
+        if (!cancelled && error?.name !== "AbortError") {
+          console.error("Failed to read auth token:", error);
+        }
+      }
 
-          if (token && !cancelled) {
-            const params = new URLSearchParams({
-              source_post_number: String(postNr).trim(),
-            });
-            if (courseId != null && String(courseId).trim() !== "") {
-              params.set("piazza_course_id", String(courseId).trim());
-            }
-
-            const existingResponse = await fetch(
-              `${API_ENDPOINT}/calendar/events/by-source?${params.toString()}`,
-              {
-                headers: {
-                  Authorization: `Bearer ${token}`,
-                },
-                signal: ac.signal,
-              },
+      if (
+        token &&
+        postNr != null &&
+        String(postNr).trim() !== "" &&
+        !cancelled
+      ) {
+        try {
+          const listResp = await fetch(`${API_ENDPOINT}/calendar/events?include_links=true`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+            signal: ac.signal,
+          });
+          if (listResp.ok && !cancelled) {
+            const allEvents = await listResp.json();
+            const postNumber = String(postNr).trim();
+            const courseKey =
+              courseId != null && String(courseId).trim() !== ""
+                ? String(courseId).trim()
+                : null;
+            existingEvents = (Array.isArray(allEvents) ? allEvents : []).filter(
+              (evt) =>
+                String(evt?.source_post_number ?? "").trim() === postNumber &&
+                (courseKey == null ||
+                  String(evt?.piazza_course_id ?? "").trim() === courseKey),
             );
-
-            if (existingResponse.ok && !cancelled) {
-              const existingData = await existingResponse.json();
-              if (existingData?.exists) {
-                setStatus("exists");
-                setExistingEventUrl(existingData?.html_link ?? null);
-                setParsePhase("done");
-                return;
-              }
-            }
           }
         } catch (error) {
           if (!cancelled && error?.name !== "AbortError") {
-            console.error("Failed to check existing calendar event:", error);
+            console.error("Failed to load existing calendar events:", error);
           }
         }
       }
@@ -178,51 +225,66 @@ export default function InjectedEventButton({ article }) {
       const cached = getCachedParse(fp);
       if (cached !== undefined) {
         if (!cancelled) {
-          setSuggestion(cached);
+          if (Array.isArray(cached)) {
+            setSuggestions(cached);
+            markExistingSuggestions(cached, existingEvents);
+          } else {
+            const single = cached ? [cached] : [];
+            setSuggestions(single);
+            markExistingSuggestions(single, existingEvents);
+          }
           setParsePhase("done");
         }
         return;
       }
 
       try {
-        const response = await fetch(
-          `${API_ENDPOINT}/calendar/events/parse-thread`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              content: JSON.stringify(content),
-            }),
-            signal: ac.signal,
+        const response = await fetch(`${API_ENDPOINT}/calendar/extract-dates`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
           },
-        );
+          body: JSON.stringify({
+            input: content,
+          }),
+          signal: ac.signal,
+        });
 
         if (cancelled) return;
 
         const data = await response.json();
-        const parsed = data?.parsed_event ?? null;
-        const confidence = parsed?.confidence ?? data?.confidence ?? 0;
+        const rawEvents = Array.isArray(data?.events)
+          ? data.events
+          : data?.parsed_event
+            ? [data.parsed_event]
+            : [];
+        const normalizedEvents = rawEvents
+          .map((evt) => {
+            const confidence = evt?.confidence ?? data?.confidence ?? 0;
+            return {
+              event_name: evt?.event_name,
+              event_type: evt?.event_type,
+              start_time: evt?.start_time,
+              end_time: evt?.end_time,
+              display_text: evt?.display_text,
+              confidence,
+            };
+          })
+          .filter(
+            (evt) =>
+              evt.event_name &&
+              evt.start_time &&
+              evt.end_time &&
+              evt.confidence >= CONFIDENCE_THRESHOLD,
+          );
 
-        let next = null;
-        if (parsed && confidence >= CONFIDENCE_THRESHOLD) {
-          next = {
-            event_name: parsed.event_name,
-            event_type: parsed.event_type,
-            start_time: parsed.start_time,
-            end_time: parsed.end_time,
-            display_text: parsed.display_text,
-            confidence,
-          };
-        }
-
-        setCachedParse(fp, next);
-        setSuggestion(next);
+        setCachedParse(fp, normalizedEvents);
+        setSuggestions(normalizedEvents);
+        markExistingSuggestions(normalizedEvents, existingEvents);
       } catch (err) {
         if (err.name === "AbortError") return;
         console.error("Failed to fetch suggested event:", err);
-        setSuggestion(null);
+        setSuggestions([]);
       } finally {
         if (!cancelled) {
           setParsePhase("done");
@@ -237,30 +299,44 @@ export default function InjectedEventButton({ article }) {
     };
   }, [article]);
 
-  const handleClick = async () => {
-    if (status === "exists") {
+  const handleClick = async (targetSuggestion) => {
+    const suggestionKey = getSuggestionKey(targetSuggestion);
+    const existingLinkForSuggestion = eventLinks[suggestionKey];
+    if (
+      eventStatuses[suggestionKey] === "success" ||
+      eventStatuses[suggestionKey] === "exists"
+    ) {
       window.open(
-        existingEventUrl || "https://calendar.google.com/calendar/u/0/r",
+        existingLinkForSuggestion || "https://calendar.google.com/calendar/u/0/r",
         "_blank",
         "noopener,noreferrer",
       );
       return;
     }
 
-    setStatus("loading");
+    setEventStatuses((prev) => ({ ...prev, [suggestionKey]: "loading" }));
+    setEventErrors((prev) => ({ ...prev, [suggestionKey]: null }));
 
     chrome.storage.local.get(["authToken"], async (result) => {
       const token = result.authToken;
 
       if (!token) {
         console.warn("No auth token found");
-        setStatus("error");
+        setEventStatuses((prev) => ({ ...prev, [suggestionKey]: "error" }));
+        setEventErrors((prev) => ({
+          ...prev,
+          [suggestionKey]: "Missing auth token",
+        }));
         return;
       }
 
-      if (!suggestion) {
+      if (!targetSuggestion) {
         console.warn("No event suggestion available");
-        setStatus("error");
+        setEventStatuses((prev) => ({ ...prev, [suggestionKey]: "error" }));
+        setEventErrors((prev) => ({
+          ...prev,
+          [suggestionKey]: "No event suggestion available",
+        }));
         return;
       }
 
@@ -268,7 +344,7 @@ export default function InjectedEventButton({ article }) {
         const content = readArticleContent(article);
         const piazzaCourseId = getPiazzaCourseIdFromLocation();
         const payload = buildAddEventRequestBody(
-          suggestion,
+          targetSuggestion,
           content,
           piazzaCourseId,
         );
@@ -290,19 +366,33 @@ export default function InjectedEventButton({ article }) {
         }
 
         if (response.ok && data) {
-          setStatus("success");
-          setExistingEventUrl(data?.link ?? null);
+          setEventStatuses((prev) => ({
+            ...prev,
+            [suggestionKey]: data?.status === "exists" ? "exists" : "success",
+          }));
+          setEventLinks((prev) => ({
+            ...prev,
+            [suggestionKey]: data?.link ?? null,
+          }));
         } else {
           console.error("Failed to create event", {
             status: response.status,
             data,
+            suggestion: targetSuggestion,
           });
-          setStatus("error");
-          setErrorMessage(data?.detail ?? "Failed to create event");
+          setEventStatuses((prev) => ({ ...prev, [suggestionKey]: "error" }));
+          setEventErrors((prev) => ({
+            ...prev,
+            [suggestionKey]: data?.detail ?? "Failed to create event",
+          }));
         }
       } catch (error) {
         console.error("Error while creating event", error);
-        setStatus("error");
+        setEventStatuses((prev) => ({ ...prev, [suggestionKey]: "error" }));
+        setEventErrors((prev) => ({
+          ...prev,
+          [suggestionKey]: "Unexpected error while creating event",
+        }));
       }
     });
   };
@@ -315,64 +405,60 @@ export default function InjectedEventButton({ article }) {
     );
   }
 
-  if (status === "exists") {
-    return (
-      <button
-        type="button"
-        className="piazza-ai-calendar-btn piazza-ai-calendar-btn--success"
-        onClick={handleClick}
-      >
-        <CalendarIcon variant="success" />
-        <span>Event already added - Open in Google Calendar</span>
-      </button>
-    );
-  }
-
-  if (!suggestion) {
+  if (!suggestions.length) {
     return null;
   }
 
-  const labelText =
-    suggestion.display_text ||
-    `Possible ${suggestion.event_type ?? "event"}: ${
-      suggestion.event_name ?? "Unnamed"
-    }`;
-
-  const variant =
-    status === "success" || status === "exists"
-      ? "success"
-      : status === "error"
-        ? "error"
-        : "idle";
-
   return (
-    <button
-      type="button"
-      className={`piazza-ai-calendar-btn piazza-ai-calendar-btn--${variant}`}
-      onClick={handleClick}
-      disabled={status === "loading"}
-    >
-      {status === "success" ? (
-        <>
-          <CalendarIcon variant="success" />
-          <span>Event added to Google Calendar</span>
-        </>
-      ) : status === "exists" ? (
-        <>
-          <CalendarIcon variant="success" />
-          <span>Event already added - Open in Google Calendar</span>
-        </>
-      ) : status === "error" ? (
-        <>
-          <CalendarIcon variant="error" />
-          <span>Failed to add event: {errorMessage}</span>
-        </>
-      ) : (
-        <>
-          <CalendarIcon variant="default" />
-          <span>{labelText}</span>
-        </>
-      )}
-    </button>
+    <div className="piazza-ai-calendar-btn-group">
+      {suggestions.map((item) => {
+        const key = getSuggestionKey(item);
+        const itemStatus = eventStatuses[key] ?? "idle";
+        const itemError = eventErrors[key];
+        const itemLink = eventLinks[key];
+        const labelText = `Possible event: ${item.event_name ?? "Unnamed"}`;
+        const variant =
+          itemStatus === "success" || itemStatus === "exists"
+            ? "success"
+            : itemStatus === "error"
+              ? "error"
+              : "idle";
+
+        return (
+          <button
+            key={key}
+            type="button"
+            className={`piazza-ai-calendar-btn piazza-ai-calendar-btn--${variant}`}
+            onClick={() => handleClick(item)}
+            disabled={itemStatus === "loading"}
+          >
+            {itemStatus === "success" || itemStatus === "exists" ? (
+              <>
+                <CalendarIcon variant="success" />
+                <span>
+                  {itemLink
+                    ? itemStatus === "exists"
+                      ? "Event already added to calendar - Open here"
+                      : "Event added - Open here"
+                    : itemStatus === "exists"
+                      ? "Event already added to calendar"
+                      : "Event added - Open Google Calendar"}
+                </span>
+              </>
+            ) : itemStatus === "error" ? (
+              <>
+                <CalendarIcon variant="error" />
+                <span>Failed to add event: {itemError ?? "Unknown error"}</span>
+              </>
+            ) : (
+              <>
+                <CalendarIcon variant="default" />
+                <span>{labelText}</span>
+              </>
+            )}
+          </button>
+        );
+      })}
+    </div>
   );
 }

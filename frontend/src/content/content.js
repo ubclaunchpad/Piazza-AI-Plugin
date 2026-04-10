@@ -25,17 +25,17 @@ function scheduleInjectEventButtons() {
 
 async function sendArticleContentToBackend(content) {
   try {
-    await fetch(`${API_ENDPOINT}/calendar/events/parse-thread`, {
+    await fetch(`${API_ENDPOINT}/calendar/extract-dates`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        content: JSON.stringify(content),
+        input: content,
       }),
     });
   } catch (err) {
-    console.error("Failed to send thread article to backend:", err);
+    console.error("Failed to send thread context to backend:", err);
   }
 }
 

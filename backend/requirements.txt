@@ -62,9 +62,6 @@ cymem==2.0.13
     #   preshed
     #   spacy
     #   thinc
-dateparser==1.1.8
-    # via date_extractor
-    # via uvicorn
 cryptography==46.0.3
     # via
     #   google-auth
