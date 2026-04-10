@@ -65,6 +65,7 @@ class FlashcardRequestGenerate(BaseModel):
     title: str = Field(..., min_length=1, max_length=255)
     tags: Optional[list[str]] = None
     source_posts: Optional[list[str]] = None
+    num_cards: int = Field(default=15, ge=5, le=40)
 
 
 class FlashcardReviewRequest(BaseModel):

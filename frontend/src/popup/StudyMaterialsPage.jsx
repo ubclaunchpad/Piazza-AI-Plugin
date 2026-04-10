@@ -1,4 +1,6 @@
 import { useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 /* global chrome */
 const API_ENDPOINT = process.env.API_ENDPOINT || "http://localhost:8000/api/v1";
@@ -51,10 +53,36 @@ const darkTheme = {
 export default function StudyMaterialsPage({ user, onLogout, piazzaCourseId }) {
   const [view, setView] = useState("home");
   const [darkMode, setDarkMode] = useState(false);
-  const [loadingKey, setLoadingKey] = useState(null);
-  const [results, setResults] = useState({ quiz: null, flashcards: null, summary: null });
-  const [errors, setErrors] = useState({ quiz: null, flashcards: null, summary: null });
-  const [quizRetryKey, setQuizRetryKey] = useState(0);
+
+  // Summary state (unchanged)
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryResult, setSummaryResult] = useState(null);
+  const [summaryError, setSummaryError] = useState(null);
+
+  // Dashboard list state
+  const [quizList, setQuizList] = useState(null);
+  const [flashcardList, setFlashcardList] = useState(null);
+  const [lastLoadedCourseId, setLastLoadedCourseId] = useState(undefined);
+  const [dashboardLoading, setDashboardLoading] = useState({ quiz: false, flashcards: false });
+  const [dashboardError, setDashboardError] = useState({ quiz: null, flashcards: null });
+
+  // Currently active quiz/deck for playback
+  const [activeQuiz, setActiveQuiz] = useState(null);
+  const [activeDeck, setActiveDeck] = useState(null);
+  const [quizPlayKey, setQuizPlayKey] = useState(0);
+  const [deckPlayKey, setDeckPlayKey] = useState(0);
+
+  // Creation modal visibility
+  const [showQuizModal, setShowQuizModal] = useState(false);
+  const [showDeckModal, setShowDeckModal] = useState(false);
+
+  // Modal form state
+  const [quizForm, setQuizForm] = useState({ title: "", difficulty: "medium", num_questions: 10 });
+  const [deckForm, setDeckForm] = useState({ title: "", tags: "", num_cards: 15 });
+
+  // Creating state
+  const [creating, setCreating] = useState({ quiz: false, flashcards: false });
+  const [createError, setCreateError] = useState({ quiz: null, flashcards: null });
 
   const theme = darkMode ? darkTheme : lightTheme;
 
@@ -72,61 +100,169 @@ export default function StudyMaterialsPage({ user, onLogout, piazzaCourseId }) {
     return null;
   };
 
-  const handleNavigate = async (key, force = false) => {
-    if (key === "home") {
-      setView("home");
-      return;
-    }
+  const authHeaders = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${user.access_token}`,
+  };
 
-    setView(key);
-
-    // Already cached — no need to re-fetch
-    if (!force && results[key] !== null) return;
-
-    setLoadingKey(key);
-
+  const fetchQuizList = async (courseId) => {
+    setDashboardLoading(prev => ({ ...prev, quiz: true }));
+    setDashboardError(prev => ({ ...prev, quiz: null }));
     try {
-      const piazza_course_id = await resolveCourseId();
-      if (!piazza_course_id) {
-        setErrors(prev => ({ ...prev, [key]: "No Piazza course detected. Navigate to a Piazza class page first." }));
-        return;
-      }
-
-      const headers = {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${user.access_token}`,
-      };
-
-      const configs = {
-        quiz: {
-          url: `${API_ENDPOINT}/study/quiz/generate`,
-          body: { piazza_course_id, title: "Auto Quiz", difficulty: "medium", num_questions: 7 },
-        },
-        flashcards: {
-          url: `${API_ENDPOINT}/study/flashcards/generate`,
-          body: { piazza_course_id, title: "Auto Flashcards" },
-        },
-        summary: {
-          url: `${API_ENDPOINT}/study/summary/generate`,
-          body: { piazza_course_id, title: "Auto Summary", summary_type: "weekly" },
-        },
-      };
-
-      const { url, body } = configs[key];
-      const res = await fetch(url, { method: "POST", headers, body: JSON.stringify(body) });
+      const url = courseId
+        ? `${API_ENDPOINT}/study/quiz/course/${encodeURIComponent(courseId)}`
+        : `${API_ENDPOINT}/study/quiz`;
+      const res = await fetch(url, { headers: authHeaders });
       if (res.status === 401) { onLogout(); return; }
       if (!res.ok) throw new Error(`Request failed: ${res.status}`);
-      const data = await res.json();
-      setResults(prev => ({ ...prev, [key]: data }));
+      setQuizList(await res.json());
     } catch (err) {
-      setErrors(prev => ({ ...prev, [key]: err.message }));
+      setDashboardError(prev => ({ ...prev, quiz: err.message }));
     } finally {
-      setLoadingKey(null);
+      setDashboardLoading(prev => ({ ...prev, quiz: false }));
     }
   };
 
-  const showQuizView = view === "quiz" && results.quiz && loadingKey !== "quiz" && !errors.quiz;
-  const showFlashcardsView = view === "flashcards" && results.flashcards && loadingKey !== "flashcards" && !errors.flashcards;
+  const fetchFlashcardList = async (courseId) => {
+    setDashboardLoading(prev => ({ ...prev, flashcards: true }));
+    setDashboardError(prev => ({ ...prev, flashcards: null }));
+    try {
+      const url = courseId
+        ? `${API_ENDPOINT}/study/flashcards/course/${encodeURIComponent(courseId)}`
+        : `${API_ENDPOINT}/study/flashcards`;
+      const res = await fetch(url, { headers: authHeaders });
+      if (res.status === 401) { onLogout(); return; }
+      if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+      setFlashcardList(await res.json());
+    } catch (err) {
+      setDashboardError(prev => ({ ...prev, flashcards: err.message }));
+    } finally {
+      setDashboardLoading(prev => ({ ...prev, flashcards: false }));
+    }
+  };
+
+  const handleNavigate = async (key) => {
+    if (key === "home") { setView("home"); return; }
+    if (key === "quiz" || key === "flashcards") {
+      const courseId = await resolveCourseId();
+      const courseChanged = courseId !== lastLoadedCourseId;
+      if (key === "quiz") {
+        setView("quiz");
+        if (quizList === null || courseChanged) {
+          setLastLoadedCourseId(courseId);
+          fetchQuizList(courseId);
+        }
+      } else {
+        setView("flashcards");
+        if (flashcardList === null || courseChanged) {
+          setLastLoadedCourseId(courseId);
+          fetchFlashcardList(courseId);
+        }
+      }
+      return;
+    }
+    // Summary
+    setView(key);
+    if (summaryResult !== null) return;
+    setSummaryLoading(true);
+    setSummaryError(null);
+    try {
+      const piazza_course_id = await resolveCourseId();
+      if (!piazza_course_id) {
+        setSummaryError("No Piazza course detected. Navigate to a Piazza class page first.");
+        return;
+      }
+      const res = await fetch(`${API_ENDPOINT}/study/summary/generate`, {
+        method: "POST",
+        headers: authHeaders,
+        body: JSON.stringify({ piazza_course_id, title: "Auto Summary", summary_type: "weekly" }),
+      });
+      if (res.status === 401) { onLogout(); return; }
+      if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+      setSummaryResult(await res.json());
+    } catch (err) {
+      setSummaryError(err.message);
+    } finally {
+      setSummaryLoading(false);
+    }
+  };
+
+  const handleCreateQuiz = async () => {
+    setCreating(prev => ({ ...prev, quiz: true }));
+    setCreateError(prev => ({ ...prev, quiz: null }));
+    try {
+      const piazza_course_id = await resolveCourseId();
+      if (!piazza_course_id) throw new Error("No Piazza course detected.");
+      const res = await fetch(`${API_ENDPOINT}/study/quiz/generate`, {
+        method: "POST",
+        headers: authHeaders,
+        body: JSON.stringify({
+          piazza_course_id,
+          title: quizForm.title || "My Quiz",
+          difficulty: quizForm.difficulty,
+          num_questions: quizForm.num_questions,
+        }),
+      });
+      if (res.status === 401) { onLogout(); return; }
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `Request failed: ${res.status}`);
+      }
+      const quiz = await res.json();
+      setQuizList(prev => (prev ? [quiz, ...prev] : [quiz]));
+      setActiveQuiz(quiz);
+      setQuizPlayKey(k => k + 1);
+      setShowQuizModal(false);
+      setQuizForm({ title: "", difficulty: "medium", num_questions: 10 });
+      setView("quiz-play");
+    } catch (err) {
+      setCreateError(prev => ({ ...prev, quiz: err.message }));
+    } finally {
+      setCreating(prev => ({ ...prev, quiz: false }));
+    }
+  };
+
+  const handleCreateDeck = async () => {
+    setCreating(prev => ({ ...prev, flashcards: true }));
+    setCreateError(prev => ({ ...prev, flashcards: null }));
+    try {
+      const piazza_course_id = await resolveCourseId();
+      if (!piazza_course_id) throw new Error("No Piazza course detected.");
+      const tags = deckForm.tags
+        ? deckForm.tags.split(",").map(t => t.trim()).filter(Boolean)
+        : [];
+      const res = await fetch(`${API_ENDPOINT}/study/flashcards/generate`, {
+        method: "POST",
+        headers: authHeaders,
+        body: JSON.stringify({
+          piazza_course_id,
+          title: deckForm.title || "My Deck",
+          tags: tags.length ? tags : null,
+          num_cards: deckForm.num_cards,
+        }),
+      });
+      if (res.status === 401) { onLogout(); return; }
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `Request failed: ${res.status}`);
+      }
+      const deck = await res.json();
+      setFlashcardList(prev => (prev ? [deck, ...prev] : [deck]));
+      setActiveDeck(deck);
+      setDeckPlayKey(k => k + 1);
+      setShowDeckModal(false);
+      setDeckForm({ title: "", tags: "", num_cards: 15 });
+      setView("flashcards-play");
+    } catch (err) {
+      setCreateError(prev => ({ ...prev, flashcards: err.message }));
+    } finally {
+      setCreating(prev => ({ ...prev, flashcards: false }));
+    }
+  };
+
+  const navActiveKey = view.startsWith("quiz") ? "quiz"
+    : view.startsWith("flashcards") ? "flashcards"
+    : view;
 
   return (
     <div
@@ -140,7 +276,7 @@ export default function StudyMaterialsPage({ user, onLogout, piazzaCourseId }) {
     >
       {/* Top bar */}
       <div className="flex items-center justify-between px-8 py-4">
-        <SlidingPillNav theme={theme} items={TOP_NAV_ITEMS} activeKey={view} onSelect={handleNavigate} />
+        <SlidingPillNav theme={theme} items={TOP_NAV_ITEMS} activeKey={navActiveKey} onSelect={handleNavigate} />
         <div className="flex items-center gap-3">
           <button
             onClick={() => setDarkMode(d => !d)}
@@ -167,39 +303,77 @@ export default function StudyMaterialsPage({ user, onLogout, piazzaCourseId }) {
         </div>
       </div>
 
+      {/* Modals */}
+      {showQuizModal && (
+        <QuizCreateModal
+          theme={theme}
+          form={quizForm}
+          onChange={setQuizForm}
+          onSubmit={handleCreateQuiz}
+          onClose={() => { setShowQuizModal(false); setCreateError(prev => ({ ...prev, quiz: null })); }}
+          isCreating={creating.quiz}
+          error={createError.quiz}
+        />
+      )}
+      {showDeckModal && (
+        <DeckCreateModal
+          theme={theme}
+          form={deckForm}
+          onChange={setDeckForm}
+          onSubmit={handleCreateDeck}
+          onClose={() => { setShowDeckModal(false); setCreateError(prev => ({ ...prev, flashcards: null })); }}
+          isCreating={creating.flashcards}
+          error={createError.flashcards}
+        />
+      )}
+
       {view === "home" ? (
         <HomePage theme={theme} onNavigate={handleNavigate} />
-      ) : showQuizView ? (
-        <QuizView
-          key={quizRetryKey}
+      ) : view === "quiz" ? (
+        <QuizDashboard
           theme={theme}
-          quizData={results.quiz}
-          user={user}
-          onRetry={() => setQuizRetryKey(k => k + 1)}
-          onNewQuiz={() => {
-            setResults(prev => ({ ...prev, quiz: null }));
-            setErrors(prev => ({ ...prev, quiz: null }));
-            handleNavigate("quiz", true);
-          }}
+          quizList={quizList}
+          isLoading={dashboardLoading.quiz}
+          error={dashboardError.quiz}
+          onSelectQuiz={(quiz) => { setActiveQuiz(quiz); setQuizPlayKey(k => k + 1); setView("quiz-play"); }}
+          onNewQuiz={() => setShowQuizModal(true)}
         />
-      ) : showFlashcardsView ? (
-        <FlashcardsView
+      ) : view === "quiz-play" && activeQuiz ? (
+        <QuizView
+          key={quizPlayKey}
           theme={theme}
-          flashcardData={results.flashcards}
+          quizData={activeQuiz}
           user={user}
-          onNewDeck={() => {
-            setResults(prev => ({ ...prev, flashcards: null }));
-            setErrors(prev => ({ ...prev, flashcards: null }));
-            handleNavigate("flashcards", true);
-          }}
+          onRetry={() => setQuizPlayKey(k => k + 1)}
+          onReturnToDashboard={() => setView("quiz")}
+          onNewQuiz={() => { setView("quiz"); setShowQuizModal(true); }}
+        />
+      ) : view === "flashcards" ? (
+        <FlashcardDashboard
+          theme={theme}
+          deckList={flashcardList}
+          isLoading={dashboardLoading.flashcards}
+          error={dashboardError.flashcards}
+          onSelectDeck={(deck) => { setActiveDeck(deck); setDeckPlayKey(k => k + 1); setView("flashcards-play"); }}
+          onNewDeck={() => setShowDeckModal(true)}
+        />
+      ) : view === "flashcards-play" && activeDeck ? (
+        <FlashcardsView
+          key={deckPlayKey}
+          theme={theme}
+          flashcardData={activeDeck}
+          user={user}
+          onReviewAgain={() => setDeckPlayKey(k => k + 1)}
+          onReturnToDashboard={() => setView("flashcards")}
+          onNewDeck={() => { setView("flashcards"); setShowDeckModal(true); }}
         />
       ) : (
         <SectionView
           theme={theme}
           view={view}
-          isLoading={loadingKey === view}
-          result={results[view]}
-          error={errors[view]}
+          isLoading={summaryLoading}
+          result={summaryResult?.content ?? ""}
+          error={summaryError}
         />
       )}
     </div>
@@ -208,7 +382,7 @@ export default function StudyMaterialsPage({ user, onLogout, piazzaCourseId }) {
 
 // ─── Quiz Components ──────────────────────────────────────────────────────────
 
-function QuizView({ theme, quizData, user, onRetry, onNewQuiz }) {
+function QuizView({ theme, quizData, user, onRetry, onReturnToDashboard, onNewQuiz }) {
   const { questions, id, title, difficulty } = quizData;
 
   const [mcAnswers, setMcAnswers] = useState({});
@@ -288,16 +462,12 @@ function QuizView({ theme, quizData, user, onRetry, onNewQuiz }) {
         result={quizResult}
         totalCount={questions.length}
         onRetry={onRetry}
+        onReturnToDashboard={onReturnToDashboard}
         onNewQuiz={onNewQuiz}
       />
     );
   }
 
-  const difficultyColors = {
-    easy: { bg: "#dcfce7", text: "#15803d", border: "#86efac" },
-    medium: { bg: "#fef9c3", text: "#a16207", border: "#fde047" },
-    hard: { bg: "#fee2e2", text: "#b91c1c", border: "#fca5a5" },
-  };
   const diffColor = difficultyColors[difficulty] || difficultyColors.medium;
   const accentText = theme === lightTheme ? "#fff" : darkTheme.pillText;
 
@@ -636,7 +806,7 @@ function QuizView({ theme, quizData, user, onRetry, onNewQuiz }) {
   );
 }
 
-function QuizResults({ theme, result, totalCount, onRetry, onNewQuiz }) {
+function QuizResults({ theme, result, totalCount, onRetry, onReturnToDashboard, onNewQuiz }) {
   const score = result ? result.score : null;
   const correctCount = result ? result.correct_count : 0;
   const total = result ? result.total_count : totalCount;
@@ -742,6 +912,23 @@ function QuizResults({ theme, result, totalCount, onRetry, onNewQuiz }) {
             Try Again
           </button>
           <button
+            onClick={onReturnToDashboard}
+            style={{
+              backgroundColor: "transparent",
+              color: theme.text,
+              border: `1.5px solid ${theme.cardBorder}`,
+              borderRadius: "8px",
+              padding: "10px 22px",
+              fontSize: "13px",
+              fontWeight: "600",
+              cursor: "pointer",
+              fontFamily: "inherit",
+              transition: "all 150ms ease",
+            }}
+          >
+            Dashboard
+          </button>
+          <button
             onClick={onNewQuiz}
             style={{
               backgroundColor: theme.accent,
@@ -772,7 +959,7 @@ const CARD_TYPE_STYLES = {
   qa:         { bg: "#fff7ed", text: "#c2410c", border: "#fdba74", label: "Q & A"      },
 };
 
-function FlashcardsView({ theme, flashcardData, user, onNewDeck }) {
+function FlashcardsView({ theme, flashcardData, user, onReviewAgain, onReturnToDashboard, onNewDeck }) {
   const { cards, title } = flashcardData;
 
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -837,7 +1024,9 @@ function FlashcardsView({ theme, flashcardData, user, onNewDeck }) {
           setIsFlipped(false);
           setRatings({});
           setSessionPhase("active");
+          if (onReviewAgain) onReviewAgain();
         }}
+        onReturnToDashboard={onReturnToDashboard}
         onNewDeck={onNewDeck}
       />
     );
@@ -1090,7 +1279,7 @@ function FlashcardsView({ theme, flashcardData, user, onNewDeck }) {
   );
 }
 
-function FlashcardSessionComplete({ theme, cards, ratings, onReviewAgain, onNewDeck }) {
+function FlashcardSessionComplete({ theme, cards, ratings, onReviewAgain, onReturnToDashboard, onNewDeck }) {
   const solidCount     = Object.values(ratings).filter(q => q >= 4).length;
   const needsWorkCount = Object.values(ratings).filter(q => q < 4).length;
   const total          = cards.length;
@@ -1179,6 +1368,23 @@ function FlashcardSessionComplete({ theme, cards, ratings, onReviewAgain, onNewD
             Review Again
           </button>
           <button
+            onClick={onReturnToDashboard}
+            style={{
+              backgroundColor: "transparent",
+              color: theme.text,
+              border: `1.5px solid ${theme.cardBorder}`,
+              borderRadius: "8px",
+              padding: "10px 22px",
+              fontSize: "13px",
+              fontWeight: "600",
+              cursor: "pointer",
+              fontFamily: "inherit",
+              transition: "all 150ms ease",
+            }}
+          >
+            Dashboard
+          </button>
+          <button
             onClick={onNewDeck}
             style={{
               backgroundColor: theme.accent,
@@ -1196,6 +1402,366 @@ function FlashcardSessionComplete({ theme, cards, ratings, onReviewAgain, onNewD
             New Deck
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Dashboard Components ─────────────────────────────────────────────────────
+
+const difficultyColors = {
+  easy: { bg: "#dcfce7", text: "#15803d", border: "#86efac" },
+  medium: { bg: "#fef9c3", text: "#a16207", border: "#fde047" },
+  hard: { bg: "#fee2e2", text: "#b91c1c", border: "#fca5a5" },
+};
+
+function QuizDashboard({ theme, quizList, isLoading, error, onSelectQuiz, onNewQuiz }) {
+  const [hoveredCard, setHoveredCard] = useState(null);
+  const accentText = theme === lightTheme ? "#fff" : darkTheme.pillText;
+
+  return (
+    <div className="flex flex-col flex-1 px-8" style={{ paddingBottom: "48px" }}>
+      <div style={{ maxWidth: "900px", width: "100%", margin: "0 auto" }}>
+        <div className="flex items-center justify-between" style={{ marginBottom: "24px" }}>
+          <h2 style={{ margin: 0, fontSize: "20px", fontWeight: "700", color: theme.text }}>My Quizzes</h2>
+          <button
+            onClick={onNewQuiz}
+            style={{
+              backgroundColor: theme.accent,
+              color: accentText,
+              border: "none",
+              borderRadius: "8px",
+              padding: "9px 18px",
+              fontSize: "13px",
+              fontWeight: "600",
+              cursor: "pointer",
+              fontFamily: "inherit",
+            }}
+          >
+            + New Quiz
+          </button>
+        </div>
+
+        {isLoading && <Spinner theme={theme} />}
+
+        {!isLoading && error && (
+          <div style={{ background: "#fee2e2", border: "1px solid #fecaca", borderRadius: "10px", padding: "16px 20px", color: "#b91c1c", fontSize: "14px" }}>
+            {error}
+          </div>
+        )}
+
+        {!isLoading && !error && quizList && quizList.length === 0 && (
+          <div className="flex flex-col items-center justify-center" style={{ paddingTop: "60px", color: theme.textMuted }}>
+            <div style={{ fontSize: "48px", marginBottom: "16px" }}>📝</div>
+            <p style={{ fontSize: "15px", fontWeight: "600", margin: "0 0 8px", color: theme.text }}>No quizzes yet</p>
+            <p style={{ fontSize: "13px", margin: 0 }}>Create your first quiz to get started!</p>
+          </div>
+        )}
+
+        {!isLoading && !error && quizList && quizList.length > 0 && (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "14px" }}>
+            {quizList.map((quiz, i) => {
+              const dc = difficultyColors[quiz.difficulty] || difficultyColors.medium;
+              return (
+                <button
+                  key={quiz.id}
+                  onClick={() => onSelectQuiz(quiz)}
+                  onMouseEnter={() => setHoveredCard(i)}
+                  onMouseLeave={() => setHoveredCard(null)}
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "flex-start",
+                    textAlign: "left",
+                    padding: "18px",
+                    backgroundColor: hoveredCard === i ? theme.cardBgHover : theme.cardBg,
+                    border: `1.5px solid ${hoveredCard === i ? theme.cardBorderHover : theme.cardBorder}`,
+                    borderRadius: "14px",
+                    cursor: "pointer",
+                    transition: "all 180ms ease",
+                    transform: hoveredCard === i ? "translateY(-3px)" : "translateY(0)",
+                    boxShadow: hoveredCard === i ? "0 10px 30px rgba(0,0,0,0.12)" : "0 2px 8px rgba(0,0,0,0.05)",
+                    color: theme.text,
+                    fontFamily: "inherit",
+                  }}
+                >
+                  <span style={{ fontSize: "13px", fontWeight: "700", marginBottom: "10px", lineHeight: "1.4", color: theme.text }}>{quiz.title}</span>
+                  <span style={{ backgroundColor: dc.bg, color: dc.text, border: `1px solid ${dc.border}`, borderRadius: "9999px", padding: "2px 9px", fontSize: "11px", fontWeight: "600", textTransform: "capitalize", marginBottom: "8px" }}>
+                    {quiz.difficulty}
+                  </span>
+                  <span style={{ fontSize: "12px", color: theme.textMuted, marginBottom: "4px" }}>{quiz.questions.length} questions</span>
+                  <span style={{ fontSize: "11px", color: theme.textMuted }}>
+                    {new Date(quiz.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function FlashcardDashboard({ theme, deckList, isLoading, error, onSelectDeck, onNewDeck }) {
+  const [hoveredCard, setHoveredCard] = useState(null);
+  const accentText = theme === lightTheme ? "#fff" : darkTheme.pillText;
+
+  return (
+    <div className="flex flex-col flex-1 px-8" style={{ paddingBottom: "48px" }}>
+      <div style={{ maxWidth: "900px", width: "100%", margin: "0 auto" }}>
+        <div className="flex items-center justify-between" style={{ marginBottom: "24px" }}>
+          <h2 style={{ margin: 0, fontSize: "20px", fontWeight: "700", color: theme.text }}>My Flashcard Decks</h2>
+          <button
+            onClick={onNewDeck}
+            style={{
+              backgroundColor: theme.accent,
+              color: accentText,
+              border: "none",
+              borderRadius: "8px",
+              padding: "9px 18px",
+              fontSize: "13px",
+              fontWeight: "600",
+              cursor: "pointer",
+              fontFamily: "inherit",
+            }}
+          >
+            + New Deck
+          </button>
+        </div>
+
+        {isLoading && <Spinner theme={theme} />}
+
+        {!isLoading && error && (
+          <div style={{ background: "#fee2e2", border: "1px solid #fecaca", borderRadius: "10px", padding: "16px 20px", color: "#b91c1c", fontSize: "14px" }}>
+            {error}
+          </div>
+        )}
+
+        {!isLoading && !error && deckList && deckList.length === 0 && (
+          <div className="flex flex-col items-center justify-center" style={{ paddingTop: "60px", color: theme.textMuted }}>
+            <div style={{ fontSize: "48px", marginBottom: "16px" }}>🃏</div>
+            <p style={{ fontSize: "15px", fontWeight: "600", margin: "0 0 8px", color: theme.text }}>No decks yet</p>
+            <p style={{ fontSize: "13px", margin: 0 }}>Create your first flashcard deck to get started!</p>
+          </div>
+        )}
+
+        {!isLoading && !error && deckList && deckList.length > 0 && (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "14px" }}>
+            {deckList.map((deck, i) => (
+              <button
+                key={deck.id}
+                onClick={() => onSelectDeck(deck)}
+                onMouseEnter={() => setHoveredCard(i)}
+                onMouseLeave={() => setHoveredCard(null)}
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "flex-start",
+                  textAlign: "left",
+                  padding: "18px",
+                  backgroundColor: hoveredCard === i ? theme.cardBgHover : theme.cardBg,
+                  border: `1.5px solid ${hoveredCard === i ? theme.cardBorderHover : theme.cardBorder}`,
+                  borderRadius: "14px",
+                  cursor: "pointer",
+                  transition: "all 180ms ease",
+                  transform: hoveredCard === i ? "translateY(-3px)" : "translateY(0)",
+                  boxShadow: hoveredCard === i ? "0 10px 30px rgba(0,0,0,0.12)" : "0 2px 8px rgba(0,0,0,0.05)",
+                  color: theme.text,
+                  fontFamily: "inherit",
+                }}
+              >
+                <span style={{ fontSize: "13px", fontWeight: "700", marginBottom: "10px", lineHeight: "1.4", color: theme.text }}>{deck.title}</span>
+                <span style={{ fontSize: "12px", color: theme.textMuted, marginBottom: "6px" }}>{deck.cards.length} cards</span>
+                {deck.tags && deck.tags.length > 0 && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginBottom: "8px" }}>
+                    {deck.tags.slice(0, 3).map(tag => (
+                      <span key={tag} style={{ backgroundColor: theme.cardBgHover, color: theme.textMuted, borderRadius: "9999px", padding: "2px 8px", fontSize: "10px", fontWeight: "600" }}>{tag}</span>
+                    ))}
+                    {deck.tags.length > 3 && (
+                      <span style={{ color: theme.textMuted, fontSize: "10px" }}>+{deck.tags.length - 3} more</span>
+                    )}
+                  </div>
+                )}
+                <span style={{ fontSize: "11px", color: theme.textMuted }}>
+                  {new Date(deck.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function QuizCreateModal({ theme, form, onChange, onSubmit, onClose, isCreating, error }) {
+  const accentText = theme === lightTheme ? "#fff" : darkTheme.pillText;
+
+  return (
+    <div
+      onClick={onClose}
+      style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.45)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center" }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{ backgroundColor: theme.cardBg, border: `1px solid ${theme.cardBorder}`, borderRadius: "16px", padding: "28px 32px", width: "360px", maxWidth: "90vw", boxShadow: "0 16px 48px rgba(0,0,0,0.18)" }}
+      >
+        <div className="flex items-center justify-between" style={{ marginBottom: "20px" }}>
+          <h3 style={{ margin: 0, fontSize: "16px", fontWeight: "700", color: theme.text }}>New Quiz</h3>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "18px", color: theme.textMuted, lineHeight: 1, padding: "2px 4px" }}>✕</button>
+        </div>
+
+        <div style={{ marginBottom: "16px" }}>
+          <label style={{ display: "block", fontSize: "12px", fontWeight: "600", color: theme.textMuted, marginBottom: "6px" }}>Title</label>
+          <input
+            value={form.title}
+            onChange={e => onChange(prev => ({ ...prev, title: e.target.value }))}
+            placeholder="e.g. Week 3 Review"
+            style={{ width: "100%", padding: "9px 12px", borderRadius: "8px", border: `1px solid ${theme.cardBorder}`, backgroundColor: theme.bg, color: theme.text, fontSize: "13px", fontFamily: "inherit", outline: "none", boxSizing: "border-box" }}
+          />
+        </div>
+
+        <div style={{ marginBottom: "16px" }}>
+          <label style={{ display: "block", fontSize: "12px", fontWeight: "600", color: theme.textMuted, marginBottom: "8px" }}>Difficulty</label>
+          <div style={{ display: "flex", gap: "8px" }}>
+            {["easy", "medium", "hard"].map(d => {
+              const dc = difficultyColors[d];
+              const isActive = form.difficulty === d;
+              return (
+                <button
+                  key={d}
+                  onClick={() => onChange(prev => ({ ...prev, difficulty: d }))}
+                  style={{
+                    flex: 1, padding: "7px 0", borderRadius: "8px", fontSize: "12px", fontWeight: "600", cursor: "pointer", fontFamily: "inherit", textTransform: "capitalize", transition: "all 150ms ease",
+                    backgroundColor: isActive ? dc.bg : "transparent",
+                    color: isActive ? dc.text : theme.textMuted,
+                    border: `1.5px solid ${isActive ? dc.border : theme.cardBorder}`,
+                  }}
+                >
+                  {d}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div style={{ marginBottom: "20px" }}>
+          <label style={{ display: "block", fontSize: "12px", fontWeight: "600", color: theme.textMuted, marginBottom: "8px" }}>
+            Questions: <span style={{ color: theme.accent }}>{form.num_questions}</span>
+          </label>
+          <input
+            type="range" min={3} max={25} value={form.num_questions}
+            onChange={e => onChange(prev => ({ ...prev, num_questions: Number(e.target.value) }))}
+            style={{ width: "100%", accentColor: theme.accent }}
+          />
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: theme.textMuted, marginTop: "4px" }}>
+            <span>3</span><span>25</span>
+          </div>
+        </div>
+
+        {error && (
+          <div style={{ background: "#fee2e2", border: "1px solid #fecaca", borderRadius: "8px", padding: "10px 14px", color: "#b91c1c", fontSize: "12px", marginBottom: "14px" }}>
+            {error}
+          </div>
+        )}
+
+        <button
+          onClick={onSubmit}
+          disabled={isCreating}
+          style={{
+            width: "100%", padding: "11px", borderRadius: "8px", border: "none", backgroundColor: theme.accent, color: accentText,
+            fontSize: "13px", fontWeight: "600", cursor: isCreating ? "not-allowed" : "pointer", fontFamily: "inherit",
+            opacity: isCreating ? 0.7 : 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
+          }}
+        >
+          {isCreating ? (
+            <>
+              <span style={{ width: "13px", height: "13px", borderRadius: "50%", border: "2px solid rgba(255,255,255,0.35)", borderTopColor: "#fff", display: "inline-block", animation: "spin 0.6s linear infinite" }} />
+              Generating…
+            </>
+          ) : "Generate Quiz"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function DeckCreateModal({ theme, form, onChange, onSubmit, onClose, isCreating, error }) {
+  const accentText = theme === lightTheme ? "#fff" : darkTheme.pillText;
+
+  return (
+    <div
+      onClick={onClose}
+      style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.45)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center" }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{ backgroundColor: theme.cardBg, border: `1px solid ${theme.cardBorder}`, borderRadius: "16px", padding: "28px 32px", width: "360px", maxWidth: "90vw", boxShadow: "0 16px 48px rgba(0,0,0,0.18)" }}
+      >
+        <div className="flex items-center justify-between" style={{ marginBottom: "20px" }}>
+          <h3 style={{ margin: 0, fontSize: "16px", fontWeight: "700", color: theme.text }}>New Flashcard Deck</h3>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "18px", color: theme.textMuted, lineHeight: 1, padding: "2px 4px" }}>✕</button>
+        </div>
+
+        <div style={{ marginBottom: "16px" }}>
+          <label style={{ display: "block", fontSize: "12px", fontWeight: "600", color: theme.textMuted, marginBottom: "6px" }}>Title</label>
+          <input
+            value={form.title}
+            onChange={e => onChange(prev => ({ ...prev, title: e.target.value }))}
+            placeholder="e.g. Data Structures"
+            style={{ width: "100%", padding: "9px 12px", borderRadius: "8px", border: `1px solid ${theme.cardBorder}`, backgroundColor: theme.bg, color: theme.text, fontSize: "13px", fontFamily: "inherit", outline: "none", boxSizing: "border-box" }}
+          />
+        </div>
+
+        <div style={{ marginBottom: "16px" }}>
+          <label style={{ display: "block", fontSize: "12px", fontWeight: "600", color: theme.textMuted, marginBottom: "6px" }}>
+            Tags <span style={{ fontWeight: "400" }}>(comma-separated, optional)</span>
+          </label>
+          <input
+            value={form.tags}
+            onChange={e => onChange(prev => ({ ...prev, tags: e.target.value }))}
+            placeholder="e.g. trees, graphs, sorting"
+            style={{ width: "100%", padding: "9px 12px", borderRadius: "8px", border: `1px solid ${theme.cardBorder}`, backgroundColor: theme.bg, color: theme.text, fontSize: "13px", fontFamily: "inherit", outline: "none", boxSizing: "border-box" }}
+          />
+        </div>
+
+        <div style={{ marginBottom: "20px" }}>
+          <label style={{ display: "block", fontSize: "12px", fontWeight: "600", color: theme.textMuted, marginBottom: "8px" }}>
+            Cards: <span style={{ color: theme.accent }}>{form.num_cards}</span>
+          </label>
+          <input
+            type="range" min={5} max={30} value={form.num_cards}
+            onChange={e => onChange(prev => ({ ...prev, num_cards: Number(e.target.value) }))}
+            style={{ width: "100%", accentColor: theme.accent }}
+          />
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: theme.textMuted, marginTop: "4px" }}>
+            <span>5</span><span>30</span>
+          </div>
+        </div>
+
+        {error && (
+          <div style={{ background: "#fee2e2", border: "1px solid #fecaca", borderRadius: "8px", padding: "10px 14px", color: "#b91c1c", fontSize: "12px", marginBottom: "14px" }}>
+            {error}
+          </div>
+        )}
+
+        <button
+          onClick={onSubmit}
+          disabled={isCreating}
+          style={{
+            width: "100%", padding: "11px", borderRadius: "8px", border: "none", backgroundColor: theme.accent, color: accentText,
+            fontSize: "13px", fontWeight: "600", cursor: isCreating ? "not-allowed" : "pointer", fontFamily: "inherit",
+            opacity: isCreating ? 0.7 : 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
+          }}
+        >
+          {isCreating ? (
+            <>
+              <span style={{ width: "13px", height: "13px", borderRadius: "50%", border: "2px solid rgba(255,255,255,0.35)", borderTopColor: "#fff", display: "inline-block", animation: "spin 0.6s linear infinite" }} />
+              Generating…
+            </>
+          ) : "Generate Deck"}
+        </button>
       </div>
     </div>
   );
@@ -1351,6 +1917,11 @@ function HomePage({ theme, onNavigate }) {
 }
 
 function SectionView({ theme, view, isLoading, result, error }) {
+  const markdownResult =
+    typeof result === "string"
+      ? result.replace(/\\r\\n/g, "\n").replace(/\\n/g, "\n").replace(/\r\n/g, "\n")
+      : "";
+
   return (
     <div className="flex flex-col flex-1 px-6" style={{ paddingBottom: "48px" }}>
       {/* Content area */}
@@ -1396,19 +1967,54 @@ function SectionView({ theme, view, isLoading, result, error }) {
                 {SECTION_ITEMS.find(n => n.key === view)?.label}
               </h3>
             </div>
-            <pre
+            <div
               style={{
                 padding: "16px 20px",
                 fontSize: "12px",
                 color: theme.textMuted,
                 overflowX: "auto",
-                whiteSpace: "pre-wrap",
+                whiteSpace: "normal",
                 wordBreak: "break-word",
                 margin: 0,
               }}
             >
-              {JSON.stringify(result, null, 2)}
-            </pre>
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={{
+                  p: ({ children }) => <p style={{ margin: "0 0 10px 0", lineHeight: "1.6" }}>{children}</p>,
+                  ul: ({ children }) => <ul style={{ margin: "0 0 10px 18px" }}>{children}</ul>,
+                  ol: ({ children }) => <ol style={{ margin: "0 0 10px 18px" }}>{children}</ol>,
+                  li: ({ children }) => <li style={{ marginBottom: "4px" }}>{children}</li>,
+                  code: ({ children }) => (
+                    <code
+                      style={{
+                        backgroundColor: "rgba(125, 125, 125, 0.15)",
+                        padding: "2px 4px",
+                        borderRadius: "4px",
+                        fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+                      }}
+                    >
+                      {children}
+                    </code>
+                  ),
+                  pre: ({ children }) => (
+                    <pre
+                      style={{
+                        backgroundColor: "rgba(125, 125, 125, 0.12)",
+                        padding: "10px",
+                        borderRadius: "8px",
+                        overflowX: "auto",
+                        margin: "0 0 10px 0",
+                      }}
+                    >
+                      {children}
+                    </pre>
+                  ),
+                }}
+              >
+                {markdownResult}
+              </ReactMarkdown>
+            </div>
           </div>
         )}
       </div>
