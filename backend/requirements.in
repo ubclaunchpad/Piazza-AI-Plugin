@@ -1,5 +1,5 @@
 dateparser==1.2.0
-google-api-python-client==2.108.0
+google-api-python-client==2.194.0
 google-auth-oauthlib==1.2.0
 cryptography==46.0.7
 fastapi==0.123.10
