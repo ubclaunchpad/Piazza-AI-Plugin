@@ -32,7 +32,12 @@ from app.core.supabase import supabase
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-SCOPES = ["https://www.googleapis.com/auth/calendar"]
+SCOPES = [
+    "https://www.googleapis.com/auth/calendar",
+    "openid",
+    "https://www.googleapis.com/auth/userinfo.email",
+    "https://www.googleapis.com/auth/userinfo.profile",
+]
 REDIRECT_URI = "http://localhost:8000/api/v1/calendar/callback"
 
 
@@ -70,7 +75,7 @@ def get_google_client_config():
                 "GOOGLE_CLIENT_AUTH_PROVIDER_X509_CERT_URL"
             ),
             "client_secret": os.getenv("GOOGLE_CLIENT_CLIENT_SECRET"),
-            "redirect_uris": os.getenv("GOOGLE_CLIENT_REDIRECT_URIS"),
+            "redirect_uris": json.loads(os.getenv("GOOGLE_CLIENT_REDIRECT_URIS", "[]")),
         }
     }
 
@@ -130,8 +135,7 @@ async def calendar_callback(state: str, code: str):
         UPDATE calendar_tokens
         SET access_token = %s,
             refresh_token = %s,
-            expires_at = %s,
-            updated_at = NOW()
+            expires_at = %s
         WHERE user_id = %s
         """,
         (creds.token, creds.refresh_token, creds.expiry, user_id),
@@ -167,9 +171,18 @@ def get_valid_google_credentials(user_id: str):
     if not record:
         return None
 
+    def _to_str(val):
+        if val is None:
+            return None
+        if isinstance(val, memoryview):
+            return bytes(val).decode("utf-8")
+        if isinstance(val, bytes):
+            return val.decode("utf-8")
+        return str(val)
+
     creds = Credentials(
-        token=record["access_token"],
-        refresh_token=record["refresh_token"],
+        token=_to_str(record["access_token"]),
+        refresh_token=_to_str(record["refresh_token"]),
         token_uri=os.getenv("GOOGLE_CLIENT_TOKEN_URI"),
         client_id=os.getenv("GOOGLE_CLIENT_ID"),
         client_secret=os.getenv("GOOGLE_CLIENT_CLIENT_SECRET"),
@@ -189,8 +202,7 @@ def get_valid_google_credentials(user_id: str):
                 """
                 UPDATE calendar_tokens
                 SET access_token = %s,
-                    expires_at = %s,
-                    updated_at = NOW()
+                    expires_at = %s
                 WHERE user_id = %s
                 """,
                 (creds.token, creds.expiry, user_id),
