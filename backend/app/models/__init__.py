@@ -36,6 +36,25 @@ from app.models.search import (
     SimilarSearchRequest,
 )
 
+# Import Post Assistant Models
+from app.models.post_assistant import (
+    PostRequest,
+    SimplifyPostRequest,
+    TranslateLanguage,
+    TranslatePostRequest,
+)
+
+# Import Resource aggregator models
+from app.models.resource import (
+    ResourceSearchItem,
+    ResourceSearchRequest,
+    ResourceSearchResponse,
+    SavedResource,
+    SavedResourceListResponse,
+    SaveResourceRequest,
+    SaveResourceResponse,
+)
+
 
 class UserStatus(str, Enum):
     """User status enumeration."""
@@ -104,6 +123,11 @@ __all__ = [
     "SearchResponse",
     "SavedSearchCreate",
     "SavedSearchResponse",
+    # Post assistant model
+    "PostRequest",
+    "SimplifyPostRequest",
+    "TranslateLanguage",
+    "TranslatePostRequest",
     # Document models
     "PermissionEnum",
     "DocumentBase",
@@ -114,6 +138,14 @@ __all__ = [
     "DocumentUploadResponse",
     "DocumentListResponse",
     "DocumentDeleteResponse",
+    # Resource aggregator models
+    "ResourceSearchRequest",
+    "ResourceSearchItem",
+    "ResourceSearchResponse",
+    "SavedResource",
+    "SavedResourceListResponse",
+    "SaveResourceRequest",
+    "SaveResourceResponse",
 ]
 
 # TODO: Add SQLAlchemy database models when needed

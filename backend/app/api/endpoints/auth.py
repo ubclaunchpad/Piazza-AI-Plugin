@@ -24,7 +24,7 @@ router = APIRouter()
 @router.post(
     "/signup", response_model=SignUpResponse, status_code=status.HTTP_201_CREATED
 )
-def signup(user_data: SignUpRequest):
+def signup(user_data: SignUpRequest) -> SignUpResponse:
     """
     Register a new user via Supabase Auth and persist their profile to the local database.
 
@@ -116,7 +116,7 @@ def signup(user_data: SignUpRequest):
 
 
 @router.post("/login", response_model=LoginResponse, status_code=status.HTTP_200_OK)
-def login(credentials: LoginRequest):
+def login(credentials: LoginRequest) -> LoginResponse:
     """
     Authenticate a user and return access tokens.
 
@@ -179,7 +179,7 @@ def login(credentials: LoginRequest):
             detail="Please confirm your email before logging in. Check your inbox for the confirmation link.",
         )
 
-    # Retrieve user profile from database
+    # Retrieve user profile from database and return it
     try:
         user_profile = execute_query(
             "SELECT id, display_name, hashed_email FROM users WHERE id = %s",
@@ -200,11 +200,15 @@ def login(credentials: LoginRequest):
             detail="Failed to retrieve user profile",
         )
 
+    # Safely extract user data with fallbacks
+    display_name = user_profile.get("display_name", "") if user_profile else ""
+    user_email = user.email or ""
+
     return LoginResponse(
         user={
             "id": user.id,
-            "name": user_profile["display_name"],
-            "email": user.email,
+            "name": display_name,
+            "email": user_email,
         },
         access_token=session.access_token,
         refresh_token=session.refresh_token,

@@ -8,12 +8,17 @@ from pydantic import BaseModel
 # Import endpoint routers
 from app.api.endpoints import (
     auth,
+    calendar,
     chat_sessions,
+    date_extraction,
     documents,
     example,
     ingestion,
     llm,
+    per_post_llm,
+    resources,
     search,
+    study_materials,
 )
 
 # Create main API router
@@ -47,6 +52,27 @@ api_router.include_router(documents.router, prefix="/documents", tags=["document
 
 # Include search endpoints
 api_router.include_router(search.router, tags=["search"])
+
+# Include google calendar auth endpoints
+api_router.include_router(calendar.router, prefix="/calendar", tags=["calendar-auth"])
+
+# Include calendar date extraction endpoints
+api_router.include_router(
+    date_extraction.router, prefix="/calendar", tags=["calendar-date-extraction"]
+)
+
+# Include resource aggregator endpoints
+api_router.include_router(resources.router, prefix="/resources", tags=["resources"])
+
+# Include post assistant endpoints
+api_router.include_router(
+    per_post_llm.router, prefix="/per-post", tags=["post-assistant"]
+)
+
+# Include study material generator endpoints
+api_router.include_router(
+    study_materials.router, prefix="/study", tags=["study-materials"]
+)
 
 
 @api_router.get("/health", response_model=MessageResponse)

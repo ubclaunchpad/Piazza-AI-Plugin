@@ -7,6 +7,7 @@ import rehypeRaw from "rehype-raw";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { searchContent, searchSimilar } from "../api/searchApi";
+import { normalizeLatexForMarkdown } from "./markdownUtils.js";
 
 const FORMULA_TOKEN_PATTERN =
   /\\[a-zA-Z]+|[A-Za-z]+(?:_[A-Za-z0-9]+)?|[0-9]+(?:\.[0-9]+)?|[+\-*/=^_(){}\[\]]/g;
@@ -136,6 +137,7 @@ function FormulaPreview({ query }) {
 }
 
 function ChatbotApp() {
+  const TOOLBAR_SESSION_EVENT = "piazza-ai-open-session";
   const [isExpanded, setIsExpanded] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [messages, setMessages] = useState([]);
@@ -201,9 +203,7 @@ function ChatbotApp() {
     const messageListener = (request, sender, sendResponse) => {
       if (request.type === "OPEN_CHAT_SESSION") {
         setSessionId(request.sessionId);
-        if (request.title) {
-          setSessionTitle(request.title);
-        }
+        setSessionTitle(request.title || null);
         setIsExpanded(true);
       }
     };
@@ -215,11 +215,23 @@ function ChatbotApp() {
       }
     };
 
+    const toolbarSessionListener = (event) => {
+      const detail = event?.detail;
+      if (!detail?.sessionId) return;
+
+      setSessionId(detail.sessionId);
+      setSessionTitle(detail.title || null);
+      setIsExpanded(true);
+    };
+
     chrome.runtime.onMessage.addListener(messageListener);
     chrome.storage.onChanged.addListener(storageListener);
+    window.addEventListener(TOOLBAR_SESSION_EVENT, toolbarSessionListener);
+
     return () => {
       chrome.runtime.onMessage.removeListener(messageListener);
       chrome.storage.onChanged.removeListener(storageListener);
+      window.removeEventListener(TOOLBAR_SESSION_EVENT, toolbarSessionListener);
     };
   }, []);
 
@@ -310,25 +322,7 @@ function ChatbotApp() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  const convertLatexToMarkdown = (text) => {
-    // Replace display math: \[ ... \] -> $$...$$
-    let converted = text.replace(
-      /\\\[\s*([^\]]+?)\s*\\\]/g,
-      (match, content) => {
-        return `\n$$\n${content.trim()}\n$$\n`;
-      },
-    );
 
-    // Replace inline math: \( ... \) -> $...$
-    converted = converted.replace(
-      /\\\(\s*([^)]+?)\s*\\\)/g,
-      (match, content) => {
-        return `$${content.trim()}$`;
-      },
-    );
-
-    return converted;
-  };
   const handleAuthError = () => {
     setMessages((prev) => [
       ...prev,
@@ -438,10 +432,7 @@ function ChatbotApp() {
           setSessionId(sessions[0].id);
           setSessionTitle(sessions[0].title);
         } else {
-          // Create a new session automatically if none exist?
-          // Or just let the first message create it?
-          // For now, let's create one.
-          createNewSession(threadId);
+          await createNewSession(threadId);
         }
       }
     } catch (error) {
@@ -527,7 +518,10 @@ function ChatbotApp() {
 
           return {
             role: type === "human" ? "user" : "assistant",
-            content: content,
+            content:
+              type === "ai"
+                ? normalizeLatexForMarkdown(content)
+                : content,
             sources: sources,
             threadId: currentThreadId,
           };
@@ -568,11 +562,11 @@ function ChatbotApp() {
       if (!currentSessionId) {
         // Create a new session and use the returned ID immediately.
         const newSession = await createNewSession(threadId);
-        currentSessionId = newSession?.id ?? null;
+        currentSessionId = newSession?.id || null;
       }
 
       if (!currentSessionId) {
-        throw new Error("Could not create a chat session");
+        throw new Error("Unable to create a chat session.");
       }
 
       // Call the backend API
@@ -600,6 +594,9 @@ function ChatbotApp() {
       if (!response.ok) {
         throw new Error(`API error: ${response.status}`);
       }
+      if (!response.body) {
+        throw new Error("The assistant response stream was unavailable.");
+      }
 
       // Initialize empty AI message
       setMessages((prev) => [
@@ -617,15 +614,21 @@ function ChatbotApp() {
       const decoder = new TextDecoder();
       let aiResponseContent = "";
       let aiSources = [];
+      let buffer = "";
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split("\n").filter((line) => line.trim() !== "");
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
 
         for (const line of lines) {
+          if (!line.trim()) {
+            continue;
+          }
+
           try {
             const data = JSON.parse(line);
 
@@ -637,7 +640,7 @@ function ChatbotApp() {
                 const newMessages = [...prev];
                 const lastMsg = newMessages[newMessages.length - 1];
                 if (lastMsg.role === "assistant") {
-                  lastMsg.content = convertLatexToMarkdown(aiResponseContent);
+                  lastMsg.content = normalizeLatexForMarkdown(aiResponseContent);
                 }
                 return newMessages;
               });
@@ -660,6 +663,32 @@ function ChatbotApp() {
           } catch (e) {
             console.error("Error parsing JSON chunk", e);
           }
+        }
+      }
+
+      buffer += decoder.decode();
+      if (buffer.trim()) {
+        const data = JSON.parse(buffer);
+        if (data.type === "content") {
+          aiResponseContent += data.content;
+          setMessages((prev) => {
+            const newMessages = [...prev];
+            const lastMsg = newMessages[newMessages.length - 1];
+            if (lastMsg.role === "assistant") {
+              lastMsg.content = normalizeLatexForMarkdown(aiResponseContent);
+            }
+            return newMessages;
+          });
+        } else if (data.type === "sources") {
+          aiSources = data.sources;
+          setMessages((prev) => {
+            const newMessages = [...prev];
+            const lastMsg = newMessages[newMessages.length - 1];
+            if (lastMsg.role === "assistant") {
+              lastMsg.sources = aiSources;
+            }
+            return newMessages;
+          });
         }
       }
     } catch (error) {

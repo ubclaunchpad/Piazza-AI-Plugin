@@ -2,12 +2,16 @@
 LLM API endpoint for text generation.
 """
 
+import logging
+import os
+
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
 from app.models import QueryRequest
 from app.textGeneration import stream_llm_response
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -24,7 +28,7 @@ async def generate_llm_response(request: QueryRequest):
             media_type="application/x-ndjson",
         )
     except Exception as e:
-        print(e)
+        logger.exception("Failed to generate LLM response")
         raise HTTPException(
             status_code=500,
             detail=f"Failed to generate response: {str(e)}",
@@ -34,9 +38,7 @@ async def generate_llm_response(request: QueryRequest):
 @router.get("/health")
 async def llm_health_check():
     """Check if the LLM service is configured."""
-    import os
-
-    api_key = os.getenv("OPENAI_API_KEY")
+    api_key = os.getenv("OPENAI_API_KEY") or os.getenv("GROQ_API_KEY")
     return {
         "status": "healthy" if api_key else "unhealthy",
         "model": "openai/gpt-oss-120b",
