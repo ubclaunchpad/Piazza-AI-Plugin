@@ -55,21 +55,39 @@ Copy the values from the output:
 
 - **Database URL** → `DATABASE_URL`
 
-4. Create a Google Cloud project and OAuth client:
+### 4. Google Calendar API and OAuth credentials
 
-- Go to Google Cloud Console
-- Enable Google Calendar API
-- Create OAuth credentials (Web application)
-- Add redirect URI (e.g. http://localhost:8000/api/calendar/oauth/callback)
-- Download client_secret.json
-- Add the following credentials to .env:
-  GOOGLE_CLIENT_ID=...
-  GOOGLE_CLIENT_PROJECT_ID=...
-  GOOGLE_CLIENT_AUTH_URI=...
-  GOOGLE_CLIENT_TOKEN_URI=...
-  GOOGLE_CLIENT_AUTH_PROVIDER_X509_CERT_URL=....
-  GOOGLE_CLIENT_CLIENT_SECRET=
-  GOOGLE_CLIENT_REDIRECT_URIS=...
+Calendar features use **OAuth 2.0** (a **Client ID** and **Client secret** for a **Web application** client). You need to set up Google Cloud Console for the calendar features to work.
+
+1. In [Google Cloud Console](https://console.cloud.google.com/), select or create a project.
+2. **APIs & Services → Library** → enable **Google Calendar API**.
+3. **APIs & Services → OAuth consent screen** → configure the app type, scopes, and test users if the app is in testing.
+4. **APIs & Services → Credentials → Create credentials → OAuth client ID** → type **Web application**.
+5. Under **Authorized redirect URIs**, add the callback URL your backend uses. With the default local setup (`API_PREFIX=/api/v1` in `main.py` and the calendar router mounted at `/calendar`), the redirect URI is:
+
+   `http://localhost:8000/api/v1/calendar/callback`
+
+   This must match **exactly** what is in your `.env` and in the OAuth client. Mismatches produce `redirect_uri_mismatch` from Google.
+
+6. Copy the **Client ID** and **Client secret** from the new client (or from the downloaded JSON).
+
+Add the following variables to `backend/.env` (names must match `app/api/endpoints/calendar.py`):
+
+```bash
+GOOGLE_CLIENT_ID="your-client-id.apps.googleusercontent.com"
+GOOGLE_CLIENT_PROJECT_ID="your-gcp-project-id"
+GOOGLE_CLIENT_CLIENT_SECRET="your-client-secret"
+GOOGLE_CLIENT_AUTH_URI="https://accounts.google.com/o/oauth2/auth"
+GOOGLE_CLIENT_TOKEN_URI="https://oauth2.googleapis.com/token"
+GOOGLE_CLIENT_AUTH_PROVIDER_X509_CERT_URL="https://www.googleapis.com/oauth2/v1/certs"
+GOOGLE_CLIENT_REDIRECT_URIS=["http://localhost:8000/api/v1/calendar/callback"]
+```
+
+Notes:
+
+- `GOOGLE_CLIENT_REDIRECT_URIS` is parsed as JSON; keep it valid JSON on one line.
+- For production, add your deployed callback URL to both Google Cloud **Authorized redirect URIs** and this JSON array, and keep the same URI in your deployed backend configuration.
+- Restart the backend after changing OAuth-related environment variables.
 
 ## 🌐 Resource Aggregator Configuration (when enabled)
 
@@ -103,7 +121,7 @@ python main.py
 
 The server will start at `http://localhost:8000`
 
-### 3. Test the API
+### 4. Test the API
 
 - **API Docs**: http://localhost:8000/docs
 - **Health Check**: http://localhost:8000/api/v1/health
@@ -188,6 +206,8 @@ PORT=8000
 # Add database URL when needed
 # DATABASE_URL=postgresql://user:password@localhost:5432/database
 ```
+
+For **Google Calendar OAuth**, set the `GOOGLE_CLIENT_*` variables documented in [Google Calendar API and OAuth credentials](#4-google-calendar-api-and-oauth-credentials) (step 4 under Environment Configuration).
 
 ## 🚀 Deployment
 
