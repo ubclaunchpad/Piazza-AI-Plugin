@@ -111,4 +111,4 @@ Desktop.ini
 
 # Chrome Extension build artifacts
 dist/
-build/
+build/secret.key

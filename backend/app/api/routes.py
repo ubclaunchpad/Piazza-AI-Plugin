@@ -10,6 +10,7 @@ from app.api.endpoints import (
     auth,
     calendar,
     chat_sessions,
+    date_extraction,
     documents,
     example,
     ingestion,
@@ -48,8 +49,14 @@ api_router.include_router(chat_sessions.router, tags=["chat-sessions"])
 # Include document endpoints
 api_router.include_router(documents.router, prefix="/documents", tags=["documents"])
 
-# Include calendar endpoints
-api_router.include_router(calendar.router, prefix="/calendar", tags=["calendar"])
+# Include google calendar auth endpoints
+api_router.include_router(calendar.router, prefix="/calendar", tags=["calendar-auth"])
+
+# Include calendar date extraction endpoints
+api_router.include_router(
+    date_extraction.router, prefix="/calendar", tags=["calendar-date-extraction"]
+)
+
 # Include resource aggregator endpoints
 api_router.include_router(resources.router, prefix="/resources", tags=["resources"])
 

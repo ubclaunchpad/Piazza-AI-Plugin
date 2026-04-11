@@ -1,148 +1,528 @@
 """
 Calendar endpoint handlers for Google Calendar integration.
 
-This module defines API endpoints for:
-- Initiating Google OAuth flow
-- Handling OAuth callback and storing tokens
-- Creating calendar events
-- Listing user's synced events
-- Updating reminder preferences
-
-Endpoints follow FastAPI best practices and include detailed docstrings for clarity.
+Features:
+- Google OAuth flow (auth + callback)
+- Token storage & refresh
+- Create Google Calendar events + store in DB
+- List and retrieve events
+- Check user connection status
+- Update reminder settings
 """
 
+import base64
 import json
-from typing import List
+import logging
+import os
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+import google_auth_oauthlib.flow
+from fastapi import APIRouter, Header, HTTPException, Query
+from fastapi.responses import RedirectResponse
+from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build
+from psycopg2.extras import Json
+from pydantic import BaseModel
 
-from app.api.endpoints.chat_sessions import get_current_user as _get_current_user
 from app.core.database import execute_query, execute_statement
-from app.models.calendar import CalendarEvent
-
-get_current_user = _get_current_user
-
+from app.core.supabase import supabase
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+SCOPES = [
+    "https://www.googleapis.com/auth/calendar",
+    "openid",
+    "https://www.googleapis.com/auth/userinfo.email",
+    "https://www.googleapis.com/auth/userinfo.profile",
+]
+REDIRECT_URI = "http://localhost:8000/api/v1/calendar/callback"
 
 
-@router.get("/oauth")
-def calendar_auth():
-    """
-    Handle OAuth callback and store tokens for the authenticated user.
+# =====================================
+# Auth - Supabase User
+# =====================================
+async def get_current_user(authorization: Optional[str] = Header(None)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Missing authorization header")
 
-    TODO: When implementing, encrypt access_token and refresh_token using Fernet before storing in the database.
-    See app/core/encryption.py for encryption setup.
-    """
-    # TODO: Implement OAuth callback logic
-    # Example:
-    # encrypted_access_token = fernet.encrypt(access_token.encode())
-    # encrypted_refresh_token = fernet.encrypt(refresh_token.encode())
-    # Store these in calendar_tokens table
-    raise HTTPException(
-        status_code=501, detail="Google Calendar OAuth initiation not implemented"
+    try:
+        token = authorization.replace("Bearer ", "")
+        user = supabase.auth.get_user(token)
+
+        if not user or not user.user:
+            raise HTTPException(status_code=401, detail="Invalid token")
+
+        return user.user
+    except Exception as e:
+        logger.error("Authentication failed: %s", e)
+        raise HTTPException(status_code=401, detail=str(e))
+
+
+# =====================================
+# Google OAuth Config
+# =====================================
+def get_google_client_config():
+    return {
+        "web": {
+            "client_id": os.getenv("GOOGLE_CLIENT_ID"),
+            "project_id": os.getenv("GOOGLE_CLIENT_PROJECT_ID"),
+            "auth_uri": os.getenv("GOOGLE_CLIENT_AUTH_URI"),
+            "token_uri": os.getenv("GOOGLE_CLIENT_TOKEN_URI"),
+            "auth_provider_x509_cert_url": os.getenv(
+                "GOOGLE_CLIENT_AUTH_PROVIDER_X509_CERT_URL"
+            ),
+            "client_secret": os.getenv("GOOGLE_CLIENT_CLIENT_SECRET"),
+            "redirect_uris": json.loads(os.getenv("GOOGLE_CLIENT_REDIRECT_URIS", "[]")),
+        }
+    }
+
+
+# =====================================
+# Step 1 - Start OAuth
+# =====================================
+@router.get("/auth")
+async def calendar_auth(token: Optional[str] = Query(None)):
+    user = await get_current_user(token)
+
+    flow = google_auth_oauthlib.flow.Flow.from_client_config(
+        get_google_client_config(),
+        scopes=SCOPES,
+        redirect_uri=REDIRECT_URI,
     )
 
+    state = base64.urlsafe_b64encode(
+        json.dumps({"user_id": str(user.id)}).encode()
+    ).decode()
 
+    auth_url, _ = flow.authorization_url(
+        access_type="offline",
+        include_granted_scopes="true",
+        prompt="consent",
+        state=state,
+    )
+
+    return RedirectResponse(auth_url)
+
+
+# =====================================
+# Step 2 - OAuth Callback
+# =====================================
 @router.get("/callback")
-def calendar_callback():
-    """
-    Handle Google OAuth callback and store access tokens.
+async def calendar_callback(state: str, code: str):
+    try:
+        decoded = json.loads(base64.urlsafe_b64decode(state.encode()).decode())
+        user_id = decoded["user_id"]
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid OAuth state")
 
-    Returns:
-        Success message or error details.
-    """
-    # TODO: Implement Google OAuth callback handling logic
-    raise HTTPException(
-        status_code=501, detail="Google Calendar OAuth callback not implemented"
+    flow = google_auth_oauthlib.flow.Flow.from_client_config(
+        get_google_client_config(),
+        scopes=SCOPES,
+        state=state,
+        redirect_uri=REDIRECT_URI,
     )
 
+    flow.fetch_token(code=code)
+    creds = flow.credentials
 
-@router.post("/events", response_model=CalendarEvent)
-def create_calendar_event(event: CalendarEvent, current_user=Depends(get_current_user)):
-    """
-    Create a new Google Calendar event based on Piazza post data and save it to the database.
-
-    Args:
-        event (CalendarEvent): The event data sent by the client.
-
-    Returns:
-        CalendarEvent: The created event.
-    """
-
-    query = """
-        INSERT INTO calendar_events (
-            id, user_id, piazza_course_id, google_event_id, title, event_date, source_post_number, reminder_settings
-        ) VALUES (
-        %s, %s, %s, %s, %s, %s, %s, %s
+    # Use update-then-insert instead of ON CONFLICT to support older schemas
+    # where calendar_tokens.user_id may not yet be uniquely constrained.
+    updated = execute_statement(
+        """
+        UPDATE calendar_tokens
+        SET access_token = %s,
+            refresh_token = %s,
+            expires_at = %s
+        WHERE user_id = %s
+        """,
+        (creds.token, creds.refresh_token, creds.expiry, user_id),
     )
-    """
+    if updated == 0:
+        execute_statement(
+            """
+            INSERT INTO calendar_tokens (
+                user_id, access_token, refresh_token, expires_at
+            )
+            VALUES (%s, %s, %s, %s)
+            """,
+            (user_id, creds.token, creds.refresh_token, creds.expiry),
+        )
 
-    params = (
-        str(event.id),
-        str(current_user.id),
-        str(event.piazza_course_id),
-        event.google_event_id,
-        event.title,
-        event.event_date,
-        event.source_post_number,
-        json.dumps(event.reminder_settings) if event.reminder_settings else None,
+    return RedirectResponse("https://piazza.com")
+
+
+# =====================================
+# Helper - Get Valid Credentials
+# =====================================
+def get_valid_google_credentials(user_id: str):
+    record = execute_query(
+        """
+        SELECT access_token, refresh_token, expires_at
+        FROM calendar_tokens
+        WHERE user_id = %s
+        """,
+        (user_id,),
+        fetch_one=True,
     )
 
-    execute_statement(query, params)
-    return event
+    if not record:
+        return None
+
+    def _to_str(val):
+        if val is None:
+            return None
+        if isinstance(val, memoryview):
+            return bytes(val).decode("utf-8")
+        if isinstance(val, bytes):
+            return val.decode("utf-8")
+        return str(val)
+
+    creds = Credentials(
+        token=_to_str(record["access_token"]),
+        refresh_token=_to_str(record["refresh_token"]),
+        token_uri=os.getenv("GOOGLE_CLIENT_TOKEN_URI"),
+        client_id=os.getenv("GOOGLE_CLIENT_ID"),
+        client_secret=os.getenv("GOOGLE_CLIENT_CLIENT_SECRET"),
+        scopes=SCOPES,
+    )
+
+    expires_at = record["expires_at"]
+
+    if isinstance(expires_at, datetime):
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+
+        if expires_at <= datetime.now(timezone.utc):
+            creds.refresh(Request())
+
+            execute_statement(
+                """
+                UPDATE calendar_tokens
+                SET access_token = %s,
+                    expires_at = %s
+                WHERE user_id = %s
+                """,
+                (creds.token, creds.expiry, user_id),
+            )
+
+    return creds
 
 
-@router.get("/events", response_model=List[CalendarEvent])
-def list_calendar_events(current_user=Depends(get_current_user)):
-    """
-    List all calendar events synced with the user's Google Calendar.
+# =====================================
+# User Status Endpoint
+# =====================================
+@router.get("/user/{user_id}")
+async def get_calendar_status(
+    user_id: str,
+    authorization: Optional[str] = Header(None),
+):
+    user = await get_current_user(authorization)
+
+    if str(user.id) != user_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    creds = get_valid_google_credentials(user_id)
+    if not creds:
+        raise HTTPException(404, "Google Calendar not connected")
+
+    expiry = creds.expiry.isoformat() if creds.expiry else None
+    return {
+        "connected": True,
+        "expires_at": expiry,
+        "token_expires_at": expiry,
+        "has_refresh_token": bool(creds.refresh_token),
+    }
 
 
-    Returns:
-        A list of calendar events.
-    """
-
-    query = "SELECT * FROM calendar_events WHERE user_id = %s"
-    results = execute_query(query, (str(current_user.id),))
-    return [CalendarEvent(**event) for event in results]
-
-
-@router.get("/events/{event_id}", response_model=CalendarEvent)
-def get_calendar_event(event_id: str, current_user=Depends(get_current_user)):
-    """
-    Get a single calendar event by its ID.
-
-    Args:
-        event_id (str): The unique identifier for the event.
-
-    Returns:
-        CalendarEvent: The event data, or raises 404 if not found.
-    """
-    query = "SELECT * FROM calendar_events WHERE id = %s AND user_id = %s"
-    result = execute_query(query, (event_id, str(current_user.id)), fetch_one=True)
-    if not result:
-        raise HTTPException(status_code=404, detail="Event not found")
-    return CalendarEvent(**result)
+# =====================================
+# Request Models
+# =====================================
+class AddEventRequest(BaseModel):
+    title: str
+    start_time: str
+    end_time: str
+    piazza_course_id: Optional[str] = None
+    source_post_number: Optional[str] = None
+    reminder_settings: Optional[Dict[str, Any]] = None
 
 
-@router.put("/settings")
-def update_calendar_settings(
-    reminder_settings: str, current_user=Depends(get_current_user)
+class ParseArticleContentRequest(BaseModel):
+    content: str
+
+
+# =====================================
+# Create Event
+# =====================================
+@router.post("/events")
+async def create_calendar_event(
+    event: AddEventRequest,
+    authorization: Optional[str] = Header(None),
+):
+    user = await get_current_user(authorization)
+
+    creds = get_valid_google_credentials(user.id)
+    if not creds:
+        raise HTTPException(401, "Google not connected")
+
+    # Idempotency check: avoid creating duplicate Google events for same payload.
+    existing = execute_query(
+        """
+        SELECT id, google_event_id
+        FROM calendar_events
+        WHERE user_id = %s
+          AND event_start_at = %s
+          AND event_end_at IS NOT DISTINCT FROM %s
+          AND piazza_course_id IS NOT DISTINCT FROM %s
+          AND source_post_number IS NOT DISTINCT FROM %s
+        ORDER BY created_at DESC
+        LIMIT 1
+        """,
+        (
+            str(user.id),
+            event.start_time,
+            event.end_time,
+            event.piazza_course_id,
+            event.source_post_number,
+        ),
+        fetch_one=True,
+    )
+    if existing:
+        html_link = None
+        existing_google_event_id = existing.get("google_event_id")
+        if existing_google_event_id:
+            try:
+                service = build("calendar", "v3", credentials=creds)
+                existing_event = (
+                    service.events()
+                    .get(calendarId="primary", eventId=existing_google_event_id)
+                    .execute()
+                )
+                html_link = existing_event.get("htmlLink")
+            except Exception as e:
+                logger.warning(
+                    "Failed to resolve htmlLink for existing event_id=%s: %s",
+                    existing_google_event_id,
+                    e,
+                )
+
+        return {
+            "status": "exists",
+            "google_event_id": existing_google_event_id,
+            "link": html_link,
+        }
+
+    service = build("calendar", "v3", credentials=creds)
+
+    google_event = (
+        service.events()
+        .insert(
+            calendarId="primary",
+            body={
+                "summary": event.title,
+                "start": {"dateTime": event.start_time, "timeZone": "UTC"},
+                "end": {"dateTime": event.end_time, "timeZone": "UTC"},
+            },
+        )
+        .execute()
+    )
+
+    try:
+        execute_statement(
+            """
+            INSERT INTO calendar_events (
+                user_id,
+                piazza_course_id,
+                google_event_id,
+                title,
+                event_start_at,
+                event_end_at,
+                source_post_number,
+                reminder_settings
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            (
+                str(user.id),
+                event.piazza_course_id,
+                google_event["id"],
+                event.title,
+                event.start_time,
+                event.end_time,
+                event.source_post_number,
+                Json(event.reminder_settings) if event.reminder_settings else None,
+            ),
+        )
+    except Exception:
+        logger.exception("DB insert failed after Google event creation")
+        raise HTTPException(
+            500,
+            f"Google event created but DB failed. event_id={google_event['id']}",
+        )
+
+    return {
+        "status": "created",
+        "google_event_id": google_event["id"],
+        "link": google_event.get("htmlLink"),
+    }
+
+
+# =====================================
+# List Events
+# =====================================
+@router.get("/events", response_model=List[Dict[str, Any]])
+async def list_calendar_events(
+    authorization: Optional[str] = Header(None),
+    include_links: bool = Query(False),
+):
+    user = await get_current_user(authorization)
+
+    results = execute_query(
+        "SELECT * FROM calendar_events WHERE user_id = %s",
+        (str(user.id),),
+    )
+
+    if include_links:
+        creds = get_valid_google_credentials(str(user.id))
+        service = build("calendar", "v3", credentials=creds) if creds else None
+        for row in results:
+            row["html_link"] = None
+            google_event_id = row.get("google_event_id")
+            if not service or not google_event_id:
+                continue
+            try:
+                event = (
+                    service.events()
+                    .get(calendarId="primary", eventId=google_event_id)
+                    .execute()
+                )
+                row["html_link"] = event.get("htmlLink")
+            except Exception as e:
+                logger.warning(
+                    "Failed to resolve htmlLink for event_id=%s: %s",
+                    google_event_id,
+                    e,
+                )
+
+    return results
+
+
+# =====================================
+# Check Existing Event By Source Post
+# =====================================
+@router.get("/events/by-source")
+async def get_event_by_source(
+    source_post_number: str = Query(..., min_length=1),
+    piazza_course_id: Optional[str] = Query(None),
+    authorization: Optional[str] = Header(None),
 ):
     """
-    Update user's calendar integration settings, such as reminder preferences.
-
-     Args:
-        reminder_settings: The new reminder settings.
-
-    Returns:
-        Updated settings or confirmation message.
+    Return whether a calendar event already exists for a post/course for the user.
+    Also tries to return the Google Calendar HTML link for opening the event.
     """
-    query = "UPDATE calendar_events SET reminder_settings = %s WHERE user_id = %s"
-    result = execute_statement(query, (reminder_settings, str(current_user.id)))
-    if result == 0:
-        raise HTTPException(
-            status_code=404, detail="Event not found or not owned by user"
+    user = await get_current_user(authorization)
+
+    course_id = piazza_course_id.strip() if piazza_course_id else None
+    post_num = source_post_number.strip()
+
+    if course_id:
+        result = execute_query(
+            """
+            SELECT id, google_event_id
+            FROM calendar_events
+            WHERE user_id = %s
+              AND source_post_number = %s
+              AND piazza_course_id = %s
+            ORDER BY created_at DESC
+            LIMIT 1
+            """,
+            (str(user.id), post_num, course_id),
+            fetch_one=True,
         )
-    return {"status": "success", "reminder_settings": reminder_settings}
+    else:
+        result = execute_query(
+            """
+            SELECT id, google_event_id
+            FROM calendar_events
+            WHERE user_id = %s
+              AND source_post_number = %s
+            ORDER BY created_at DESC
+            LIMIT 1
+            """,
+            (str(user.id), post_num),
+            fetch_one=True,
+        )
+
+    if not result:
+        return {"exists": False}
+
+    html_link = None
+    google_event_id = result.get("google_event_id")
+    if google_event_id:
+        try:
+            creds = get_valid_google_credentials(str(user.id))
+            if creds:
+                service = build("calendar", "v3", credentials=creds)
+                event = (
+                    service.events()
+                    .get(calendarId="primary", eventId=google_event_id)
+                    .execute()
+                )
+                html_link = event.get("htmlLink")
+        except Exception as e:
+            logger.warning(
+                "Failed to resolve htmlLink for event_id=%s: %s", google_event_id, e
+            )
+
+    return {
+        "exists": True,
+        "event_id": result["id"],
+        "google_event_id": google_event_id,
+        "html_link": html_link,
+    }
+
+
+# =====================================
+# Get Single Event
+# =====================================
+@router.get("/events/{event_id}")
+async def get_calendar_event(
+    event_id: str,
+    authorization: Optional[str] = Header(None),
+):
+    user = await get_current_user(authorization)
+
+    result = execute_query(
+        "SELECT * FROM calendar_events WHERE id = %s AND user_id = %s",
+        (event_id, str(user.id)),
+        fetch_one=True,
+    )
+
+    if not result:
+        raise HTTPException(404, "Event not found")
+
+    return result
+
+
+# =====================================
+# Update Reminder Settings
+# =====================================
+@router.put("/settings")
+async def update_calendar_settings(
+    reminder_settings: Dict[str, Any],
+    authorization: Optional[str] = Header(None),
+):
+    user = await get_current_user(authorization)
+
+    execute_statement(
+        """
+        UPDATE calendar_events
+        SET reminder_settings = %s
+        WHERE user_id = %s
+        """,
+        (Json(reminder_settings), str(user.id)),
+    )
+
+    return {"status": "updated"}

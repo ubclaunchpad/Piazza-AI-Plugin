@@ -179,7 +179,7 @@ def login(credentials: LoginRequest) -> LoginResponse:
             detail="Please confirm your email before logging in. Check your inbox for the confirmation link.",
         )
 
-    # Retrieve user profile from database
+    # Retrieve user profile from database and return it
     try:
         user_profile = execute_query(
             "SELECT id, display_name, hashed_email FROM users WHERE id = %s",
