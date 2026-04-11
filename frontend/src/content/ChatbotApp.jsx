@@ -6,6 +6,7 @@ import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { searchContent, searchSimilar } from "../api/searchApi";
 
 function SourcesDropdown({ sources, threadId }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -38,6 +39,49 @@ function SourcesDropdown({ sources, threadId }) {
   );
 }
 
+function SearchResultCard({ result, currentCourseId, onFindSimilar }) {
+  const metadata = result.metadata || {};
+  const courseId = metadata.piazza_course_id || currentCourseId;
+  const postId = result.external_id || metadata.post_number || metadata.post_id;
+  const canOpenPost = !!courseId && !!postId;
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm">
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-sm font-semibold text-gray-800 m-0 truncate">
+          {result.title || "Untitled Result"}
+        </p>
+        <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full whitespace-nowrap">
+          {(result.score || 0).toFixed(2)}
+        </span>
+      </div>
+      <p className="text-xs text-gray-600 mt-2 mb-2 line-clamp-3">
+        {result.excerpt}
+      </p>
+      <div className="flex items-center gap-2">
+        {canOpenPost && (
+          <a
+            href={`https://piazza.com/class/${courseId}/post/${postId}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[11px] text-blue-600 hover:text-blue-700 hover:underline"
+          >
+            Open Post
+          </a>
+        )}
+        {currentCourseId && postId && (
+          <button
+            onClick={() => onFindSimilar(postId)}
+            className="text-[11px] text-gray-700 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded px-2 py-1"
+          >
+            Find similar
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ChatbotApp() {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
@@ -50,27 +94,55 @@ function ChatbotApp() {
   const [sessionId, setSessionId] = useState(null);
   const [sessionTitle, setSessionTitle] = useState(null);
   const [user, setUser] = useState(null);
+  const [launcherPosition, setLauncherPosition] = useState({
+    top: 60,
+    left: 260,
+  });
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchType, setSearchType] = useState("semantic");
+  const [searchScopeCourseOnly, setSearchScopeCourseOnly] = useState(true);
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchError, setSearchError] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
+  const [contextPostId, setContextPostId] = useState(null);
+  const [contextCourseId, setContextCourseId] = useState(null);
+  const [contextCourseName, setContextCourseName] = useState(null);
+
+  const loadStoredAuth = () => {
+    chrome.storage.local.get(["user", "authToken", "tokenExpiry"], (result) => {
+      if (result.user && result.authToken) {
+        if (result.tokenExpiry && Date.now() > result.tokenExpiry) {
+          setUser(null);
+          return;
+        }
+        setUser({ ...result.user, access_token: result.authToken });
+      } else {
+        setUser(null);
+      }
+    });
+  };
+
+  const getAccessToken = async () => {
+    if (user?.access_token) {
+      return user.access_token;
+    }
+
+    const result = await chrome.storage.local.get(["authToken", "tokenExpiry"]);
+    if (
+      result.authToken &&
+      (!result.tokenExpiry || Date.now() <= result.tokenExpiry)
+    ) {
+      return result.authToken;
+    }
+
+    return null;
+  };
 
   // Fetch user info on mount
   useEffect(() => {
     /* global chrome */
-    chrome.storage.local.get(["user", "authToken", "tokenExpiry"], (result) => {
-      if (result.user && result.authToken) {
-        // Check if token is expired
-        if (result.tokenExpiry && Date.now() > result.tokenExpiry) {
-          console.warn("Token expired");
-          setMessages([
-            {
-              role: "assistant",
-              content:
-                "Session expired. Please open the extension icon to log in again.",
-            },
-          ]);
-          return;
-        }
-        setUser({ ...result.user, access_token: result.authToken });
-      }
-    });
+    loadStoredAuth();
 
     // Listen for messages from popup
     const messageListener = (request, sender, sendResponse) => {
@@ -82,8 +154,20 @@ function ChatbotApp() {
         setIsExpanded(true);
       }
     };
+
+    const storageListener = (changes, areaName) => {
+      if (areaName !== "local") return;
+      if (changes.user || changes.authToken || changes.tokenExpiry) {
+        loadStoredAuth();
+      }
+    };
+
     chrome.runtime.onMessage.addListener(messageListener);
-    return () => chrome.runtime.onMessage.removeListener(messageListener);
+    chrome.storage.onChanged.addListener(storageListener);
+    return () => {
+      chrome.runtime.onMessage.removeListener(messageListener);
+      chrome.storage.onChanged.removeListener(storageListener);
+    };
   }, []);
 
   // Fetch most recent session or messages when needed
@@ -94,6 +178,76 @@ function ChatbotApp() {
       fetchMessages(sessionId);
     }
   }, [isExpanded, user, sessionId]);
+
+  // Position search launcher over the right edge of Piazza's native search bar.
+  useEffect(() => {
+    const updateLauncherPosition = () => {
+      const anchor =
+        document.querySelector('input[placeholder*="Search posts"]') ||
+        document.querySelector('input[placeholder*="Search Posts"]') ||
+        document.querySelector('input[aria-label*="Search posts"]') ||
+        document.querySelector('input[type="search"]');
+
+      if (!anchor) return;
+
+      const rect = anchor.getBoundingClientRect();
+      setLauncherPosition({
+        top: Math.max(8, Math.round(rect.top + rect.height / 2 - 17)),
+        left: Math.round(rect.right - 35),
+      });
+    };
+
+    updateLauncherPosition();
+    window.addEventListener("resize", updateLauncherPosition);
+    window.addEventListener("scroll", updateLauncherPosition, true);
+
+    const observer = new MutationObserver(updateLauncherPosition);
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    return () => {
+      window.removeEventListener("resize", updateLauncherPosition);
+      window.removeEventListener("scroll", updateLauncherPosition, true);
+      observer.disconnect();
+    };
+  }, []);
+
+  useEffect(() => {
+    const syncContextFromUrl = () => {
+      try {
+        const classMatch = window.location.pathname.match(/\/class\/([^/?]+)/);
+        const url = new URL(window.location.href);
+        const courseNameElement = document.querySelector(
+          "#topbar_current_class_number"
+        );
+        setContextCourseId(classMatch ? classMatch[1] : null);
+        setContextPostId(url.searchParams.get("cid"));
+        setContextCourseName(
+          courseNameElement?.textContent?.trim() || null
+        );
+      } catch (_) {
+        setContextCourseId(null);
+        setContextPostId(null);
+        setContextCourseName(null);
+      }
+    };
+
+    syncContextFromUrl();
+    window.addEventListener("popstate", syncContextFromUrl);
+    return () => window.removeEventListener("popstate", syncContextFromUrl);
+  }, []);
+
+  useEffect(() => {
+    const handleFindSimilar = (event) => {
+      const postId = event.detail?.postId;
+      if (postId) {
+        runSimilarSearch(postId);
+      }
+    };
+
+    window.addEventListener("threadsense-find-similar", handleFindSimilar);
+    return () =>
+      window.removeEventListener("threadsense-find-similar", handleFindSimilar);
+  }, [contextCourseId, user, searchType, searchScopeCourseOnly]);
 
   const handleToggle = () => {
     setIsExpanded(!isExpanded);
@@ -109,7 +263,7 @@ function ChatbotApp() {
       /\\\[\s*([^\]]+?)\s*\\\]/g,
       (match, content) => {
         return `\n$$\n${content.trim()}\n$$\n`;
-      }
+      },
     );
 
     // Replace inline math: \( ... \) -> $...$
@@ -117,7 +271,7 @@ function ChatbotApp() {
       /\\\(\s*([^)]+?)\s*\\\)/g,
       (match, content) => {
         return `$${content.trim()}$`;
-      }
+      },
     );
 
     return converted;
@@ -135,6 +289,76 @@ function ChatbotApp() {
     // setUser(null);
   };
 
+  const runSearch = async ({
+    queryText,
+    mode = searchType,
+    forceCourseId = undefined,
+  }) => {
+    const token = await getAccessToken();
+    if (!token) {
+      setSearchError("Please log in from the extension popup first.");
+      return;
+    }
+
+    const query = (queryText || searchQuery).trim();
+    if (!query) return;
+
+    setIsSearching(true);
+    setSearchError("");
+
+    try {
+      const response = await searchContent({
+        token,
+        query,
+        searchType: mode,
+        piazzaCourseId:
+          forceCourseId !== undefined
+            ? forceCourseId
+            : searchScopeCourseOnly
+              ? contextCourseId
+              : null,
+      });
+      setSearchResults(response.results || []);
+    } catch (error) {
+      setSearchError(error.message || "Search failed");
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const runSimilarSearch = async (piazzaPostId) => {
+    const token = await getAccessToken();
+    if (!token) {
+      setSearchError("Please log in from the extension popup first.");
+      return;
+    }
+    if (!contextCourseId || !piazzaPostId) {
+      setSearchError("Open a Piazza class post first to run similar search.");
+      return;
+    }
+
+    setIsSearching(true);
+    setSearchError("");
+    setSearchType("semantic");
+    setIsSearchOpen(true);
+
+    try {
+      const response = await searchSimilar({
+        token,
+        piazzaCourseId: contextCourseId,
+        piazzaPostId: String(piazzaPostId),
+      });
+      setSearchResults(response.results || []);
+      setSearchQuery(response.query || "");
+    } catch (error) {
+      setSearchError(error.message || "Similar search failed");
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
   const fetchMostRecentSession = async () => {
     try {
       const threadIdMatch = window.location.pathname.match(/\/class\/([^/?]+)/);
@@ -147,7 +371,7 @@ function ChatbotApp() {
         `${API_ENDPOINT}/chat-sessions?piazza_course_id=${threadId}`,
         {
           headers: { Authorization: `Bearer ${user.access_token}` },
-        }
+        },
       );
 
       if (response.status === 401) {
@@ -197,10 +421,13 @@ function ChatbotApp() {
         const newChat = await response.json();
         setSessionId(newChat.id);
         setSessionTitle(newChat.title);
+        return newChat;
       }
     } catch (error) {
       console.error("Error creating session:", error);
     }
+
+    return null;
   };
 
   const fetchMessages = async (sid) => {
@@ -212,7 +439,7 @@ function ChatbotApp() {
         `${API_ENDPOINT}/chat-sessions/${sid}/messages`,
         {
           headers: { Authorization: `Bearer ${user.access_token}` },
-        }
+        },
       );
 
       if (response.status === 401) {
@@ -286,10 +513,13 @@ function ChatbotApp() {
       // Ensure we have a session
       let currentSessionId = sessionId;
       if (!currentSessionId) {
-        // Should have been created by fetchMostRecentSession, but just in case
-        await createNewSession(threadId);
-        // We can't easily wait for state update here, so we might fail this first request's history
-        // But fetchMostRecentSession is called on expand, so it should be fine.
+        // Create a new session and use the returned ID immediately.
+        const newSession = await createNewSession(threadId);
+        currentSessionId = newSession?.id ?? null;
+      }
+
+      if (!currentSessionId) {
+        throw new Error("Could not create a chat session");
       }
 
       // Call the backend API
@@ -305,7 +535,7 @@ function ChatbotApp() {
         body: JSON.stringify({
           query: userMessage,
           thread_id: threadId,
-          session_id: sessionId, // Pass the session ID
+          session_id: currentSessionId,
         }),
       });
 
@@ -397,6 +627,109 @@ function ChatbotApp() {
 
   return (
     <div ref={chatRef} className="fixed bottom-5 left-5 z-[999999] font-sans">
+      <div
+        className="fixed z-[999999]"
+        style={{
+          top: `${launcherPosition.top}px`,
+          left: `${launcherPosition.left}px`,
+        }}
+      >
+        {!isSearchOpen ? (
+          <div className="relative group">
+            <button
+              onClick={() => setIsSearchOpen(true)}
+              className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-700 text-white rounded-full border-2 border-white text-sm shadow-lg hover:shadow-xl hover:scale-105 transition-all flex items-center justify-center"
+              aria-label="Advanced Search"
+            >
+              🔎
+            </button>
+            <div className="pointer-events-none absolute left-1/2 top-full mt-2 -translate-x-1/2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-[11px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover:opacity-100">
+              Advanced Search
+            </div>
+          </div>
+        ) : (
+          <div className="w-[400px] max-h-[70vh] bg-white border border-gray-200 rounded-2xl shadow-2xl overflow-hidden animate-slideUp flex flex-col mt-11 -ml-[330px]">
+            <div className="bg-gradient-to-r from-blue-600 to-blue-800 text-white px-4 py-3 flex items-center justify-between">
+              <div>
+                <p className="m-0 text-sm font-semibold">Advanced Search</p>
+                <p className="m-0 text-[11px] opacity-80">
+                  {searchScopeCourseOnly && contextCourseId
+                    ? `Course: ${contextCourseName || contextCourseId}`
+                    : "Cross-course"}
+                </p>
+              </div>
+              <button
+                onClick={() => setIsSearchOpen(false)}
+                className="bg-white/20 border-none text-white w-7 h-7 rounded-full cursor-pointer text-base flex items-center justify-center hover:bg-white/30"
+              >
+                &times;
+              </button>
+            </div>
+
+            <div className="p-3 border-b border-gray-100 bg-gray-50">
+              <div className="flex gap-2 mb-2">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search posts by meaning..."
+                  className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500"
+                />
+                <button
+                  onClick={() => runSearch({})}
+                  disabled={isSearching || !searchQuery.trim()}
+                  className="bg-blue-600 text-white border-none rounded-lg px-3 py-2 text-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Search
+                </button>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <select
+                  value={searchType}
+                  onChange={(e) => setSearchType(e.target.value)}
+                  className="border border-gray-200 rounded-md px-2 py-1 text-xs bg-white"
+                >
+                  <option value="semantic">Semantic</option>
+                  <option value="code">Code</option>
+                  <option value="formula">Formula</option>
+                </select>
+                <label className="text-xs text-gray-600 flex items-center gap-1">
+                  <input
+                    type="checkbox"
+                    checked={searchScopeCourseOnly}
+                    onChange={(e) => setSearchScopeCourseOnly(e.target.checked)}
+                  />
+                  This course only
+                </label>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-3 bg-gray-50 flex flex-col gap-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
+              {isSearching && (
+                <p className="text-sm text-gray-500 m-0">Searching...</p>
+              )}
+              {!isSearching && searchError && (
+                <p className="text-sm text-red-600 m-0">{searchError}</p>
+              )}
+              {!isSearching && !searchError && searchResults.length === 0 && (
+                <p className="text-sm text-gray-500 m-0">
+                  Start searching to see results.
+                </p>
+              )}
+              {!isSearching &&
+                !searchError &&
+                searchResults.map((result, idx) => (
+                  <SearchResultCard
+                    key={`${result.chunk_id}-${idx}`}
+                    result={result}
+                    currentCourseId={contextCourseId}
+                    onFindSimilar={runSimilarSearch}
+                  />
+                ))}
+            </div>
+          </div>
+        )}
+      </div>
       {!isExpanded ? (
         <button
           className={`bg-black border-none rounded-full cursor-pointer p-0 transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-0.5 overflow-hidden ${
@@ -478,7 +811,7 @@ function ChatbotApp() {
                                   node.position.start.line ===
                                     node.position.end.line);
                               const match = /language-(\w+)/.exec(
-                                className || ""
+                                className || "",
                               );
 
                               return !isInline && match ? (

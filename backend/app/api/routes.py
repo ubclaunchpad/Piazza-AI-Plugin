@@ -6,7 +6,15 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 # Import endpoint routers
-from app.api.endpoints import auth, chat_sessions, documents, example, ingestion, llm
+from app.api.endpoints import (
+    auth,
+    chat_sessions,
+    documents,
+    example,
+    ingestion,
+    llm,
+    search,
+)
 
 # Create main API router
 api_router = APIRouter()
@@ -36,6 +44,9 @@ api_router.include_router(chat_sessions.router, tags=["chat-sessions"])
 
 # Include document endpoints
 api_router.include_router(documents.router, prefix="/documents", tags=["documents"])
+
+# Include search endpoints
+api_router.include_router(search.router, tags=["search"])
 
 
 @api_router.get("/health", response_model=MessageResponse)

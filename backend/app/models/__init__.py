@@ -25,6 +25,16 @@ from app.models.document import (
 
 # Import LLM models
 from app.models.llm import QueryRequest, QueryResponse
+from app.models.search import (
+    SavedSearchCreate,
+    SavedSearchResponse,
+    SearchFilters,
+    SearchRequest,
+    SearchResponse,
+    SearchResult,
+    SearchType,
+    SimilarSearchRequest,
+)
 
 
 class UserStatus(str, Enum):
@@ -85,6 +95,15 @@ __all__ = [
     # LLM models
     "QueryRequest",
     "QueryResponse",
+    # Search models
+    "SearchType",
+    "SearchFilters",
+    "SearchRequest",
+    "SimilarSearchRequest",
+    "SearchResult",
+    "SearchResponse",
+    "SavedSearchCreate",
+    "SavedSearchResponse",
     # Document models
     "PermissionEnum",
     "DocumentBase",

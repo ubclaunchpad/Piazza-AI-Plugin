@@ -36,7 +36,7 @@ async def llm_health_check():
     """Check if the LLM service is configured."""
     import os
 
-    api_key = os.getenv("GROQ_API_KEY")
+    api_key = os.getenv("OPENAI_API_KEY")
     return {
         "status": "healthy" if api_key else "unhealthy",
         "model": "openai/gpt-oss-120b",

@@ -4,6 +4,8 @@ import ChatbotApp from "./ChatbotApp.jsx";
 import cssText from "./content.css?raw";
 
 const CONTAINER_ID = "ai-chatbot-extension-root";
+const FIND_SIMILAR_BUTTON_ID = "threadsense-find-similar-button";
+const PAGE_STYLE_ID = "threadsense-page-styles";
 let root = null;
 let shadowRoot = null;
 let observer = null;
@@ -26,6 +28,46 @@ function injectStyles(shadowRoot) {
   // Log to verify KaTeX is loading
   katexLink.onload = () => console.log("✅ KaTeX CSS loaded in Shadow DOM");
   katexLink.onerror = () => console.error("❌ Failed to load KaTeX CSS");
+}
+
+function ensurePageStyles() {
+  if (document.getElementById(PAGE_STYLE_ID)) return;
+
+  const style = document.createElement("style");
+  style.id = PAGE_STYLE_ID;
+  style.textContent = `
+    .threadsense-find-similar {
+      margin-top: 10px;
+      margin-left: 8px;
+      border: 1px solid #dbe4ff;
+      background: #f7faff;
+      color: #1d4ed8;
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      position: relative;
+      z-index: 10;
+    }
+
+    .threadsense-find-similar:hover {
+      background: #eef4ff;
+      border-color: #bfd2ff;
+      transform: translateY(-1px);
+    }
+
+    .threadsense-find-similar-host {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 8px;
+    }
+  `;
+  document.head.appendChild(style);
 }
 
 // Function to inject the chatbot
@@ -73,6 +115,100 @@ function injectChatbot() {
   }
 }
 
+function getCurrentPostId() {
+  try {
+    const url = new URL(window.location.href);
+    const fromQuery = url.searchParams.get("cid");
+    if (fromQuery) return fromQuery;
+
+    const pathnameMatch = url.pathname.match(/\/post\/([^/?#]+)/);
+    if (pathnameMatch) return pathnameMatch[1];
+
+    const hashMatch = url.hash.match(/cid=([^&]+)/);
+    if (hashMatch) return hashMatch[1];
+
+    return null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function findPostActionAnchor() {
+  const selectors = [
+    ".post_region_center",
+    ".post_region_text",
+    ".post_region_content",
+    ".post_content",
+    ".post_body",
+    ".post_region .actions_bar",
+    ".post_region .post_actions",
+    ".post_region .post_tags",
+    ".post_region .history_controls",
+    ".post_region .history",
+    "#id_post_region .actions_bar",
+    "#id_post_region .post_actions",
+    "#id_post_region .history",
+    ".post_region",
+    "#id_post_region",
+    "#piazza_page .post_region",
+    "#piazza_page .post_content",
+    '[class*="post_region"]',
+    '[class*="post_content"]',
+    '[id*="post_region"]',
+  ];
+
+  for (const selector of selectors) {
+    const node = document.querySelector(selector);
+    if (node && node.offsetParent !== null) {
+      return node;
+    }
+  }
+
+  return null;
+}
+
+function injectFindSimilarButton() {
+  const existing = document.getElementById(FIND_SIMILAR_BUTTON_ID);
+  if (existing) {
+    existing.parentElement?.remove();
+  }
+
+  const postId = getCurrentPostId();
+  const anchor = findPostActionAnchor();
+
+  if (!postId || !anchor) return;
+
+  ensurePageStyles();
+
+  const host = document.createElement("div");
+  host.className = "threadsense-find-similar-host";
+
+  const button = document.createElement("button");
+  button.id = FIND_SIMILAR_BUTTON_ID;
+  button.type = "button";
+  button.className = "threadsense-find-similar";
+  button.textContent = "Find similar";
+  button.addEventListener("click", () => {
+    window.dispatchEvent(
+      new CustomEvent("threadsense-find-similar", {
+        detail: { postId },
+      })
+    );
+  });
+
+  host.appendChild(button);
+
+  if (
+    anchor.matches(
+      ".post_region, #id_post_region, .post_region_center, .post_region_text, .post_region_content, .post_content, .post_body, [class*='post_region'], [class*='post_content'], [id*='post_region']"
+    )
+  ) {
+    anchor.prepend(host);
+  } else {
+    anchor.appendChild(host);
+  }
+}
+
 // Setup observer to watch for removal
 function setupObserver() {
   if (!document.body) {
@@ -96,12 +232,14 @@ function setupObserver() {
       root = null;
       setTimeout(injectChatbot, 50);
     }
+
+    setTimeout(injectFindSimilarButton, 100);
   });
 
   // Start observing
   observer.observe(document.body, {
     childList: true,
-    subtree: false, // Only watch direct children of body
+    subtree: true,
   });
 
   console.log("👁️ Observer started watching for DOM changes");
@@ -110,7 +248,9 @@ function setupObserver() {
 // Wait for DOM to be ready
 function init() {
   if (document.body) {
+    ensurePageStyles();
     injectChatbot();
+    injectFindSimilarButton();
     setupObserver();
   } else {
     // Retry until body is available
@@ -169,5 +309,6 @@ setInterval(() => {
     lastUrl = currentUrl;
     console.log("URL changed, checking chatbot...");
     setTimeout(injectChatbot, 200);
+    setTimeout(injectFindSimilarButton, 250);
   }
 }, 500);

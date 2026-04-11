@@ -47,3 +47,26 @@
   background: #d1d5db;
   border-radius: 3px;
 }
+
+.threadsense-find-similar {
+  margin-top: 10px;
+  margin-left: 8px;
+  border: 1px solid #dbe4ff;
+  background: #f7faff;
+  color: #1d4ed8;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.15s ease;
+}
+
+.threadsense-find-similar:hover {
+  background: #eef4ff;
+  border-color: #bfd2ff;
+  transform: translateY(-1px);
+}

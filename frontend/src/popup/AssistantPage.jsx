@@ -1,10 +1,16 @@
 import { useState, useEffect } from "react";
 import { useDocuments, useDocumentDownloadUrl } from "../queries/useDocument";
 import { uploadDocument } from "../api/documentApi";
+import {
+  deleteSavedSearch,
+  listSavedSearches,
+  saveSearch,
+  searchContent,
+} from "../api/searchApi";
 
 /* global chrome */
 export default function AssistantPage({ user, onBack, onLogout }) {
-  const [activeTab, setActiveTab] = useState("chats"); // 'chats' or 'files'
+  const [activeTab, setActiveTab] = useState("chats"); // 'chats' | 'files' | 'search'
   const [page, setPage] = useState(1);
   const [selectedDocumentId, setSelectedDocumentId] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -13,6 +19,15 @@ export default function AssistantPage({ user, onBack, onLogout }) {
   const [isLoading, setIsLoading] = useState(true);
   const [piazzaClassId, setPiazzaClassId] = useState(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchType, setSearchType] = useState("semantic");
+  const [crossCourse, setCrossCourse] = useState(false);
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState("");
+  const [savedSearches, setSavedSearches] = useState([]);
+  const [isLoadingSaved, setIsLoadingSaved] = useState(false);
+  const [isSavingSearch, setIsSavingSearch] = useState(false);
 
   // Fetch documents for this user/thread (using Piazza class ID as thread ID)
   const {
@@ -46,6 +61,12 @@ export default function AssistantPage({ user, onBack, onLogout }) {
       fetchChats();
     }
   }, [piazzaClassId]);
+
+  useEffect(() => {
+    if (activeTab === "search") {
+      fetchSavedSearches();
+    }
+  }, [activeTab, piazzaClassId, crossCourse]);
 
   const fetchPiazzaInfo = async () => {
     try {
@@ -89,6 +110,22 @@ export default function AssistantPage({ user, onBack, onLogout }) {
       console.error("Error fetching chats:", error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchSavedSearches = async () => {
+    setIsLoadingSaved(true);
+    try {
+      const data = await listSavedSearches({
+        token: user.access_token,
+        piazzaCourseId: crossCourse ? null : piazzaClassId,
+      });
+      setSavedSearches(data);
+    } catch (error) {
+      console.error("Error loading saved searches:", error);
+      setSavedSearches([]);
+    } finally {
+      setIsLoadingSaved(false);
     }
   };
 
@@ -175,6 +212,76 @@ export default function AssistantPage({ user, onBack, onLogout }) {
       }
     } catch (error) {
       console.error("Error opening chat:", error);
+    }
+  };
+
+  const handleRunSearch = async (
+    queryOverride = null,
+    typeOverride = null,
+    forceCourseId = undefined
+  ) => {
+    const query = (queryOverride ?? searchQuery).trim();
+    if (!query) return;
+
+    setIsSearching(true);
+    setSearchError("");
+
+    try {
+      const data = await searchContent({
+        token: user.access_token,
+        query,
+        searchType: typeOverride || searchType,
+        piazzaCourseId:
+          forceCourseId !== undefined
+            ? forceCourseId
+            : crossCourse
+              ? null
+              : piazzaClassId,
+      });
+      setSearchResults(data.results || []);
+      setSearchQuery(query);
+      if (typeOverride) {
+        setSearchType(typeOverride);
+      }
+    } catch (error) {
+      console.error("Search failed:", error);
+      setSearchError(error.message || "Search failed");
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleSaveSearch = async () => {
+    const query = searchQuery.trim();
+    if (!query) return;
+    setIsSavingSearch(true);
+    try {
+      await saveSearch({
+        token: user.access_token,
+        query,
+        searchType,
+        piazzaCourseId: crossCourse ? null : piazzaClassId,
+      });
+      await fetchSavedSearches();
+    } catch (error) {
+      console.error("Failed to save search:", error);
+      setSearchError(error.message || "Failed to save search");
+    } finally {
+      setIsSavingSearch(false);
+    }
+  };
+
+  const handleDeleteSavedSearch = async (savedSearchId) => {
+    try {
+      await deleteSavedSearch({
+        token: user.access_token,
+        savedSearchId,
+      });
+      setSavedSearches((prev) => prev.filter((item) => item.id !== savedSearchId));
+    } catch (error) {
+      console.error("Failed to delete saved search:", error);
+      setSearchError(error.message || "Failed to delete saved search");
     }
   };
 
@@ -291,6 +398,16 @@ export default function AssistantPage({ user, onBack, onLogout }) {
           >
             📁 Files
           </button>
+          <button
+            onClick={() => setActiveTab("search")}
+            className={`flex-1 px-4 py-3 text-sm font-medium border-none cursor-pointer transition-all ${
+              activeTab === "search"
+                ? "text-blue-600 border-b-2 border-blue-600 bg-blue-50/50"
+                : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+            }`}
+          >
+            🔎 Search
+          </button>
         </div>
       </div>
 
@@ -353,7 +470,7 @@ export default function AssistantPage({ user, onBack, onLogout }) {
               </div>
             )}
           </div>
-        ) : (
+        ) : activeTab === "files" ? (
           <div className="p-4">
             {/* File Upload Area */}
             <div className="mb-4">
@@ -494,6 +611,168 @@ export default function AssistantPage({ user, onBack, onLogout }) {
                   </>
                 )}
               </div>
+            </div>
+          </div>
+        ) : (
+          <div className="p-4 flex flex-col gap-4">
+            <div className="bg-white rounded-lg p-4 shadow-sm">
+              <h4 className="text-sm font-semibold text-gray-900 m-0 mb-3">
+                Search Posts
+              </h4>
+              <div className="flex gap-2 mb-2">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search by meaning, code, or formula..."
+                  className="flex-1 border border-gray-200 rounded-md px-3 py-2 text-sm outline-none focus:border-blue-500"
+                />
+                <button
+                  onClick={() => handleRunSearch()}
+                  disabled={isSearching || !searchQuery.trim()}
+                  className="bg-blue-600 text-white border-none px-3 py-2 rounded-md text-xs font-medium cursor-pointer transition-colors hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSearching ? "Searching..." : "Search"}
+                </button>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <select
+                  value={searchType}
+                  onChange={(e) => setSearchType(e.target.value)}
+                  className="border border-gray-200 rounded-md px-2 py-1 text-xs"
+                >
+                  <option value="semantic">Semantic</option>
+                  <option value="code">Code</option>
+                  <option value="formula">Formula</option>
+                </select>
+                <label className="text-xs text-gray-600 flex items-center gap-1">
+                  <input
+                    type="checkbox"
+                    checked={crossCourse}
+                    onChange={(e) => setCrossCourse(e.target.checked)}
+                  />
+                  Cross-course search
+                </label>
+                <button
+                  onClick={handleSaveSearch}
+                  disabled={isSavingSearch || !searchQuery.trim()}
+                  className="border border-gray-200 bg-gray-100 px-2 py-1 rounded text-xs text-gray-700 hover:bg-gray-200 disabled:opacity-50"
+                >
+                  {isSavingSearch ? "Saving..." : "Save Search"}
+                </button>
+              </div>
+              {searchError && <p className="text-xs text-red-600 mt-2 mb-0">{searchError}</p>}
+            </div>
+
+            <div className="bg-white rounded-lg p-4 shadow-sm">
+              <h4 className="text-sm font-semibold text-gray-900 m-0 mb-3">
+                Search Results
+              </h4>
+              {isSearching ? (
+                <p className="text-sm text-gray-500 m-0">Searching...</p>
+              ) : searchResults.length === 0 ? (
+                <p className="text-sm text-gray-500 m-0">No results yet.</p>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {searchResults.map((result, idx) => {
+                    const courseId = result.metadata?.piazza_course_id || piazzaClassId;
+                    const postId =
+                      result.external_id ||
+                      result.metadata?.post_number ||
+                      result.metadata?.post_id;
+                    return (
+                      <div
+                        key={`${result.chunk_id}-${idx}`}
+                        className="border border-gray-200 rounded-md p-3 bg-gray-50"
+                      >
+                        <div className="flex justify-between gap-2">
+                          <p className="text-xs font-semibold text-gray-800 m-0 truncate">
+                            {result.title || "Untitled Result"}
+                          </p>
+                          <span className="text-[10px] text-blue-700 bg-blue-100 rounded px-1.5 py-0.5">
+                            {(result.score || 0).toFixed(2)}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-600 mt-1 mb-1 line-clamp-3">
+                          {result.excerpt}
+                        </p>
+                        {courseId && postId && (
+                          <a
+                            href={`https://piazza.com/class/${courseId}/post/${postId}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[11px] text-blue-600 hover:text-blue-700 hover:underline"
+                          >
+                            Open Post
+                          </a>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="bg-white rounded-lg p-4 shadow-sm">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-sm font-semibold text-gray-900 m-0">
+                  Saved Searches
+                </h4>
+                <button
+                  onClick={fetchSavedSearches}
+                  className="text-xs border border-gray-200 bg-gray-100 px-2 py-1 rounded text-gray-700 hover:bg-gray-200"
+                >
+                  Refresh
+                </button>
+              </div>
+              {isLoadingSaved ? (
+                <p className="text-sm text-gray-500 m-0">Loading saved searches...</p>
+              ) : savedSearches.length === 0 ? (
+                <p className="text-sm text-gray-500 m-0">No saved searches.</p>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {savedSearches.map((saved) => (
+                    <div
+                      key={saved.id}
+                      className="border border-gray-200 rounded-md p-3 bg-gray-50"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div>
+                          <p className="text-xs font-semibold text-gray-800 m-0">
+                            {saved.query}
+                          </p>
+                          <p className="text-[11px] text-gray-500 m-0 mt-1">
+                            {saved.search_type}
+                            {saved.piazza_course_id
+                              ? ` • ${saved.piazza_course_id}`
+                              : " • cross-course"}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() =>
+                              handleRunSearch(
+                                saved.query,
+                                saved.search_type,
+                                saved.piazza_course_id || null
+                              )
+                            }
+                            className="text-[11px] border border-gray-200 bg-white px-2 py-1 rounded hover:bg-gray-100"
+                          >
+                            Run
+                          </button>
+                          <button
+                            onClick={() => handleDeleteSavedSearch(saved.id)}
+                            className="text-[11px] border border-red-200 text-red-600 bg-red-50 px-2 py-1 rounded hover:bg-red-100"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}
