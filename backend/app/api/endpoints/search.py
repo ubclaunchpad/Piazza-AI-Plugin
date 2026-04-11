@@ -29,6 +29,23 @@ CODE_PATTERN = re.compile(
     r"(?m)(```|^\s{4,}|class\s+\w+|def\s+\w+|function\s+\w+|const\s+\w+|let\s+\w+|var\s+\w+|=>|#include|SELECT\s)"
 )
 FORMULA_PATTERN = re.compile(r"(\\\(|\\\[|\$\$|\$[^$]+\$|=|\^|_|\\frac|\\sum|\\int)")
+FORMULA_TOKEN_PATTERN = re.compile(
+    r"\\[a-zA-Z]+|[A-Za-z]+(?:_[A-Za-z0-9]+)?|[0-9]+(?:\.[0-9]+)?|[+\-*/=^_(){}\[\]]"
+)
+FORMULA_NORMALIZATION_REPLACEMENTS = (
+    (r"\\left", ""),
+    (r"\\right", ""),
+    (r"\\cdot", "*"),
+    (r"\\times", "*"),
+    (r"\\div", "/"),
+    (r"\\geq", ">="),
+    (r"\\leq", "<="),
+    (r"\\neq", "!="),
+    (r"\\approx", "~"),
+    (r"\\,", ""),
+    (r"\\!", ""),
+    (r"\s+", ""),
+)
 
 
 def _vector_literal(values: List[float]) -> str:
@@ -47,7 +64,51 @@ def _embed_query(query: str) -> str:
         ) from exc
 
 
-def _apply_search_mode_scores(rows: List[dict], search_type: str) -> List[dict]:
+def _normalize_formula_text(text: str) -> str:
+    normalized = text or ""
+    for pattern, replacement in FORMULA_NORMALIZATION_REPLACEMENTS:
+        normalized = re.sub(pattern, replacement, normalized)
+    return normalized.strip().lower()
+
+
+def _extract_formula_tokens(text: str) -> List[str]:
+    return FORMULA_TOKEN_PATTERN.findall(_normalize_formula_text(text))
+
+
+def _formula_match_score(query_text: str, candidate_text: str) -> tuple[float, dict]:
+    normalized_query = _normalize_formula_text(query_text)
+    normalized_candidate = _normalize_formula_text(candidate_text)
+    query_tokens = _extract_formula_tokens(query_text)
+    candidate_tokens = _extract_formula_tokens(candidate_text)
+
+    if not normalized_query or not query_tokens:
+        return 0.0, {
+            "normalized_query": normalized_query,
+            "normalized_formula_match": False,
+            "formula_token_overlap": 0.0,
+        }
+
+    overlap = set(query_tokens) & set(candidate_tokens)
+    overlap_ratio = len(overlap) / max(len(set(query_tokens)), 1)
+    exact_match = normalized_query in normalized_candidate
+
+    bonus = 0.0
+    if exact_match:
+        bonus += 0.35
+    if overlap_ratio > 0:
+        bonus += min(0.3, overlap_ratio * 0.3)
+
+    return bonus, {
+        "normalized_query": normalized_query,
+        "normalized_formula_match": exact_match,
+        "formula_token_overlap": round(overlap_ratio, 3),
+        "formula_tokens": query_tokens[:12],
+    }
+
+
+def _apply_search_mode_scores(
+    rows: List[dict], search_type: str, query_text: str
+) -> List[dict]:
     if search_type == "semantic":
         return rows
 
@@ -62,6 +123,13 @@ def _apply_search_mode_scores(rows: List[dict], search_type: str) -> List[dict]:
             metadata["mode_match"] = True
         else:
             metadata["mode_match"] = False
+
+        if search_type == "formula":
+            formula_bonus, formula_metadata = _formula_match_score(
+                query_text, excerpt
+            )
+            row["score"] = float(row.get("score") or 0.0) + formula_bonus
+            metadata.update(formula_metadata)
 
         row["metadata"] = metadata
 
@@ -82,6 +150,7 @@ def _created_at_expr() -> str:
 
 def _search_post_chunks(
     vector: str,
+    query_text: str,
     piazza_course_id: Optional[str],
     limit: int,
     threshold: float,
@@ -163,7 +232,7 @@ def _search_post_chunks(
         LIMIT %s
     """
     rows = execute_query(sql, tuple(params))
-    rows = _apply_search_mode_scores(rows, search_type)
+    rows = _apply_search_mode_scores(rows, search_type, query_text)
     filtered = [row for row in rows if float(row.get("score") or 0.0) >= threshold]
     return sorted(filtered, key=lambda row: row["score"], reverse=True)[:limit]
 
@@ -179,6 +248,7 @@ async def search_content(
     vector = _embed_query(request.query)
     rows = _search_post_chunks(
         vector=vector,
+        query_text=request.query,
         piazza_course_id=request.piazza_course_id,
         limit=request.limit,
         threshold=request.similarity_threshold,
@@ -244,6 +314,7 @@ async def similar_questions(
 
     rows = _search_post_chunks(
         vector=source["embedding"],
+        query_text=source["query_text"],
         piazza_course_id=request.piazza_course_id,
         limit=request.limit,
         threshold=request.similarity_threshold,

@@ -8,6 +8,31 @@ import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { searchContent, searchSimilar } from "../api/searchApi";
 
+const FORMULA_TOKEN_PATTERN =
+  /\\[a-zA-Z]+|[A-Za-z]+(?:_[A-Za-z0-9]+)?|[0-9]+(?:\.[0-9]+)?|[+\-*/=^_(){}\[\]]/g;
+
+function normalizeFormulaText(text) {
+  return (text || "")
+    .replace(/\\left/g, "")
+    .replace(/\\right/g, "")
+    .replace(/\\cdot/g, "*")
+    .replace(/\\times/g, "*")
+    .replace(/\\div/g, "/")
+    .replace(/\\geq/g, ">=")
+    .replace(/\\leq/g, "<=")
+    .replace(/\\neq/g, "!=")
+    .replace(/\\approx/g, "~")
+    .replace(/\\,/g, "")
+    .replace(/\\!/g, "")
+    .replace(/\s+/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+function extractFormulaTokens(text) {
+  return normalizeFormulaText(text).match(FORMULA_TOKEN_PATTERN) || [];
+}
+
 function SourcesDropdown({ sources, threadId }) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -77,6 +102,34 @@ function SearchResultCard({ result, currentCourseId, onFindSimilar }) {
             Find similar
           </button>
         )}
+      </div>
+    </div>
+  );
+}
+
+function FormulaPreview({ query }) {
+  const normalized = normalizeFormulaText(query);
+  const tokens = extractFormulaTokens(query);
+
+  if (!normalized) return null;
+
+  return (
+    <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+      <p className="m-0 text-[11px] font-semibold text-amber-800">
+        Parsed Formula
+      </p>
+      <p className="mt-1 mb-2 break-all font-mono text-[11px] text-amber-900">
+        {normalized}
+      </p>
+      <div className="flex flex-wrap gap-1">
+        {tokens.slice(0, 16).map((token, idx) => (
+          <span
+            key={`${token}-${idx}`}
+            className="rounded-full bg-white px-2 py-0.5 text-[10px] text-amber-800 border border-amber-200"
+          >
+            {token}
+          </span>
+        ))}
       </div>
     </div>
   );
@@ -683,6 +736,9 @@ function ChatbotApp() {
                   Search
                 </button>
               </div>
+              {searchType === "formula" && (
+                <FormulaPreview query={searchQuery} />
+              )}
               <div className="flex items-center gap-2 flex-wrap">
                 <select
                   value={searchType}
