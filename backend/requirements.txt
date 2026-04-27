@@ -23,11 +23,6 @@ anyio==4.12.0
     #   openai
     #   starlette
     #   watchfiles
-async-timeout==4.0.3
-    # via
-    #   aiohttp
-    #   asyncpg
-    #   langchain-classic
 asyncpg==0.31.0
     # via langchain-postgres
 attrs==25.4.0
@@ -56,12 +51,6 @@ click==8.3.1
     #   uvicorn
 cloudpathlib==0.23.0
     # via weasel
-colorama==0.4.6
-    # via
-    #   click
-    #   tqdm
-    #   uvicorn
-    #   wasabi
 confection==0.1.5
     # via
     #   thinc
@@ -92,8 +81,6 @@ dnspython==2.8.0
     # via email-validator
 email-validator==2.3.0
     # via pydantic
-exceptiongroup==1.3.1
-    # via anyio
 fastapi==0.123.10
     # via -r requirements.in
 frozenlist==1.8.0
@@ -174,7 +161,7 @@ langchain-classic==1.0.0
     # via langchain-community
 langchain-community==0.4.1
     # via -r requirements.in
-langchain-core==1.1.1
+langchain-core==1.3.2
     # via
     #   langchain
     #   langchain-classic
@@ -188,10 +175,12 @@ langchain-core==1.1.1
     #   langgraph-prebuilt
 langchain-groq==1.1.0
     # via -r requirements.in
-langchain-openai==1.1.0
+langchain-openai==1.2.1
     # via -r requirements.in
 langchain-postgres==0.0.16
     # via -r requirements.in
+langchain-protocol==0.0.12
+    # via langchain-core
 langchain-text-splitters==1.0.0
     # via langchain-classic
 langgraph==1.0.4
@@ -238,7 +227,7 @@ numpy==2.2.6
     #   thinc
 oauthlib==3.3.1
     # via requests-oauthlib
-openai==2.9.0
+openai==2.32.0
     # via langchain-openai
 orjson==3.11.4
     # via
@@ -405,9 +394,7 @@ starlette==0.50.0
 storage3==2.25.0
     # via supabase
 strenum==0.4.15
-    # via
-    #   postgrest
-    #   supabase-functions
+    # via supabase-functions
 supabase==2.25.0
     # via -r requirements.in
 supabase-auth==2.25.0
@@ -437,13 +424,10 @@ typing-extensions==4.15.0
     #   aiosignal
     #   anyio
     #   beautifulsoup4
-    #   cloudpathlib
-    #   cryptography
-    #   exceptiongroup
     #   fastapi
     #   groq
     #   langchain-core
-    #   multidict
+    #   langchain-protocol
     #   openai
     #   psycopg
     #   psycopg-pool
@@ -454,17 +438,12 @@ typing-extensions==4.15.0
     #   starlette
     #   typing-inspect
     #   typing-inspection
-    #   uvicorn
 typing-inspect==0.9.0
     # via dataclasses-json
 typing-inspection==0.4.2
     # via
     #   pydantic
     #   pydantic-settings
-tzdata==2025.3
-    # via
-    #   psycopg
-    #   tzlocal
 tzlocal==5.3.1
     # via dateparser
 uritemplate==4.2.0
@@ -477,6 +456,8 @@ uuid-utils==0.12.0
     #   langsmith
 uvicorn[standard]==0.38.0
     # via -r requirements.in
+uvloop==0.22.1
+    # via uvicorn
 wasabi==1.1.3
     # via
     #   spacy
